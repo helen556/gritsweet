@@ -1,0 +1,134 @@
+[
+  {
+    "id": "rev-01",
+    "private_path": "rev-01.webp",
+    "public_path": "/uploads/reviews/rev-01.webp",
+    "alt": "Скриншот відгуку: білий торт до хрестин; клієнтка пише про ніжний бісквіт, збалансований крем і оформлення в тематиці.",
+    "is_published": 1,
+    "consent_checked": 1,
+    "sort_order": 0,
+    "width": 1179,
+    "height": 2004
+  },
+  {
+    "id": "rev-02",
+    "private_path": "rev-02.webp",
+    "public_path": "/uploads/reviews/rev-02.webp",
+    "alt": "Скриншот відгуку: торт у стилі Minecraft; подяка за дуже гарний і неймовірно смачний тортик.",
+    "is_published": 1,
+    "consent_checked": 1,
+    "sort_order": 1,
+    "width": 1179,
+    "height": 1809
+  },
+  {
+    "id": "rev-02b",
+    "private_path": "rev-02b.webp",
+    "public_path": "/uploads/reviews/rev-02b.webp",
+    "alt": "Продовження попереднього відгуку: розріз торта, слова про творожний крем, пропитаний бісквіт і начинку.",
+    "is_published": 1,
+    "consent_checked": 1,
+    "sort_order": 2,
+    "width": 1135,
+    "height": 1479
+  },
+  {
+    "id": "rev-03",
+    "private_path": "rev-03.webp",
+    "public_path": "/uploads/reviews/rev-03.webp",
+    "alt": "Скриншот відгуку: коробка червоних капкейків із написами; «Дякуємо! Нам було смачно».",
+    "is_published": 1,
+    "consent_checked": 1,
+    "sort_order": 3,
+    "width": 1161,
+    "height": 1538
+  },
+  {
+    "id": "rev-04",
+    "private_path": "rev-04.webp",
+    "public_path": "/uploads/reviews/rev-04.webp",
+    "alt": "Скриншот відгуку: рулет із полуницею на тарілці; клієнтка рекомендує десерти.",
+    "is_published": 1,
+    "consent_checked": 1,
+    "sort_order": 4,
+    "width": 1179,
+    "height": 1804
+  },
+  {
+    "id": "rev-05",
+    "private_path": "rev-05.webp",
+    "public_path": "/uploads/reviews/rev-05.webp",
+    "alt": "Скриншот відгуку: рожевий десерт-куля з ведмедиком; «Як це гарно, шкода навіть їсти».",
+    "is_published": 1,
+    "consent_checked": 1,
+    "sort_order": 5,
+    "width": 1179,
+    "height": 2072
+  },
+  {
+    "id": "rev-06",
+    "private_path": "rev-06.webp",
+    "public_path": "/uploads/reviews/rev-06.webp",
+    "alt": "Скриншот відгуку: чорний тематичний торт із черепом і вороном; подяка за торт.",
+    "is_published": 1,
+    "consent_checked": 1,
+    "sort_order": 6,
+    "width": 1148,
+    "height": 2138
+  },
+  {
+    "id": "rev-07",
+    "private_path": "rev-07.webp",
+    "public_path": null,
+    "alt": "Скриншот відгуку: букет із крему зі стрічкою; «Створює таку смачну красу».",
+    "is_published": 0,
+    "consent_checked": 0,
+    "sort_order": 7,
+    "width": 1179,
+    "height": 2107
+  },
+  {
+    "id": "rev-08",
+    "private_path": "rev-08.webp",
+    "public_path": null,
+    "alt": "Скриншот відгуку: торт із червоними написами; подяка за роботу.",
+    "is_published": 0,
+    "consent_checked": 0,
+    "sort_order": 8,
+    "width": 1179,
+    "height": 2058
+  },
+  {
+    "id": "rev-09",
+    "private_path": "rev-09.webp",
+    "public_path": null,
+    "alt": "Фото клієнта: блакитний торт і розріз; підпис Дар’ї «Дякую за ваші фото».",
+    "is_published": 0,
+    "consent_checked": 0,
+    "sort_order": 9,
+    "width": 1179,
+    "height": 2117
+  },
+  {
+    "id": "rev-10",
+    "private_path": "rev-10.webp",
+    "public_path": null,
+    "alt": "Чернетка: скриншот із дитиною — потрібен дозвіл на публікацію.",
+    "is_published": 0,
+    "consent_checked": 0,
+    "sort_order": 10,
+    "width": 1172,
+    "height": 2088
+  },
+  {
+    "id": "rev-11",
+    "private_path": "rev-11.webp",
+    "public_path": null,
+    "alt": "Чернетка: фото дитини з тортом — потрібен дозвіл на публікацію.",
+    "is_published": 0,
+    "consent_checked": 0,
+    "sort_order": 11,
+    "width": 1172,
+    "height": 2096
+  }
+]

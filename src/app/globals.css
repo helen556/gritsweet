@@ -1,0 +1,74 @@
+@import "tailwindcss";
+@import "@fontsource-variable/cormorant/wght.css";
+@import "@fontsource-variable/cormorant/wght-italic.css";
+@import "@fontsource-variable/manrope/wght.css";
+@import "@fontsource/marck-script/cyrillic-400.css";
+@import "@fontsource/marck-script/latin-400.css";
+
+@theme {
+  --color-choco: #281913;
+  --color-cocoa: #1b100c;
+  --color-cream: #fff3e3;
+  --color-milk: #f6e8d8;
+  --color-cherry: #8f2438;
+  --color-caramel: #c99a70;
+  --color-ink: #2a1a12;
+  --color-muted: #7a5c4a;
+  --font-display: "Cormorant Variable", "Georgia", serif;
+  --font-body: "Manrope Variable", system-ui, sans-serif;
+  --font-hand: "Marck Script", cursive;
+  --radius-soft: 1.25rem;
+  --shadow-warm: 0 18px 50px -20px rgb(27 16 12 / 0.55);
+  --shadow-cream: 0 14px 40px -18px rgb(42 26 18 / 0.28);
+}
+
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body { background: var(--color-cocoa); color: var(--color-cream); font-family: var(--font-body); overflow-x: hidden; }
+h1, h2, h3, .display { font-family: var(--font-display); font-weight: 500; letter-spacing: -0.01em; line-height: 1.08; }
+.hand { font-family: var(--font-hand); }
+.section-light { background: var(--color-cream); color: var(--color-ink); }
+.section-milk { background: var(--color-milk); color: var(--color-ink); }
+.section-dark { background: var(--color-choco); color: var(--color-cream); }
+.section-cocoa { background: var(--color-cocoa); color: var(--color-cream); }
+.wrap { width: 100%; max-width: 76rem; margin-inline: auto; padding-inline: clamp(1rem, 4vw, 2.5rem); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 3rem; padding: .75rem 1.5rem; border-radius: 999px; font-weight: 600; font-size: .95rem; transition: transform .2s ease, background-color .2s ease, box-shadow .2s ease; cursor: pointer; text-decoration: none; }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible, a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--color-caramel); outline-offset: 3px; }
+.btn-cherry { background: var(--color-cherry); color: #fff; box-shadow: 0 10px 28px -12px rgb(143 36 56 / .8); }
+.btn-cherry:hover { background: #a02b41; }
+.btn-cream { background: var(--color-cream); color: var(--color-choco); }
+.btn-cream:hover { background: #fff8ee; }
+.btn-outline { border: 1.5px solid currentColor; background: transparent; color: inherit; }
+.btn-outline:hover { background: rgb(255 243 227 / .08); }
+.card .btn-outline:hover { background: rgb(42 26 18 / .06); }
+.section-light .btn-outline:hover, .section-milk .btn-outline:hover { background: rgb(42 26 18 / .06); }
+.btn[disabled] { opacity: .6; cursor: not-allowed; }
+
+.field { display: block; width: 100%; min-height: 3rem; padding: .8rem 1rem; border-radius: 1rem; border: 1.5px solid rgb(42 26 18 / .18); background: #fff; color: var(--color-ink); font-size: 1rem; }
+.field:focus { border-color: var(--color-caramel); }
+.field[aria-invalid="true"] { border-color: var(--color-cherry); }
+.label { display: block; font-size: .9rem; font-weight: 600; margin-bottom: .4rem; color: var(--color-ink); }
+.error { color: var(--color-cherry); font-size: .85rem; margin-top: .35rem; }
+.card { background: #fff; color: var(--color-ink); border-radius: var(--radius-soft); box-shadow: var(--shadow-cream); overflow: hidden; }
+.chip { display: inline-flex; align-items: center; min-height: 2.5rem; padding: .5rem 1rem; border-radius: 999px; border: 1.5px solid rgb(42 26 18 / .18); background: transparent; color: var(--color-ink); font-weight: 600; font-size: .9rem; cursor: pointer; transition: background-color .2s, border-color .2s; }
+.chip[aria-pressed="true"], .chip[aria-checked="true"] { background: var(--color-choco); border-color: var(--color-choco); color: var(--color-cream); }
+
+/* Поява при прокручуванні: без JS усе видиме; клас додається на клієнті */
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s ease; }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
+/* Галерея «Мої роботи»: наведення — 5° і +12 % за 2,5 с, повернення за 1,5 с; переривання без ривків завдяки CSS-transition */
+.work-img { transform: rotate(0deg) scale(1); transition: transform 1.5s ease-in-out; transform-origin: 50% 50%; will-change: transform; }
+@media (hover: hover) {
+  .group:hover .work-img, .group:focus-visible .work-img { transform: rotate(5deg) scale(1.12); transition-duration: 2.5s; }
+}
+.prose-about p { margin-bottom: 1.1em; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+body[data-hide-cta] [data-mobile-cta] { display: none; }
