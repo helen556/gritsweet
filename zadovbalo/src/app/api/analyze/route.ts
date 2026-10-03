@@ -1,73 +1,43 @@
+import type { AnalyzeResponse } from "@/lib/ai/contract";
 import { getClassifier, getTimeoutMs } from "@/lib/ai/providers";
-import type { AnalyzeErrorCode, AnalyzeResponse } from "@/lib/ai/contract";
 import { analyzeRequestSchema } from "@/lib/ai/schema";
-import { analyzeRant } from "@/lib/ai/service";
-import { AnalyzeError } from "@/lib/ai/types";
+import { analyzeText } from "@/lib/ai/service";
+import { checkAiLimits, clientIdFor } from "@/lib/server/limits";
 import { logEvent } from "@/lib/server/log";
-import { createRateLimiter } from "@/lib/server/rate-limit";
-import { clientKey, newRequestId, noStoreHeaders } from "@/lib/server/request";
+import { newRequestId, noStoreHeaders } from "@/lib/server/request";
 
 const ROUTE = "/api/analyze";
-const allow = createRateLimiter({ limit: 20, windowMs: 60_000 });
-
-const STATUS: Record<AnalyzeErrorCode, number> = {
-  invalid_input: 400,
-  rate_limited: 429,
-  ai_unavailable: 503,
-  timeout: 504,
-  invalid_response: 502,
-};
-
-function reply(body: AnalyzeResponse, requestId: string, status = 200) {
-  return Response.json(body, { status, headers: { ...noStoreHeaders, "X-Request-Id": requestId } });
-}
-
-function fail(error: AnalyzeErrorCode, requestId: string, started: number, cause?: unknown) {
-  const status = STATUS[error];
-  logEvent(status >= 500 ? "error" : "warn", {
-    requestId,
-    route: ROUTE,
-    status,
-    type: error,
-    durationMs: Date.now() - started,
-    // Лише назва класу причини — повідомлення можуть містити фрагменти даних.
-    ...(cause instanceof Error ? { meta: { cause: cause.name } } : {}),
-  });
-  return reply({ status: "error", error }, requestId, status);
-}
+const MAX_BODY_BYTES = 8 * 1024;
 
 export async function POST(request: Request) {
   const requestId = newRequestId();
   const started = Date.now();
+  const reply = (body: AnalyzeResponse, status = 200) => {
+    const type = body.status === "manual" ? `manual:${body.reason}` : body.status === "support" ? `support:${body.reason}` : body.status;
+    // Лише код результату, статус, затримка й технічний id — без тексту, суми й відповіді моделі.
+    logEvent(status >= 500 ? "error" : body.status === "manual" ? "warn" : "info", { requestId, route: ROUTE, status, type, durationMs: Date.now() - started });
+    return Response.json(body, { status, headers: { ...noStoreHeaders, "X-Request-Id": requestId } });
+  };
 
-  if (!allow(clientKey(request))) return fail("rate_limited", requestId, started);
+  const declared = Number(request.headers.get("content-length") ?? 0);
+  if (declared > MAX_BODY_BYTES) return reply({ status: "invalid_input" }, 413);
 
   let body: unknown;
   try {
-    body = await request.json();
+    const raw = await request.text();
+    if (raw.length > MAX_BODY_BYTES) return reply({ status: "invalid_input" }, 413);
+    body = JSON.parse(raw);
   } catch {
-    return fail("invalid_input", requestId, started);
+    return reply({ status: "invalid_input" }, 400);
   }
   const input = analyzeRequestSchema.safeParse(body);
-  if (!input.success) return fail("invalid_input", requestId, started);
+  if (!input.success) return reply({ status: "invalid_input" }, 400);
 
-  try {
-    const outcome = await analyzeRant(input.data.text, { classifier: getClassifier(), timeoutMs: getTimeoutMs() });
-    if (outcome.status === "safety") {
-      logEvent("info", { requestId, route: ROUTE, status: 200, type: "safety_flow", meta: { reasons: outcome.safety.reasons.join(",") } });
-      return reply({ status: "safety" }, requestId);
-    }
-    logEvent("info", {
-      requestId,
-      route: ROUTE,
-      status: 200,
-      type: "analyzed",
-      durationMs: Date.now() - started,
-      meta: { provider: outcome.provider, topics: outcome.result.topics.length, caution: outcome.safety.level === "caution" },
-    });
-    return reply({ status: "ok", caution: outcome.safety.level === "caution", result: outcome.result }, requestId);
-  } catch (error) {
-    if (error instanceof AnalyzeError) return fail(error.type, requestId, started, error.cause);
-    return fail("ai_unavailable", requestId, started, error);
-  }
+  const clientId = await clientIdFor(request);
+  const outcome = await analyzeText(input.data.text, {
+    classifier: getClassifier(),
+    timeoutMs: getTimeoutMs(),
+    checkLimits: () => checkAiLimits(clientId),
+  });
+  return reply(outcome);
 }

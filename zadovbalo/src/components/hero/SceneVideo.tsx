@@ -26,18 +26,26 @@ export function SceneVideo({ scene, playing, preload }: { scene: HeroScene; play
     return () => video.removeEventListener("error", onError, true);
   }, []);
 
+  // Вкладка у фоні — пауза.
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    const onVis = () => setHidden(document.visibilityState === "hidden");
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
   useEffect(() => {
     const video = ref.current;
     if (!video) return;
     video.muted = true;
-    if (playing) {
+    if (playing && !hidden) {
       video.play().catch(() => {
         // Автовідтворення заборонене (енергозбереження тощо) — лишаємо постер.
       });
     } else {
       video.pause();
     }
-  }, [playing]);
+  }, [playing, hidden]);
 
   const src = HERO_MEDIA[scene].video;
   if (failed) return null;

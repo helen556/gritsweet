@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     title: SITE.title,
     description: SITE.description,
     url: "/",
-    images: [{ url: "/og.jpg", width: 1200, height: 630, alt: "Грозові хмари розходяться" }],
+    images: [{ url: "/og.jpg", width: 1200, height: 630, alt: "Видихни — грозові хмари розходяться" }],
   },
   twitter: {
     card: "summary_large_image",
@@ -26,6 +26,8 @@ export const metadata: Metadata = {
     images: ["/og.jpg"],
   },
   formatDetection: { telephone: false },
+  // Код підтвердження Google Search Console задається на хостингу (не вигадується).
+  ...(process.env.GOOGLE_SITE_VERIFICATION ? { verification: { google: process.env.GOOGLE_SITE_VERIFICATION } } : {}),
 };
 
 export const viewport: Viewport = {

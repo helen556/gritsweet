@@ -2,63 +2,42 @@
 
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/Button";
-import { useReveal } from "@/components/ui/motion";
 import { StageHeading, StagePanel } from "@/components/flow/StagePanel";
 
-/** Стан 1: «Задовбало?» на грозі. Мінімум тексту — одне питання й одна дія. */
-export function HeroIntro({ onStart }: { onStart: () => void }) {
-  const r = useReveal();
-  // Вхід — CSS-анімацією (видно до гідратації), вихід — через Motion.
-  const exitWord = r.word().exit;
+/**
+ * Перший екран. Текст і дії видно одразу (CSS-анімація, без очікування JS, відео чи WebGL).
+ */
+export function HeroFirst({ onWrite, onDictate, onManual }: { onWrite: () => void; onDictate: () => void; onManual: () => void }) {
+  const exit = { opacity: 0, filter: "blur(12px)", transition: { duration: 0.6 } };
   return (
-    <StagePanel label="Початок" focusOnMount={false} className="gap-10 sm:gap-14">
-      <motion.div initial={false} exit={exitWord} className="animate-fog-in">
-        <StageHeading size="mega" className="tracking-[-0.04em]">
-          Задовбало?
-        </StageHeading>
-      </motion.div>
-      <motion.div initial={false} exit={{ opacity: 0, transition: { duration: 0.3 } }} className="animate-rise-in">
-        <Button
-          size="lg"
-          variant="ghost"
-          onClick={onStart}
-          className="border-frost/60 px-12 text-[1.05rem] hover:bg-frost hover:text-abyss"
-        >
-          Почати
-        </Button>
-      </motion.div>
-    </StagePanel>
-  );
-}
-
-/** Стан 2: хмари розходяться. Точний текст із брифу. */
-export function HeroExhale({ onWrite, onDictate }: { onWrite: () => void; onDictate: () => void }) {
-  const r = useReveal();
-  return (
-    <StagePanel label="Видихни" className="gap-7 sm:gap-9">
-      <motion.div {...r.word(0.15, 1.8)}>
+    <StagePanel label="Видихни" focusOnMount={false} className="gap-7 sm:gap-9">
+      <motion.div initial={false} exit={exit} className="animate-fog-in">
         <StageHeading size="mega" className="italic tracking-[-0.03em]">
           Видихни.
         </StageHeading>
       </motion.div>
 
-      <div className="flex max-w-xl flex-col items-center gap-3">
-        <motion.p {...r.rise(0.95)} className="text-lede text-balance text-frost/90">
-          Ну давай. Вивалюй усе, що накипіло.
-        </motion.p>
-        <motion.p {...r.rise(1.25)} className="text-sm tracking-[0.04em] text-mist">
-          Матюкатись можна.
-        </motion.p>
-      </div>
+      <motion.div initial={false} exit={exit} className="animate-rise-in flex max-w-xl flex-col items-center gap-3">
+        <p className="text-lede text-balance text-frost/90">Ну давай. Вивалюй усе, що накипіло.</p>
+        <p className="text-sm tracking-[0.04em] text-mist">Матюкатись можна.</p>
+      </motion.div>
 
-      <motion.div {...r.rise(1.6)} className="mt-2 flex w-full max-w-md flex-wrap items-center justify-center gap-3">
-        <Button size="lg" onClick={onWrite} className="min-w-[9.5rem] flex-1">
-          Написати
+      <motion.div initial={false} exit={{ opacity: 0, transition: { duration: 0.3 } }} className="animate-rise-in mt-1 flex w-full max-w-md flex-col items-center gap-4">
+        <div className="flex w-full flex-wrap items-center justify-center gap-3">
+          <Button size="lg" onClick={onWrite} className="min-w-[9.5rem] flex-1">
+            Написати
+          </Button>
+          <Button size="lg" variant="ghost" onClick={onDictate} className="min-w-[9.5rem] flex-1">
+            <MicIcon />
+            Надиктувати
+          </Button>
+        </div>
+        <Button variant="quiet" onClick={onManual} className="text-sm">
+          Обрати дію без тексту
         </Button>
-        <Button size="lg" variant="ghost" onClick={onDictate} className="min-w-[9.5rem] flex-1">
-          <MicIcon />
-          Надиктувати
-        </Button>
+        <p className="max-w-sm text-balance text-xs leading-relaxed text-mist/80">
+          Простір символічних дій, щоб перепочити: змʼяти, розплутати, відклеїти те, що тисне. Без реєстрації.
+        </p>
       </motion.div>
     </StagePanel>
   );

@@ -143,3 +143,48 @@
     opacity: 1;
   }
 }
+
+/* ── Сцени ─────────────────────────────────────────────────────────── */
+/* Студійний фон: мʼяке верхнє світло, глибокі краї. */
+.scene-backdrop {
+  background:
+    radial-gradient(70% 55% at 50% 30%, rgb(86 116 135 / 0.22), transparent 70%),
+    radial-gradient(120% 90% at 50% 110%, rgb(8 19 28 / 0.9), transparent 60%),
+    linear-gradient(180deg, #0e1b25 0%, #0a151e 55%, #070f16 100%);
+}
+
+@utility scene-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+  padding-inline: 0.85rem;
+  border-radius: var(--radius-hair);
+  font-size: 0.9rem;
+  color: color-mix(in oklab, var(--color-frost) 88%, transparent);
+  transition: background-color 0.2s, color 0.2s;
+  touch-action: manipulation;
+  &:hover {
+    background: color-mix(in oklab, var(--color-night) 80%, transparent);
+    color: var(--color-frost);
+  }
+}
+
+/* Жести лише всередині поверхні сцени. */
+.scene-surface {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+@keyframes debt-ripple {
+  from {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0.8;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(2.6);
+    opacity: 0;
+  }
+}

@@ -1,23 +1,16 @@
 import "server-only";
-import { AnalyzeError, type RantClassifier } from "../types";
-import { mockClassifier } from "./mock";
+import type { Classifier } from "../types";
+import { createCloudflareClassifier, readCloudflareConfig } from "./cloudflare";
 
-/**
- * Реєстр провайдерів. Справжній AI додається новим записом (наприклад, `anthropic: createAnthropicClassifier`)
- * — ключ читається тут, на сервері, і ніколи не потрапляє в клієнтський бандл.
- */
-const PROVIDERS: Record<string, () => RantClassifier> = {
-  mock: () => mockClassifier,
-};
-
-export function getClassifier(): RantClassifier {
-  const id = (process.env.AI_PROVIDER ?? "mock").trim().toLowerCase();
-  const factory = PROVIDERS[id];
-  if (!factory) throw new AnalyzeError("ai_unavailable", { cause: new Error(`AI provider "${id}" is not configured`) });
-  return factory();
+/** null — AI не налаштований (немає токена тощо): тоді працює ручний вибір. */
+export function getClassifier(env: NodeJS.ProcessEnv = process.env): Classifier | null {
+  const provider = (env.AI_PROVIDER ?? "cloudflare").trim().toLowerCase();
+  if (provider === "none" || provider === "off") return null;
+  const config = readCloudflareConfig(env);
+  return config ? createCloudflareClassifier(config) : null;
 }
 
-export function getTimeoutMs(): number {
-  const value = Number(process.env.AI_TIMEOUT_MS);
-  return Number.isFinite(value) && value >= 1000 && value <= 60000 ? value : 12000;
+export function getTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  const value = Number(env.AI_TIMEOUT_MS);
+  return Number.isFinite(value) && value >= 1000 && value <= 30000 ? value : 9000;
 }

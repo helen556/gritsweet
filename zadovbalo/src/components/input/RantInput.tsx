@@ -13,11 +13,13 @@ export function RantInput({
   onChange,
   onSubmit,
   onDictate,
+  onManual,
 }: {
   value: string;
   onChange: (text: string) => void;
   onSubmit: () => void;
   onDictate: () => void;
+  onManual: () => void;
 }) {
   const r = useReveal();
   const id = useId();
@@ -62,20 +64,28 @@ export function RantInput({
             className="field-sizing-content block max-h-[42dvh] min-h-36 w-full resize-none bg-transparent px-4 py-4 text-[1.0625rem] leading-relaxed text-frost placeholder:text-mist/60 sm:px-5 sm:text-lg"
           />
           <div className="flex items-center justify-between gap-3 border-t border-steel/30 px-4 py-2 text-xs text-mist/80 sm:px-5">
-            <span id={`${id}-note`}>Текст іде тільки на розбір і ніде не зберігається.</span>
+            <span>Пиши як є: українською, російською, суржиком, з матами.</span>
             <span aria-live="polite" className="tabular-nums">
               {length > MAX_TEXT_LENGTH * 0.8 ? `${length} / ${MAX_TEXT_LENGTH}` : ""}
             </span>
           </div>
         </div>
 
+        <p id={`${id}-note`} className="text-sm leading-relaxed text-frost/75">
+          Щоб підібрати дію, текст піде на наш сервер і в Cloudflare Workers AI — лише щоб визначити тему. Ми його не зберігаємо.
+        </p>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button variant="quiet" onClick={onDictate}>
-            <MicIcon className="size-4 shrink-0" />
-            Краще надиктую
-          </Button>
+          <div className="flex flex-wrap gap-x-2">
+            <Button variant="quiet" onClick={onManual}>
+              Обрати вручну, без передачі
+            </Button>
+            <Button variant="quiet" onClick={onDictate}>
+              <MicIcon className="size-4 shrink-0" />
+              Надиктувати
+            </Button>
+          </div>
           <Button type="submit" size="lg" disabled={!canSubmit} className="min-w-44">
-            Вивалити
+            Визначити тему
           </Button>
         </div>
       </motion.form>

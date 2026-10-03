@@ -9,7 +9,7 @@ export function SiteHeader({ className }: { className?: string }) {
         href="/"
         className="pointer-events-auto font-display text-lg italic tracking-tight text-frost/85 transition-colors hover:text-frost min-h-11 inline-flex items-center"
       >
-        Задовбало
+        Видихни
       </Link>
       <Link
         href="/about"

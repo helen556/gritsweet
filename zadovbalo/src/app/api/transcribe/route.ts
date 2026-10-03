@@ -1,11 +1,10 @@
 import { logEvent } from "@/lib/server/log";
-import { createRateLimiter } from "@/lib/server/rate-limit";
-import { clientKey, newRequestId, noStoreHeaders } from "@/lib/server/request";
+import { allowRequest, clientIdFor } from "@/lib/server/limits";
+import { newRequestId, noStoreHeaders } from "@/lib/server/request";
 import { getServerTranscriber } from "@/lib/speech/server-registry";
 
 const ROUTE = "/api/transcribe";
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
-const allow = createRateLimiter({ limit: 10, windowMs: 60_000 });
 
 function json(body: object, requestId: string, status: number) {
   return Response.json(body, { status, headers: { ...noStoreHeaders, "X-Request-Id": requestId } });
@@ -19,7 +18,7 @@ export async function POST(request: Request) {
     return status;
   };
 
-  if (!allow(clientKey(request))) return json({ error: "rate_limited" }, requestId, done(429, "rate_limited"));
+  if (!(await allowRequest(await clientIdFor(request), "stt", 10, 60))) return json({ error: "rate_limited" }, requestId, done(429, "rate_limited"));
 
   const transcriber = getServerTranscriber();
   if (!transcriber) return json({ error: "not_configured" }, requestId, done(501, "not_configured"));

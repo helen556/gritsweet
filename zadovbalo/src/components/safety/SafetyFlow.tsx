@@ -7,32 +7,29 @@ import { UA_HELP_CONTACTS } from "@/lib/safety/resources";
 import { track } from "@/lib/analytics/track";
 
 /**
- * Нейтральний режим безпеки. Без ігор, без руйнування, без анімацій, крім звичайного проявлення.
- * Не ставить діагнозів і не «лікує» — лише короткі кроки до живих людей.
+ * Спокійний екран підтримки. Без ігор і руйнування. Не діагноз і не оцінка ризику —
+ * лише шлях до живих людей і можливість обрати тиху дію або вийти.
  */
-export function SafetyFlow({ onBack }: { onBack: () => void }) {
+export function SafetyFlow({ onQuiet, onTopics, onExit }: { onQuiet: () => void; onTopics: () => void; onExit: () => void }) {
   useEffect(() => {
-    track("safety_shown");
+    track("support_shown");
   }, []);
 
   return (
-    <StagePanel label="Підтримка" className="max-w-2xl gap-8">
+    <StagePanel label="Підтримка" className="max-w-2xl gap-7">
       <StageHeading size="title">Зараз важливо не лишатися з цим наодинці.</StageHeading>
 
-      <div className="flex w-full flex-col gap-6 text-left">
-        <ol className="space-y-3 text-lede text-frost/90">
-          <li>Напиши або подзвони людині, якій довіряєш. Прямо зараз — можна просто «мені погано».</li>
+      <div className="flex w-full flex-col gap-5 text-left">
+        <ul className="space-y-2 text-lede text-frost/90">
+          <li>Напиши або подзвони людині, якій довіряєш. Можна просто: «мені зараз погано».</li>
           <li>Якщо є небезпека для життя — дзвони в екстрену службу.</li>
           <li>Можна поговорити з кризовою лінією. Там вислухають.</li>
-        </ol>
+        </ul>
 
-        <ul className="divide-y divide-steel/40 rounded-[var(--radius-hair)] border border-steel/50 bg-abyss/70" aria-label="Куди звернутися">
+        <ul className="divide-y divide-steel/40 rounded-[var(--radius-hair)] border border-steel/50 bg-abyss/75" aria-label="Куди звернутися в Україні">
           {UA_HELP_CONTACTS.map((c) => (
             <li key={c.dial}>
-              <a
-                href={`tel:${c.dial}`}
-                className="flex min-h-16 items-center justify-between gap-4 px-5 py-3 transition-colors hover:bg-night/80"
-              >
+              <a href={`tel:${c.dial}`} className="flex min-h-16 items-center justify-between gap-4 px-5 py-3 transition-colors hover:bg-night/80">
                 <span className="flex flex-col">
                   <span className="font-medium text-frost">{c.label}</span>
                   <span className="text-sm text-mist">{c.note}</span>
@@ -45,9 +42,17 @@ export function SafetyFlow({ onBack }: { onBack: () => void }) {
         <p className="text-sm text-mist">Не в Україні? Набери місцевий номер екстреної допомоги.</p>
       </div>
 
-      <Button variant="quiet" onClick={onBack}>
-        Повернутися до тексту
-      </Button>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <Button variant="ghost" size="lg" onClick={onQuiet}>
+          Тиха дія: пісок і вода
+        </Button>
+        <Button variant="quiet" onClick={onTopics}>
+          Це не про те — обрати тему
+        </Button>
+        <Button variant="quiet" onClick={onExit}>
+          Вийти
+        </Button>
+      </div>
     </StagePanel>
   );
 }

@@ -1,89 +1,114 @@
 import { assessSafety } from "@/lib/safety/classifier";
-import type { SafetyAssessment } from "@/lib/safety/types";
-import { SCENARIOS } from "@/lib/scenarios/registry";
-import type { CategoryId, Emotion, Tone } from "@/lib/topics/categories";
-import type { MechanicType } from "@/lib/mechanics/types";
-import { classificationSchema, MAX_TOPICS, type Classification } from "./schema";
-import { AnalyzeError, type RantClassifier } from "./types";
+import { allowedScenes, SCENES, type SceneId } from "@/lib/scenes/registry";
+import type { Category, Currency, Emotion } from "@/lib/topics";
+import { amountAppearsIn, extractAmounts, pickAmount } from "./amount";
+import { keywordCategories } from "./keywords";
+import { modelOutputSchema, type ModelOutput } from "./schema";
+import { AiError, type AiErrorCode, type Classifier } from "./types";
 
-export interface AnalyzedTopic {
-  category: CategoryId;
-  /** Підпис чипа з реєстру — не те, що придумав провайдер. */
-  label: string;
-  emotion: Emotion;
-  intensity: number;
-}
-
-export interface AnalysisResult {
-  topics: AnalyzedTopic[];
-  primaryEmotion: Emotion;
-  recommendedMechanic: MechanicType;
-  tone: Tone;
+export interface Analysis {
+  categories: Category[];
+  primaryCategory: Category | null;
+  emotion: Emotion | null;
+  needsClarification: boolean;
+  amount: number | null;
+  currency: Currency | null;
+  sceneIds: SceneId[];
 }
 
 export type AnalyzeOutcome =
-  | { status: "safety"; safety: SafetyAssessment }
-  | { status: "ok"; safety: SafetyAssessment; result: AnalysisResult; provider: string };
+  | { status: "support"; reason: "safety" | "model" }
+  | { status: "ok"; source: "ai"; analysis: Analysis; caution: boolean }
+  | {
+      status: "manual";
+      reason: AiErrorCode;
+      /** Підказка за ключовими словами — так і підписується в інтерфейсі. */
+      keywordSuggestions: Category[];
+      amount: number | null;
+      currency: Currency | null;
+      caution: boolean;
+    };
 
-/** Дублікати категорій зливаються, найсильніше — першим, не більше MAX_TOPICS. */
-export function normalizeClassification(data: Classification): AnalysisResult {
-  const byCategory = new Map<CategoryId, AnalyzedTopic>();
-  for (const topic of data.topics) {
-    const existing = byCategory.get(topic.category);
-    if (!existing || topic.intensity > existing.intensity) {
-      byCategory.set(topic.category, {
-        category: topic.category,
-        label: SCENARIOS[topic.category].label,
-        emotion: topic.emotion,
-        intensity: topic.intensity,
-      });
-    }
+export interface AnalyzeDeps {
+  classifier: Classifier | null;
+  timeoutMs: number;
+  checkLimits: () => Promise<"ok" | "rate_limited" | "budget" | "limits_unavailable">;
+}
+
+/** Сума й валюта — лише ті, що явно є в тексті. */
+function amountFromText(text: string, modelAmount: number | null) {
+  const mentions = extractAmounts(text);
+  if (modelAmount !== null && amountAppearsIn(text, modelAmount)) {
+    const match = mentions.find((m) => Math.abs(m.amount - modelAmount) < 0.005 * Math.max(1, modelAmount));
+    return { amount: modelAmount, currency: match?.currency ?? null };
   }
-  // «unknown» має сенс лише сам по собі.
-  if (byCategory.size > 1) byCategory.delete("unknown");
+  const picked = pickAmount(mentions);
+  return { amount: picked?.amount ?? null, currency: picked?.currency ?? null };
+}
 
-  const topics = [...byCategory.values()].sort((a, b) => b.intensity - a.intensity).slice(0, MAX_TOPICS);
+export function postprocess(text: string, raw: ModelOutput, caution: boolean): Analysis {
+  const categories = [...new Set(raw.categories)];
+  const primaryCategory = raw.primaryCategory && categories.includes(raw.primaryCategory) ? raw.primaryCategory : null;
+  const allowed = allowedScenes(categories);
+  let sceneIds = raw.sceneIds.filter((s) => allowed.includes(s));
+  if (sceneIds.length === 0) sceneIds = allowed;
+  if (caution) sceneIds = sceneIds.filter((s) => s !== "war_map");
+  const needsDebtAmount = categories.includes("financial_debt");
+  const { amount, currency } = needsDebtAmount ? amountFromText(text, raw.amount) : { amount: null, currency: null };
   return {
-    topics,
-    primaryEmotion: data.primary_emotion,
-    recommendedMechanic: data.recommended_mechanic,
-    tone: data.tone,
+    categories,
+    primaryCategory,
+    emotion: raw.emotion,
+    // Якщо модель не визначилась із головною темою серед кількох — теж уточнюємо.
+    needsClarification: raw.needsClarification || (categories.length > 1 && !primaryCategory && categories.includes("general")),
+    amount,
+    currency,
+    sceneIds: sceneIds.filter((s) => SCENES[s]),
   };
 }
 
-function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>, timeoutMs: number): Promise<T> {
+function manual(text: string, reason: AiErrorCode, caution: boolean): AnalyzeOutcome {
+  const picked = pickAmount(extractAmounts(text));
+  return { status: "manual", reason, keywordSuggestions: keywordCategories(text), amount: picked?.amount ?? null, currency: picked?.currency ?? null, caution };
+}
+
+function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>, ms: number): Promise<T> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
-      controller.abort(new AnalyzeError("timeout"));
-      reject(new AnalyzeError("timeout"));
-    }, timeoutMs);
+      controller.abort();
+      reject(new AiError("timeout"));
+    }, ms);
   });
-  // Promise.race — на випадок, якщо провайдер ігнорує signal.
   return Promise.race([run(controller.signal), timeout]).finally(() => clearTimeout(timer));
 }
 
-export async function analyzeRant(
-  text: string,
-  { classifier, timeoutMs }: { classifier: RantClassifier; timeoutMs: number },
-): Promise<AnalyzeOutcome> {
-  // 1. Безпека — до будь-якого AI.
+export async function analyzeText(text: string, deps: AnalyzeDeps): Promise<AnalyzeOutcome> {
+  // 1. Детермінований шар безпеки — до будь-якого AI, не залежить від моделі.
   const safety = assessSafety(text);
-  if (safety.level === "crisis") return { status: "safety", safety };
+  if (safety.level === "crisis") return { status: "support", reason: "safety" };
+  const caution = safety.level === "caution";
 
-  // 2. Класифікація.
+  // 2. AI не налаштований — одразу ручний вибір.
+  if (!deps.classifier) return manual(text, "not_configured", caution);
+
+  // 3. Ліміти й добовий бюджет.
+  const verdict = await deps.checkLimits();
+  if (verdict !== "ok") return manual(text, verdict, caution);
+
+  // 4. Модель.
   let raw: unknown;
   try {
-    raw = await withTimeout((signal) => classifier.classify(text, { signal }), timeoutMs);
+    raw = await withTimeout((signal) => deps.classifier!.classify(text, signal), deps.timeoutMs);
   } catch (error) {
-    if (error instanceof AnalyzeError) throw error;
-    throw new AnalyzeError("ai_unavailable", { cause: error });
+    return manual(text, error instanceof AiError ? error.code : "unavailable", caution);
   }
 
-  // 3. Провайдеру не довіряємо: схема + нормалізація.
-  const parsed = classificationSchema.safeParse(raw);
-  if (!parsed.success) throw new AnalyzeError("invalid_response", { cause: parsed.error });
+  // 5. Сувора перевірка.
+  const parsed = modelOutputSchema.safeParse(raw);
+  if (!parsed.success) return manual(text, "invalid_response", caution);
 
-  return { status: "ok", safety, result: normalizeClassification(parsed.data), provider: classifier.id };
+  if (parsed.data.categories.includes("needs_support")) return { status: "support", reason: "model" };
+  return { status: "ok", source: "ai", analysis: postprocess(text, parsed.data, caution), caution };
 }

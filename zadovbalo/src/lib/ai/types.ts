@@ -1,20 +1,27 @@
-/**
- * Будь-який класифікатор (mock, Anthropic, OpenAI, власна модель) реалізує цей інтерфейс.
- * Повертає «сирі» дані — валідація й нормалізація робляться в service.ts, тож провайдеру не довіряємо.
- */
-export interface RantClassifier {
-  readonly id: string;
-  classify(text: string, options: { signal: AbortSignal }): Promise<unknown>;
+/** Коди збоїв AI. Усі ведуть до ручного вибору теми, доступ до сцен не втрачається. */
+export type AiErrorCode =
+  | "not_configured"
+  | "auth"
+  | "rate_limited"
+  | "quota"
+  | "budget"
+  | "limits_unavailable"
+  | "timeout"
+  | "unavailable"
+  | "invalid_response";
+
+export class AiError extends Error {
+  constructor(
+    readonly code: AiErrorCode,
+    readonly status?: number,
+  ) {
+    super(code);
+    this.name = "AiError";
+  }
 }
 
-export type AnalyzeErrorType = "ai_unavailable" | "timeout" | "invalid_response";
-
-export class AnalyzeError extends Error {
-  constructor(
-    readonly type: AnalyzeErrorType,
-    options?: { cause?: unknown },
-  ) {
-    super(type, options);
-    this.name = "AnalyzeError";
-  }
+export interface Classifier {
+  readonly id: string;
+  /** Повертає сирий (неперевірений) обʼєкт. */
+  classify(text: string, signal: AbortSignal): Promise<unknown>;
 }

@@ -1,13 +1,12 @@
 import { analyticsPayloadSchema } from "@/lib/analytics/events";
+import { allowRequest, clientIdFor } from "@/lib/server/limits";
 import { logEvent } from "@/lib/server/log";
-import { createRateLimiter } from "@/lib/server/rate-limit";
-import { clientKey, newRequestId } from "@/lib/server/request";
+import { newRequestId } from "@/lib/server/request";
 
-const allow = createRateLimiter({ limit: 120, windowMs: 60_000 });
-
-/** Приймає агреговані події й пише їх у структурований лог. Підключити справжню аналітику — тут. */
+/** Загальні події → структурований лог. Підключити зовнішню аналітику — тут. */
 export async function POST(request: Request) {
-  if (!allow(clientKey(request))) return new Response(null, { status: 429 });
+  if (Number(request.headers.get("content-length") ?? 0) > 512) return new Response(null, { status: 413 });
+  if (!(await allowRequest(await clientIdFor(request), "ev", 120, 60))) return new Response(null, { status: 429 });
   let body: unknown;
   try {
     body = await request.json();
@@ -16,8 +15,6 @@ export async function POST(request: Request) {
   }
   const parsed = analyticsPayloadSchema.safeParse(body);
   if (!parsed.success) return new Response(null, { status: 400 });
-
-  const { event, ...meta } = parsed.data;
-  logEvent("info", { requestId: newRequestId(), route: "/api/events", status: 204, type: event, meta });
+  logEvent("info", { requestId: newRequestId(), route: "/api/events", status: 204, type: parsed.data.event });
   return new Response(null, { status: 204 });
 }

@@ -1,33 +1,42 @@
 import { z } from "zod";
-import { CATEGORY_IDS, EMOTIONS, TONES } from "@/lib/topics/categories";
-import { MECHANIC_TYPES } from "@/lib/mechanics/types";
+import { CATEGORIES, CURRENCIES, EMOTIONS } from "@/lib/topics";
+import { SCENE_IDS } from "@/lib/scenes/registry";
 
-export const MAX_TOPICS = 6;
+export const MIN_TEXT_LENGTH = 2;
+export const MAX_TEXT_LENGTH = 2000;
+export const MAX_CATEGORIES = 3;
 
-/** Те, що має повернути будь-який класифікатор (mock чи справжній AI). */
-export const classificationSchema = z.object({
-  topics: z
-    .array(
-      z.object({
-        category: z.enum(CATEGORY_IDS),
-        label: z.string().trim().min(1).max(40),
-        emotion: z.enum(EMOTIONS),
-        intensity: z.number().int().min(1).max(10),
-      }),
-    )
-    .min(1)
-    .max(12),
-  primary_emotion: z.enum(EMOTIONS),
-  recommended_mechanic: z.enum(MECHANIC_TYPES),
-  tone: z.enum(TONES),
-});
+export const analyzeRequestSchema = z
+  .object({ text: z.string().trim().min(MIN_TEXT_LENGTH).max(MAX_TEXT_LENGTH) })
+  .strict();
 
-export type Classification = z.infer<typeof classificationSchema>;
-export type Topic = Classification["topics"][number];
+/** Що мусить повернути модель. Перевіряється на сервері; відповідь моделі не довіряємо. */
+export const modelOutputSchema = z
+  .object({
+    categories: z.array(z.enum(CATEGORIES)).min(1).max(MAX_CATEGORIES),
+    primaryCategory: z.enum(CATEGORIES).nullable(),
+    emotion: z.enum(EMOTIONS).nullable(),
+    needsClarification: z.boolean(),
+    amount: z.number().positive().max(1e12).nullable(),
+    currency: z.enum(CURRENCIES).nullable(),
+    sceneIds: z.array(z.enum(SCENE_IDS)).max(6),
+  })
+  .strict();
 
-export const MIN_TEXT_LENGTH = 3;
-export const MAX_TEXT_LENGTH = 5000;
+export type ModelOutput = z.infer<typeof modelOutputSchema>;
 
-export const analyzeRequestSchema = z.object({
-  text: z.string().trim().min(MIN_TEXT_LENGTH).max(MAX_TEXT_LENGTH),
-});
+/** Та сама схема у форматі JSON Schema для JSON Mode Workers AI. */
+export const modelOutputJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    categories: { type: "array", items: { type: "string", enum: [...CATEGORIES] }, minItems: 1, maxItems: MAX_CATEGORIES },
+    primaryCategory: { type: ["string", "null"], enum: [...CATEGORIES, null] },
+    emotion: { type: ["string", "null"], enum: [...EMOTIONS, null] },
+    needsClarification: { type: "boolean" },
+    amount: { type: ["number", "null"] },
+    currency: { type: ["string", "null"], enum: [...CURRENCIES, null] },
+    sceneIds: { type: "array", items: { type: "string", enum: [...SCENE_IDS] }, maxItems: 6 },
+  },
+  required: ["categories", "primaryCategory", "emotion", "needsClarification", "amount", "currency", "sceneIds"],
+} as const;
