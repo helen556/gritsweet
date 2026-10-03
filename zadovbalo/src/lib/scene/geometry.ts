@@ -65,3 +65,20 @@ export function peel(poly: Pt[], a: Pt, p: Pt) {
   const flap = peeled.map((q) => reflect(q, m, n));
   return { stuck, flap, fold: { m, n }, peeledFraction: area(peeled) / area(poly) };
 }
+
+/** Комірки Вороного всередині полігона (для уламків). O(n²), для n ≤ ~30. */
+export function voronoiCells(poly: Pt[], seeds: Pt[]): Pt[][] {
+  return seeds.map((si, i) => {
+    let cell = poly;
+    for (let j = 0; j < seeds.length && cell.length >= 3; j++) {
+      if (i === j) continue;
+      const sj = seeds[j]!;
+      const dx = si.x - sj.x;
+      const dy = si.y - sj.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 1e-6) continue;
+      cell = clipHalfPlane(cell, { x: (si.x + sj.x) / 2, y: (si.y + sj.y) / 2 }, { x: dx / len, y: dy / len });
+    }
+    return cell;
+  });
+}

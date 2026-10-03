@@ -37,3 +37,16 @@ describe("heightfield", () => {
     expect(out[3]).toBe(0);
   });
 });
+
+import { relax } from "./heightfield";
+describe("relax", () => {
+  it("steep slopes slump until below the talus angle and keep volume", () => {
+    const hf = createHeightfield(20, 20);
+    hf.data.fill(0.5);
+    hf.data[10 * 20 + 10] = 2;
+    const before = volume(hf);
+    for (let k = 0; k < 200; k++) relax(hf, 1, 1, 18, 18, 0.05);
+    expect(hf.data[10 * 20 + 10]!).toBeLessThan(0.8);
+    expect(volume(hf)).toBeCloseTo(before, 3);
+  });
+});

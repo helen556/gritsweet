@@ -119,8 +119,20 @@
   }
 }
 
+/* Головний заголовок: видимий з першого кадру (LCP), лише «фокусується» з розмиття. */
+@keyframes focus-in {
+  from {
+    filter: blur(14px);
+    transform: translateY(8px);
+  }
+  to {
+    filter: blur(0);
+    transform: none;
+  }
+}
+
 @utility animate-fog-in {
-  animation: fog-in 1.6s var(--ease-release) 0.15s both;
+  animation: focus-in 1.6s var(--ease-release) both;
 }
 
 @utility animate-rise-in {
@@ -128,7 +140,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-fog-in,
+  .animate-fog-in {
+    animation: none;
+  }
   .animate-rise-in {
     animation-name: fade-in;
     animation-duration: 0.4s !important;

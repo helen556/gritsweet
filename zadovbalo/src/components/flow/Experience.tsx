@@ -1,21 +1,29 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { AnimatePresence } from "motion/react";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { StormHero } from "@/components/hero/StormHero";
 import { HeroFirst } from "@/components/hero/HeroCopy";
-import { RantInput } from "@/components/input/RantInput";
-import { VoiceInput } from "@/components/input/VoiceInput";
-import { Analyzing } from "@/components/ai/Analyzing";
-import { SceneHost } from "@/components/scenes/SceneHost";
-import { SafetyFlow } from "@/components/safety/SafetyFlow";
 import { SiteFooter, SiteHeader } from "@/components/ui/SiteChrome";
 import { createAnalyzer } from "@/lib/ai/client";
 import { track } from "@/lib/analytics/track";
 import { splitPhrases } from "@/lib/text";
-import { Clarify, Confirm, Finish, Manual, WarChoice } from "./Choices";
-import { DebtSetup, LabelsSetup } from "./Setup";
 import { flowReducer, initialFlow } from "./state";
+
+// Усе після першого екрана — окремими чанками: перший екран не чекає на їхній JS.
+const RantInput = dynamic(() => import("@/components/input/RantInput").then((m) => m.RantInput));
+const VoiceInput = dynamic(() => import("@/components/input/VoiceInput").then((m) => m.VoiceInput));
+const Analyzing = dynamic(() => import("@/components/ai/Analyzing").then((m) => m.Analyzing));
+const SceneHost = dynamic(() => import("@/components/scenes/SceneHost").then((m) => m.SceneHost));
+const SafetyFlow = dynamic(() => import("@/components/safety/SafetyFlow").then((m) => m.SafetyFlow));
+const Confirm = dynamic(() => import("./Choices").then((m) => m.Confirm));
+const Clarify = dynamic(() => import("./Choices").then((m) => m.Clarify));
+const Manual = dynamic(() => import("./Choices").then((m) => m.Manual));
+const WarChoice = dynamic(() => import("./Choices").then((m) => m.WarChoice));
+const Finish = dynamic(() => import("./Choices").then((m) => m.Finish));
+const DebtSetup = dynamic(() => import("./Setup").then((m) => m.DebtSetup));
+const LabelsSetup = dynamic(() => import("./Setup").then((m) => m.LabelsSetup));
 
 const STICKER_EXAMPLES = ["«Не драматизуй»", "«Тобі здалося»", "«Ти перебільшуєш»", "«Це ж дрібниці»", "«Можна було й краще»", "«Знову ти зі своїм»"];
 const BACKPACK_EXAMPLES = ["Робота", "Дім", "Рахунки", "Діти", "Навчання", "Здоровʼя"];

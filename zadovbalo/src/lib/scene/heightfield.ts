@@ -204,6 +204,33 @@ export function squeeze(hf: Heightfield, axis: "x" | "y", amount: number) {
     }
 }
 
+/**
+ * Осипання: де схил крутіший за кут природного укосу, частина матеріалу сповзає вниз.
+ * Працює в прямокутнику; повертає true, якщо щось зрушилось.
+ */
+export function relax(hf: Heightfield, x0: number, y0: number, x1: number, y1: number, talus: number, rate = 0.25) {
+  const { w, h, data } = hf;
+  let moved = false;
+  const ax = clampI(Math.floor(x0), 1, w - 2);
+  const bx = clampI(Math.ceil(x1), 1, w - 2);
+  const ay = clampI(Math.floor(y0), 1, h - 2);
+  const by = clampI(Math.ceil(y1), 1, h - 2);
+  for (let y = ay; y <= by; y++)
+    for (let x = ax; x <= bx; x++) {
+      const i = y * w + x;
+      for (const j of [i - 1, i + 1, i - w, i + w]) {
+        const diff = data[i]! - data[j]!;
+        if (diff > talus) {
+          const m = (diff - talus) * rate;
+          data[i]! -= m;
+          data[j]! += m;
+          moved = true;
+        }
+      }
+    }
+  return moved;
+}
+
 export interface Material {
   /** Базовий колір, 0..255 */
   base: [number, number, number];
@@ -226,7 +253,7 @@ const H = norm3(L[0], L[1], L[2] + 1);
  * Освітлення поля висот у RGBA: дифузне + відблиск (сильніший на глянці) + затінення западин.
  * Якщо передано shadow — пише туди силует для мʼякої контактної тіні.
  */
-export function shade(hf: Heightfield, out: Uint8ClampedArray, m: Material, shadow?: Uint8ClampedArray) {
+export function shade(hf: Heightfield, out: Uint8ClampedArray, m: Material, shadow?: Uint8ClampedArray, tint?: Float32Array) {
   const { w, h, data, gloss } = hf;
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
@@ -256,7 +283,7 @@ export function shade(hf: Heightfield, out: Uint8ClampedArray, m: Material, shad
       const lap = l + r + u + d - 4 * v;
       const ao = Math.max(0.55, Math.min(1.08, 1 - lap * 1.6));
       const n = 1 + (fbm(x * 0.35, y * 0.35) - 0.5) * m.grain;
-      const lightK = (0.42 + 0.7 * diff) * ao * n;
+      const lightK = (0.42 + 0.7 * diff) * ao * n * (tint ? 1 - 0.38 * Math.min(1, tint[i]!) : 1);
       const edge = Math.min(1, v / 0.12);
       out[o] = m.base[0] * lightK + 255 * spec;
       out[o + 1] = m.base[1] * lightK + 255 * spec;

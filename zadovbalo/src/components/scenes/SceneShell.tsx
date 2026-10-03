@@ -68,7 +68,7 @@ export function SceneShell({
   return (
     <div className="scene-backdrop fixed inset-0 z-40 flex flex-col overflow-hidden text-frost" role="region" aria-label={meta.title}>
       <header className="safe-px safe-pt relative z-20 flex items-center justify-between gap-2 pb-2">
-        <button type="button" onClick={onChangeAction} className="scene-btn shrink-0" aria-label="Інша дія">
+        <button type="button" onClick={onChangeAction} className="scene-btn min-w-11 shrink-0 justify-center" aria-label="Інша дія">
           <span aria-hidden>←</span>
           <span className="hidden sm:inline">Інша дія</span>
         </button>
@@ -85,7 +85,7 @@ export function SceneShell({
           >
             <SoundIcon on={soundOn} />
           </button>
-          <button type="button" onClick={restart} className="scene-btn" aria-label="Почати заново">
+          <button type="button" onClick={restart} className="scene-btn min-w-11 justify-center" aria-label="Почати заново">
             <span aria-hidden>↺</span>
             <span className="hidden sm:inline">Заново</span>
           </button>

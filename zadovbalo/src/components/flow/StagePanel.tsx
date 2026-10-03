@@ -13,11 +13,14 @@ export function StagePanel({
   className,
   focusOnMount = true,
   label,
+  visibleOnLoad = false,
 }: {
   children: React.ReactNode;
   className?: string;
   focusOnMount?: boolean;
   label: string;
+  /** Перший екран: видимий у серверному HTML, без очікування JS (важливо для LCP). */
+  visibleOnLoad?: boolean;
 }) {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -31,7 +34,7 @@ export function StagePanel({
       ref={ref}
       aria-label={label}
       className={cn("relative mx-auto flex w-full max-w-5xl flex-col items-center text-center", className)}
-      initial={{ opacity: 0 }}
+      initial={visibleOnLoad ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 0.45 } }}
       transition={{ duration: 0.5 }}

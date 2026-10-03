@@ -10,7 +10,7 @@ import { StageHeading, StagePanel } from "@/components/flow/StagePanel";
 export function HeroFirst({ onWrite, onDictate, onManual }: { onWrite: () => void; onDictate: () => void; onManual: () => void }) {
   const exit = { opacity: 0, filter: "blur(12px)", transition: { duration: 0.6 } };
   return (
-    <StagePanel label="Видихни" focusOnMount={false} className="gap-7 sm:gap-9">
+    <StagePanel label="Видихни" focusOnMount={false} visibleOnLoad className="gap-7 sm:gap-9">
       <motion.div initial={false} exit={exit} className="animate-fog-in">
         <StageHeading size="mega" className="italic tracking-[-0.03em]">
           Видихни.

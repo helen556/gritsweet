@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   const reply = (body: AnalyzeResponse, status = 200) => {
     const type = body.status === "manual" ? `manual:${body.reason}` : body.status === "support" ? `support:${body.reason}` : body.status;
     // Лише код результату, статус, затримка й технічний id — без тексту, суми й відповіді моделі.
-    logEvent(status >= 500 ? "error" : body.status === "manual" ? "warn" : "info", { requestId, route: ROUTE, status, type, durationMs: Date.now() - started });
+    logEvent(status >= 500 ? "error" : status >= 400 || body.status === "manual" ? "warn" : "info", { requestId, route: ROUTE, status, type, durationMs: Date.now() - started });
     return Response.json(body, { status, headers: { ...noStoreHeaders, "X-Request-Id": requestId } });
   };
 

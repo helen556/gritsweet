@@ -36,7 +36,7 @@ const SCENE_UI: Record<SceneId, { hint: string; intensity?: boolean }> = {
   backpack: { hint: "Потягни за бігунок блискавки." },
   yarn: { hint: "Знайди світлий кінчик нитки й повільно тягни." },
   sand: { hint: "Веди пальцем по піску. Камінці можна пересувати." },
-  war_map: { hint: "Обери дію внизу." },
+  war_map: { hint: "Проведи пальцем через карту від краю до краю. Інші дії — внизу.", intensity: true },
 };
 
 export function SceneHost({

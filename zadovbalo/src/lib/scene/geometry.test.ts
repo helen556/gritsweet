@@ -20,3 +20,19 @@ describe("peel geometry", () => {
     expect(peel(rect, a, { x: 400, y: 200 }).peeledFraction).toBeCloseTo(1, 2);
   });
 });
+
+import { voronoiCells } from "./geometry";
+describe("voronoi", () => {
+  it("cells tile the polygon", () => {
+    const poly = roundedRect(200, 100, 4);
+    const seeds = [
+      { x: -60, y: -20 },
+      { x: 40, y: 10 },
+      { x: 0, y: 30 },
+      { x: 80, y: -30 },
+    ];
+    const cells = voronoiCells(poly, seeds);
+    const total = cells.reduce((a, c) => a + area(c), 0);
+    expect(total).toBeCloseTo(area(poly), 0);
+  });
+});
