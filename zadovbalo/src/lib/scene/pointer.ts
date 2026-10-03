@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect as useEffectReact, useRef as useRefReact } from "react";
+
 export interface PointerInfo {
   id: number;
   x: number;
@@ -44,13 +46,15 @@ export function bindPointer(el: HTMLElement, h: PointerHandlers) {
   const onMove = (e: PointerEvent) => {
     if (!active.has(e.pointerId)) return;
     // Згладжені події між кадрами — плавніший слід пальця.
-    const events = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
+    const events =
+      typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
     if (events.length > 1) for (const c of events) h.move?.(info(c), c);
     else h.move?.(info(e), e);
   };
   const end = (cancelled: boolean) => (e: PointerEvent) => {
     if (!active.delete(e.pointerId)) return;
-    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    if (el.hasPointerCapture(e.pointerId))
+      el.releasePointerCapture(e.pointerId);
     h.up?.(info(e), cancelled);
   };
   const onUp = end(false);
@@ -67,4 +71,27 @@ export function bindPointer(el: HTMLElement, h: PointerHandlers) {
     el.removeEventListener("pointercancel", onCancel);
     el.removeEventListener("lostpointercapture", onCancel);
   };
+}
+
+/**
+ * Привʼязати жести один раз: обробники беруться з ref, тож зміна розміру чи стану сцени
+ * посеред жесту не губить захоплений палець.
+ */
+export function usePointer(
+  target: React.RefObject<HTMLElement | null>,
+  handlers: PointerHandlers,
+) {
+  const ref = useRefReact(handlers);
+  useEffectReact(() => {
+    ref.current = handlers;
+  });
+  useEffectReact(() => {
+    const el = target.current;
+    if (!el) return;
+    return bindPointer(el, {
+      down: (p, e) => ref.current.down?.(p, e),
+      move: (p, e) => ref.current.move?.(p, e),
+      up: (p, c) => ref.current.up?.(p, c),
+    });
+  }, [target]);
 }

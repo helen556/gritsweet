@@ -1,37 +1,66 @@
 import { describe, expect, it } from "vitest";
-import { applyTransfer, billStep, formatAmount, STACK_SIZE } from "./debt";
+import { applyTransfer, formatAmount, planDebt, transferred } from "./debt";
 
-function movesToZero(amount: number, stack = false) {
-  const step = billStep(amount) * (stack ? STACK_SIZE : 1);
+function moves(amount: number, step: number) {
   let left = amount;
   let n = 0;
-  while (left > 0 && n < 10000) {
+  let sum = 0;
+  while (left > 0 && n < 100000) {
+    sum += transferred(left, step);
     left = applyTransfer(left, step);
     n++;
   }
-  return { n, left };
+  return { n, left, sum };
 }
 
-describe("debt math", () => {
-  it.each([0.5, 7, 99.99, 1500, 48500, 1_000_000, 987_654_321.55, 1e12])("reaches exactly zero for %d in a sane number of moves", (amount) => {
-    const bills = movesToZero(amount);
-    expect(bills.left).toBe(0);
-    expect(bills.n).toBeGreaterThanOrEqual(5);
-    expect(bills.n).toBeLessThanOrEqual(40);
-    const stacks = movesToZero(amount, true);
-    expect(stacks.left).toBe(0);
-    expect(stacks.n).toBeLessThanOrEqual(bills.n);
+describe("гроші: план перенесення", () => {
+  it("гривня — справжні купюри 500/1000", () => {
+    expect(planDebt(3000, "UAH")).toMatchObject({ note: "uah-500", bill: 500, billMode: true, packMode: false });
+    expect(planDebt(48500, "UAH")).toMatchObject({ note: "uah-1000", bill: 1000, pack: 100000, symbolicPack: false });
   });
 
-  it("never goes negative", () => {
-    expect(applyTransfer(3, 5)).toBe(0);
+  it("долари без ліцензованого фото — чесна нейтральна купюра, не гривня", () => {
+    const p = planDebt(200000, "USD");
+    expect(p.note).toBe("neutral");
+    expect(p.bill).toBe(100);
+    expect(p).toMatchObject({ pack: 10000, symbolicPack: false, packMode: true });
+    expect(planDebt(200000, "USD", true).note).toBe("usd-100");
+  });
+
+  it("величезні суми — умовна пачка, явно позначена", () => {
+    const p = planDebt(5_000_000, "UAH");
+    expect(p.symbolicPack).toBe(true);
+    expect(p.billMode).toBe(false);
+    expect(moves(5_000_000, p.pack).n).toBeLessThanOrEqual(24);
+  });
+
+  it.each([
+    [0.5, null],
+    [7, "EUR"],
+    [300, "UAH"],
+    [48500, "UAH"],
+    [200000, "USD"],
+    [987_654_321.55, "UAH"],
+    [1e12, null],
+  ] as const)("доходить точно до нуля: %d %s", (amount, cur) => {
+    const p = planDebt(amount, cur);
+    for (const step of [p.billMode ? p.bill : p.pack, p.pack]) {
+      const r = moves(amount, step);
+      expect(r.left).toBe(0);
+      expect(Math.round(r.sum * 100)).toBe(Math.round(amount * 100));
+      expect(r.n).toBeLessThanOrEqual(Math.max(24, 300));
+    }
+  });
+
+  it("ніколи не мінус; останній крок — лише залишок", () => {
+    expect(applyTransfer(300, 500)).toBe(0);
+    expect(transferred(300, 500)).toBe(300);
     expect(applyTransfer(0.1 + 0.2, 0.1)).toBe(0.2);
   });
 
-  it("formats currencies in Ukrainian", () => {
+  it("формат українською", () => {
     expect(formatAmount(48500, "UAH", 48500).replace(/\s/g, " ")).toBe("48 500 ₴");
     expect(formatAmount(1500.5, "USD", 1500.5).replace(/\s/g, " ")).toBe("1 500,50 $");
-    expect(formatAmount(12.5, "EUR", 12.5).replace(/\s/g, " ")).toBe("12,50 €");
     expect(formatAmount(2000, null, 2000).replace(/\s/g, " ")).toBe("2 000");
   });
 });

@@ -1,56 +1,73 @@
 import { describe, expect, it } from "vitest";
+import { localRoute } from "@/lib/ai/route";
 import type { Analysis } from "@/lib/ai/service";
 import { flowReducer, initialFlow, type FlowState } from "./state";
 
 const analysis = (over: Partial<Analysis> = {}): Analysis => ({
-  categories: ["financial_debt", "overload"],
+  categories: ["financial_debt"],
   primaryCategory: "financial_debt",
   emotion: null,
   needsClarification: false,
-  amount: 50000,
-  currency: "UAH",
-  sceneIds: ["debt", "backpack"],
+  amount: 200000,
+  currency: "USD",
+  sceneIds: ["debt"],
   ...over,
 });
 
-describe("flowReducer", () => {
-  it("ai result → confirm → debt needs setup → scene → finish", () => {
-    let s: FlowState = flowReducer(initialFlow, { type: "write" });
-    s = flowReducer(s, { type: "edit", text: "кредит 50 тис грн і все на мені" });
-    s = flowReducer(s, { type: "analyze" });
-    s = flowReducer(s, { type: "analyzed", analysis: analysis() });
-    expect(s).toMatchObject({ stage: "confirm", category: "financial_debt", source: "ai", extracted: { amount: 50000 } });
-    s = flowReducer(s, { type: "choose_scene", scene: "debt" });
-    expect(s.stage).toBe("setup");
-    s = flowReducer(s, { type: "setup_done", input: { amount: 50000, currency: "UAH" } });
+const local = (text: string, s: FlowState = initialFlow) =>
+  flowReducer(s, { type: "local", route: localRoute(text), reason: "not_configured", amount: null, currency: null });
+
+describe("flowReducer — однозначна тема веде одразу в сцену", () => {
+  it("AI: борг із сумою й валютою → одразу гроші, без анкети", () => {
+    const s = flowReducer(initialFlow, { type: "analyzed", analysis: analysis(), warMood: null });
+    expect(s).toMatchObject({ stage: "scene", scene: "debt", source: "ai", sceneInput: { amount: 200000, currency: "USD" } });
+  });
+
+  it("борг без суми/валюти → короткий крок суми", () => {
+    const s = flowReducer(initialFlow, { type: "analyzed", analysis: analysis({ amount: null, currency: null }), warMood: null });
+    expect(s).toMatchObject({ stage: "setup", scene: "debt" });
+    expect(flowReducer(s, { type: "setup_done", input: { amount: 10, currency: "UAH" } }).stage).toBe("scene");
+  });
+
+  it("без AI: «Мене бісить Росія» → карта, без повторного вибору категорії", () => {
+    expect(local("Мене бісить Росія")).toMatchObject({ stage: "scene", scene: "war_map", source: "local" });
+  });
+
+  it("без AI: «Все на мені» → рюкзак (крок підписів), «думки по колу» → клубок", () => {
+    expect(local("Все на мені")).toMatchObject({ stage: "setup", scene: "backpack" });
+    expect(local("думки по колу")).toMatchObject({ stage: "scene", scene: "yarn" });
+    expect(local("не встигла сказати йому")).toMatchObject({ stage: "scene", scene: "unsaid" });
+  });
+
+  it("страх/горе через війну → тихіший вибір, не карта", () => {
+    expect(local("мені страшно через обстріли")).toMatchObject({ stage: "war_choice", warMood: "fear" });
+    expect(local("війна")).toMatchObject({ stage: "war_choice", warMood: null });
+  });
+
+  it("кілька тем → «З чого почнемо?»; неоднозначно → ручний вибір", () => {
+    expect(local("кредит і все на мені")).toMatchObject({ stage: "choose", options: ["financial_debt", "overload"] });
+    expect(local("ну таке")).toMatchObject({ stage: "manual" });
+    const a = flowReducer(initialFlow, { type: "analyzed", analysis: analysis({ categories: ["overload", "rumination"], primaryCategory: null, needsClarification: true }), warMood: null });
+    expect(a).toMatchObject({ stage: "clarify", options: ["overload", "rumination"] });
+  });
+
+  it("«злість» поряд із конкретною темою не заважає", () => {
+    const s = flowReducer(initialFlow, { type: "analyzed", analysis: analysis({ categories: ["war_anger", "anger"], primaryCategory: "anger", amount: null, currency: null }), warMood: "anger" });
+    expect(s).toMatchObject({ stage: "scene", scene: "war_map" });
+  });
+
+  it("змінити сцену завжди доступно; reset усе стирає", () => {
+    let s = local("Все на мені");
+    s = flowReducer(s, { type: "setup_done", input: { labels: ["робота"] } });
+    s = flowReducer(s, { type: "change_scene" });
+    expect(s).toMatchObject({ stage: "manual", scene: null });
+    s = flowReducer(s, { type: "choose_scene", scene: "clay" });
     expect(s.stage).toBe("scene");
-    s = flowReducer(s, { type: "change_action" });
-    expect(s.stage).toBe("confirm");
-    s = flowReducer(s, { type: "choose_scene", scene: "backpack" });
-    s = flowReducer(s, { type: "setup_done", input: { labels: ["звіт"] } });
-    s = flowReducer(s, { type: "finish_scene" });
-    expect(s.stage).toBe("finish");
-  });
-
-  it("ambiguous → clarify; war anger → explicit choice first", () => {
-    expect(flowReducer(initialFlow, { type: "analyzed", analysis: analysis({ needsClarification: true }) }).stage).toBe("clarify");
-    expect(flowReducer(initialFlow, { type: "analyzed", analysis: analysis({ categories: ["war_anger"], primaryCategory: "war_anger" }) }).stage).toBe("war_choice");
-    expect(flowReducer(initialFlow, { type: "choose_category", category: "war_anger" }).stage).toBe("war_choice");
-  });
-
-  it("manual fallback keeps keyword hints separate from ai", () => {
-    const s = flowReducer(initialFlow, { type: "manual", reason: "quota", keywordSuggestions: ["anger"] });
-    expect(s).toMatchObject({ stage: "manual", source: "manual", manualReason: "quota", keywordSuggestions: ["anger"], analysis: null });
-  });
-
-  it("reset wipes text, analysis and amounts", () => {
-    let s = flowReducer(initialFlow, { type: "edit", text: "особисте" });
-    s = flowReducer(s, { type: "analyzed", analysis: analysis() });
-    s = flowReducer(s, { type: "reset" });
+    s = flowReducer(flowReducer(s, { type: "edit", text: "особисте" }), { type: "reset" });
     expect(s).toEqual(initialFlow);
   });
 
-  it("choosing needs_support opens support", () => {
+  it("needs_support → підтримка", () => {
     expect(flowReducer(initialFlow, { type: "choose_category", category: "needs_support" }).stage).toBe("support");
   });
 });

@@ -12,12 +12,15 @@ export function RantInput({
   value,
   onChange,
   onSubmit,
+  onLocal,
   onDictate,
   onManual,
 }: {
   value: string;
   onChange: (text: string) => void;
   onSubmit: () => void;
+  /** Підібрати сцену за словами в тексті — на пристрої, без передачі. */
+  onLocal: () => void;
   onDictate: () => void;
   onManual: () => void;
 }) {
@@ -72,12 +75,16 @@ export function RantInput({
         </div>
 
         <p id={`${id}-note`} className="text-sm leading-relaxed text-frost/75">
-          Щоб підібрати дію, текст піде на наш сервер і в Cloudflare Workers AI — лише щоб визначити тему. Ми його не зберігаємо.
+          «Визначити тему» передасть цей текст на наш сервер і в Cloudflare Workers AI — лише щоб визначити тему. Ми його не зберігаємо.
+          Без передачі — підберемо сцену за словами в тексті просто тут, на пристрої.
         </p>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-x-2">
+          <div className="flex flex-wrap gap-x-3">
+            <Button variant="quiet" onClick={onLocal} disabled={!canSubmit}>
+              Без передачі
+            </Button>
             <Button variant="quiet" onClick={onManual}>
-              Обрати вручну, без передачі
+              Обрати сцену вручну
             </Button>
             <Button variant="quiet" onClick={onDictate}>
               <MicIcon className="size-4 shrink-0" />

@@ -74,7 +74,7 @@ export function DebtSetup({
         <p className="text-xs text-mist">Суму ніде не зберігаємо й нікуди не надсилаємо.</p>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Button variant="quiet" onClick={onBack}>
-            Назад
+            Змінити тему
           </Button>
           <Button type="submit" size="lg" disabled={!value}>
             Далі
@@ -85,7 +85,7 @@ export function DebtSetup({
   );
 }
 
-/** Редагування коротких назв: задачі в рюкзаку або фрази на наліпках. */
+/** Короткі підписи каменів. Можна змінити, додати свої чи лишити без назв. */
 export function LabelsSetup({
   title,
   intro,
@@ -154,10 +154,10 @@ export function LabelsSetup({
       </div>
       <div className="flex w-full max-w-md flex-wrap items-center justify-between gap-3">
         <Button variant="quiet" onClick={onBack}>
-          Назад
+          Змінити тему
         </Button>
-        <Button size="lg" disabled={clean.length === 0} onClick={() => onDone(clean.slice(0, 8))}>
-          Далі
+        <Button size="lg" onClick={() => onDone(clean.slice(0, 8))}>
+          {clean.length ? "Далі" : "Без назв"}
         </Button>
       </div>
     </StagePanel>

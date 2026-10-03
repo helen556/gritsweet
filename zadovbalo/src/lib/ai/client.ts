@@ -29,6 +29,8 @@ export function createAnalyzer(fetchImpl: typeof fetch = (...a) => fetch(...a)) 
       controller = ctrl;
       const timer = setTimeout(() => ctrl.abort("timeout"), CLIENT_TIMEOUT_MS);
       try {
+        // Статичне превʼю без сервера: чесно кажемо, що автоматичне визначення вимкнене.
+        if (process.env.NEXT_PUBLIC_STATIC_PREVIEW === "1") return offline("not_configured");
         if (typeof navigator !== "undefined" && navigator.onLine === false) return offline("offline");
         const res = await fetchImpl("/api/analyze", {
           method: "POST",

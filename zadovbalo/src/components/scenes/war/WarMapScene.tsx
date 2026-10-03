@@ -11,7 +11,7 @@ import { haptic, sound } from "@/lib/scene/sound";
 import { pointInPoly } from "@/lib/scene/tear";
 import { RUSSIA_RINGS, RUSSIA_VIEW } from "@/lib/scenes/russia-outline";
 import type { SceneProps } from "../types";
-import { drawPiece, drawTearInProgress, makePiece, stepPieces, tearPiece, toLocal, toWorld, type Piece } from "../paper/pieces";
+import { drawPiece, drawTearInProgress, makePiece, stepPieces, tearPiece, toLocal, toWorld, type Piece } from "@/lib/scene/pieces";
 
 type Mode = "tear" | "burn" | "blast";
 const MODES: { id: Mode; label: string; hint: string }[] = [

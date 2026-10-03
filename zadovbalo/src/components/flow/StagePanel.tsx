@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/cn";
 
@@ -23,6 +23,7 @@ export function StagePanel({
   visibleOnLoad?: boolean;
 }) {
   const ref = useRef<HTMLElement>(null);
+  const reduced = useReducedMotion();
   useEffect(() => {
     if (!focusOnMount) return;
     const heading = ref.current?.querySelector<HTMLElement>("[data-stage-heading]");
@@ -34,10 +35,16 @@ export function StagePanel({
       ref={ref}
       aria-label={label}
       className={cn("relative mx-auto flex w-full max-w-5xl flex-col items-center text-center", className)}
-      initial={visibleOnLoad ? false : { opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0, transition: { duration: 0.45 } }}
-      transition={{ duration: 0.5 }}
+      // Просторовий перехід: попередній екран відходить углиб, новий наближається з глибини.
+      style={{ transformPerspective: 1200 }}
+      initial={visibleOnLoad ? false : reduced ? { opacity: 0 } : { opacity: 0, scale: 1.06, y: 18, rotateX: -4 }}
+      animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0 }}
+      exit={
+        reduced
+          ? { opacity: 0, transition: { duration: 0.2 } }
+          : { opacity: 0, scale: 0.9, y: -14, rotateX: 6, filter: "blur(6px)", transition: { duration: 0.5, ease: [0.4, 0, 0.6, 1] } }
+      }
+      transition={{ duration: reduced ? 0.25 : 0.7, ease: [0.16, 1, 0.3, 1] }}
     >
       {children}
     </motion.section>
@@ -59,7 +66,7 @@ export function StageHeading({
       data-stage-heading
       tabIndex={-1}
       className={cn(
-        "font-display font-medium text-balance text-frost outline-none [text-shadow:0_2px_40px_rgb(8_19_28/0.55)]",
+        "font-display font-medium text-balance text-frost outline-none [text-shadow:0_2px_40px_rgb(10_11_12/0.6)]",
         size === "mega" && "text-mega",
         size === "giant" && "text-giant",
         size === "title" && "text-title",

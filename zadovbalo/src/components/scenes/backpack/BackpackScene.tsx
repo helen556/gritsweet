@@ -1,344 +1,726 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/cn";
-import { hash2 } from "@/lib/scene/heightfield";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { loadImage, loadJson, useSceneAssets } from "@/lib/scene/assets";
+import { drawSoftShadow } from "@/lib/scene/bend";
+import { useCanvas2D } from "@/lib/scene/canvas";
 import { useFrameLoop } from "@/lib/scene/loop";
-import { bindPointer } from "@/lib/scene/pointer";
+import { usePointer } from "@/lib/scene/pointer";
 import { haptic, sound } from "@/lib/scene/sound";
+import {
+  contactShadow,
+  featherImage,
+  makeSprite,
+  opaqueAt,
+  type Sprite,
+} from "@/lib/scene/sprite";
 import type { SceneProps } from "../types";
 
-type Zone = "today" | "later" | "help";
-const ZONES: { id: Zone; label: string }[] = [
-  { id: "today", label: "Сьогодні" },
-  { id: "later", label: "Може почекати" },
-  { id: "help", label: "Потрібна допомога" },
-];
-const SHAPES = ["book", "box", "ball", "bottle", "folder", "weight"] as const;
-type Shape = (typeof SHAPES)[number];
-
-interface Item {
-  id: number;
-  label: string;
-  shape: Shape;
-  /** Вага: важчі тягнуться повільніше й сильніше провисають. */
-  weight: number;
-  where: "bag" | Zone;
+interface Meta {
+  size: [number, number];
+  order: string[];
+  supports: Record<string, Record<string, number>>;
+  stones: Record<
+    string,
+    { x: number; y: number; w: number; h: number; cx: number; cy: number }
+  >;
+  flap: { x: number; y: number; w: number; h: number };
+  flapEdge: [number, number][];
 }
 
-interface Drag {
-  id: number;
-  pointer: number;
+const TAGS = [
+  "Відкласти",
+  "Попросити допомоги",
+  "Це не моя відповідальність",
+] as const;
+type Tag = (typeof TAGS)[number];
+/** Кому дістаються підписи: спершу найбільші й найдоступніші камені. */
+const LABEL_ORDER = ["B", "C", "D", "E", "A", "F"];
+const FLOOR_Y = 1030; // лінія підлоги на фото (поруч із рюкзаком)
+const BAG_BOTTOM = 1060;
+
+interface Stone {
+  key: string;
+  sprite: Sprite;
+  /** Центр у світових координатах (пікселі фото). */
   x: number;
   y: number;
-  tx: number;
-  ty: number;
   vx: number;
   vy: number;
-  ox: number;
-  oy: number;
+  rot: number;
+  vr: number;
+  scale: number;
+  restX: number;
+  restY: number;
+  /** Осідання, коли зникла опора (ціль і показане з пружиною). */
+  settle: number;
+  shownSettle: number;
+  sv: number;
+  inBag: boolean;
+  /** Камінь піднято над клапаном (малюється поверх тканини). */
+  above: boolean;
+  lift: number;
+  label: string | null;
+  tag: Tag | null;
+  order: number;
+  /** Куди падає після відпускання. */
+  dropTo: { x: number; y: number } | null;
 }
 
-export default function BackpackScene({ input, reducedMotion, setHint, onSettled }: SceneProps) {
-  const labels = (input.labels?.length ? input.labels : ["Робота", "Дім", "Рахунки"]).slice(0, 8);
-  const [items, setItems] = useState<Item[]>(() =>
-    labels.map((label, id) => ({ id, label, shape: SHAPES[id % SHAPES.length]!, weight: 0.7 + hash2(id, 3) * 0.9, where: "bag" })),
-  );
-  const [open, setOpen] = useState(0);
-  const [dragId, setDragId] = useState<number | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const bagRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const zoneRefs = useRef<Record<Zone, HTMLDivElement | null>>({ today: null, later: null, help: null });
-  const ghostRef = useRef<HTMLDivElement>(null);
-  const drag = useRef<Drag | null>(null);
-  const zip = useRef<{ pointer: number } | null>(null);
-  const itemsRef = useRef(items);
-  const openRef = useRef(open);
-  useEffect(() => {
-    itemsRef.current = items;
-    openRef.current = open;
-  });
-
-  const inBag = items.filter((i) => i.where === "bag");
-  const fullness = inBag.length / Math.max(1, items.length);
-  const zipped = open < 0.85;
-
-  useEffect(() => {
-    if (items.length && inBag.length === 0) {
-      setHint("Що хочеш залишити на сьогодні?");
-      onSettled();
-    }
-  }, [inBag.length, items.length, onSettled, setHint]);
-
-  const moveItem = useCallback(
-    (id: number, where: Item["where"]) => {
-      setItems((all) => all.map((i) => (i.id === id ? { ...i, where } : i)));
-      if (where !== "bag") {
-        sound.play("thud", 0.5);
-        haptic(10);
-      }
-    },
-    [],
-  );
-
-  const zoneAt = (x: number, y: number): Zone | null => {
-    for (const z of ZONES) {
-      const r = zoneRefs.current[z.id]?.getBoundingClientRect();
-      if (r && x >= r.left - 8 && x <= r.right + 8 && y >= r.top - 8 && y <= r.bottom + 8) return z.id;
-    }
-    return null;
+async function loadBackpack() {
+  const meta = await loadJson<Meta>("/scenes/backpack/backpack.json");
+  const [base, flap, ...stones] = await Promise.all([
+    loadImage("/scenes/backpack/base.webp"),
+    loadImage("/scenes/backpack/flap.webp"),
+    ...meta.order.map((k) => loadImage(`/scenes/backpack/stone-${k}.webp`)),
+  ]);
+  return {
+    meta,
+    base: featherImage(base, 0.1),
+    flap,
+    sprites: Object.fromEntries(
+      meta.order.map((k, i) => [k, makeSprite(stones[i]!)]),
+    ) as Record<string, Sprite>,
   };
+}
+
+export default function BackpackScene(props: SceneProps) {
+  const assets = useSceneAssets(loadBackpack);
+  if (assets.status === "loading")
+    return (
+      <div
+        role="status"
+        className="grid h-full place-items-center text-sm text-mist"
+      >
+        Готую рюкзак…
+      </div>
+    );
+  if (assets.status === "error")
+    return (
+      <div className="grid h-full place-items-center gap-3 px-6 text-center text-mist">
+        <p>Не вдалося завантажити рюкзак.</p>
+        <button
+          type="button"
+          onClick={assets.retry}
+          className="scene-btn border border-steel/60"
+        >
+          Спробувати ще
+        </button>
+      </div>
+    );
+  return <Backpack {...props} data={assets.data} />;
+}
+
+function Backpack({
+  input,
+  reducedMotion,
+  onSettled,
+  setHint,
+  onInteract,
+  data,
+}: SceneProps & { data: Awaited<ReturnType<typeof loadBackpack>> }) {
+  const { meta, base, flap, sprites } = data;
+  const { canvasRef, ctx, size } = useCanvas2D();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [menu, setMenu] = useState<{
+    key: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [outCount, setOutCount] = useState(0);
+  const [, force] = useState(0);
+
+  const labels = useMemo(
+    () => (input.labels ?? []).slice(0, 6),
+    [input.labels],
+  );
+  const stones = useRef<Stone[]>([]);
+  if (stones.current.length === 0) {
+    stones.current = meta.order.map((k, i) => {
+      const m = meta.stones[k]!;
+      const li = LABEL_ORDER.indexOf(k);
+      return {
+        key: k,
+        sprite: sprites[k]!,
+        x: m.x + m.w / 2,
+        y: m.y + m.h / 2,
+        vx: 0,
+        vy: 0,
+        rot: 0,
+        vr: 0,
+        scale: 1,
+        restX: m.x + m.w / 2,
+        restY: m.y + m.h / 2,
+        settle: 0,
+        shownSettle: 0,
+        sv: 0,
+        inBag: true,
+        above: false,
+        lift: 0,
+        label: li >= 0 && li < labels.length ? labels[li]! : null,
+        tag: null,
+        order: i,
+        dropTo: null,
+      };
+    });
+  }
+  const drag = useRef<{
+    key: string;
+    id: number;
+    ox: number;
+    oy: number;
+    tx: number;
+    ty: number;
+    sx: number;
+    sy: number;
+    moved: number;
+  } | null>(null);
+  const bagLoad = useRef(1);
+
+  // Вид: рюкзак у центрі, довкола — підлога, куди можна класти камені.
+  const view = useMemo(() => {
+    const W = size.width;
+    const H = size.height;
+    const worldW = 1254;
+    const worldH = 1380;
+    const s = Math.min(W / worldW, H / worldH);
+    return { s, ox: (W - worldW * s) / 2, oy: (H - worldH * s) / 2 - 40 * s };
+  }, [size]);
+  const toWorld = useCallback(
+    (x: number, y: number) => ({
+      x: (x - view.ox) / view.s,
+      y: (y - view.oy) / view.s,
+    }),
+    [view],
+  );
+
+  const flapEdgeY = useCallback(
+    (x: number) => {
+      const e = meta.flapEdge;
+      if (x <= e[0]![0]) return e[0]![1];
+      for (let i = 1; i < e.length; i++) {
+        const [x1, y1] = e[i]!;
+        const [x0, y0] = e[i - 1]!;
+        if (x <= x1) return y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
+      }
+      return e[e.length - 1]![1];
+    },
+    [meta.flapEdge],
+  );
+
+  /**
+   * Осідання: кожен камінь у рюкзаку падає, доки не ляже на камінь під ним або на дно.
+   * Рахуємо знизу вгору; базовий стан (повний рюкзак) віднімаємо, щоб на старті нічого не рухалось.
+   */
+  const stackBottoms = useCallback((present: (st: Stone) => boolean) => {
+    const list = stones.current.filter(present).sort((a, b) => b.restY + b.sprite.h / 2 - (a.restY + a.sprite.h / 2));
+    const placed: { key: string; x0: number; x1: number; top: number; depth: number }[] = [];
+    const out = new Map<string, number>();
+    for (const st of list) {
+      const depth = meta.order.indexOf(st.key);
+      const x0 = st.restX - st.sprite.w * 0.36;
+      const x1 = st.restX + st.sprite.w * 0.36;
+      // Дно рюкзака в перспективі: що далі від нас, то вище на екрані.
+      let floor = 850 - (meta.order.length - 1 - depth) * 42;
+      // Опора — камені позаду або ті, на яких він лежить на фото; ближчі — ні: камінь ковзає вниз позаду них.
+      const own = meta.supports[st.key] ?? {};
+      for (const q of placed) if ((q.depth <= depth || q.key in own) && Math.min(x1, q.x1) - Math.max(x0, q.x0) > 20) floor = Math.min(floor, q.top);
+      // Нижня точка не нижче опори, але й не вище, ніж лежить зараз (камені не злітають).
+      const restBottom = st.restY + st.sprite.h * 0.42;
+      const bottom = Math.max(restBottom, floor);
+      out.set(st.key, bottom - restBottom);
+      placed.push({ key: st.key, x0, x1, top: bottom - st.sprite.h * 0.58, depth });
+    }
+    return out;
+  }, [meta.order, meta.supports]);
+  const baseline = useRef<Map<string, number> | null>(null);
+
+  const recomputeSettle = useCallback(() => {
+    baseline.current ??= stackBottoms(() => true);
+    const now = stackBottoms((st) => st.inBag);
+    for (const s of stones.current) s.settle = Math.max(0, (now.get(s.key) ?? 0) - (baseline.current.get(s.key) ?? 0));
+    const total = stones.current.reduce((a, s) => a + s.sprite.w * s.sprite.h, 0);
+    const left = stones.current.filter((s) => s.inBag).reduce((a, s) => a + s.sprite.w * s.sprite.h, 0);
+    bagLoad.current = left / total;
+  }, [stackBottoms]);
+
+  const relax = useRef(1); // плавне «розправляння» тканини (1 — повний рюкзак)
+
+  const draw = useCallback(() => {
+    const g = ctx;
+    if (!g) return;
+    const { s, ox, oy } = view;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, g.canvas.width, g.canvas.height);
+    const dpr = size.dpr;
+    g.setTransform(dpr * s, 0, 0, dpr * s, dpr * ox, dpr * oy);
+    // Тло-підлога (тон фото), рюкзак.
+    const load = relax.current;
+    const cx = 660;
+    // Повний рюкзак трохи роздутий; з кожним каменем тканина розправляється.
+    g.save();
+    g.translate(cx, BAG_BOTTOM);
+    g.scale(1 + 0.018 * load, 1 - 0.008 * load);
+    g.translate(-cx, -BAG_BOTTOM);
+    g.drawImage(base, 0, 0);
+    g.restore();
+
+    const list = stones.current;
+    const d = drag.current;
+    const inside = list
+      .filter((st) => st.inBag || !st.above)
+      .sort((a, b) => a.order - b.order);
+    for (const st of inside) drawStone(g, st);
+
+    // Передній клапан: під вагою провисає нижче; без каменів піднімається.
+    g.save();
+    g.translate(cx, BAG_BOTTOM);
+    g.scale(1 + 0.012 * load, 1 - 0.035 * (1 - load));
+    g.translate(-cx, -BAG_BOTTOM);
+    g.drawImage(flap, meta.flap.x, meta.flap.y);
+    g.restore();
+
+    const outside = list
+      .filter((st) => !st.inBag && st.above)
+      .sort((a, b) =>
+        d && a.key === d.key ? 1 : d && b.key === d.key ? -1 : a.y - b.y,
+      );
+    for (const st of outside) {
+      const floorScale = st.scale;
+      const rx = st.sprite.w * 0.46 * floorScale;
+      const ry = st.sprite.h * 0.16 * floorScale;
+      if (st.lift > 2)
+        drawSoftShadow(
+          g,
+          st.x + st.lift * 0.5,
+          st.y + st.sprite.h * 0.32 * floorScale + st.lift * 0.9,
+          rx * 1.6,
+          ry * 1.6,
+          0,
+          16 + st.lift * 0.6,
+          Math.max(0.18, 0.5 - st.lift * 0.004),
+          ry,
+        );
+      else
+        contactShadow(
+          g,
+          st.x + 6,
+          st.y + st.sprite.h * 0.36 * floorScale,
+          rx * 1.05,
+          ry * 1.1,
+          0.62,
+        );
+      drawStone(g, st);
+    }
+    // Підписи — шар сайту, не частина фото.
+    for (const st of list) if (st.label || st.tag) drawLabel(g, st, s);
+  }, [ctx, view, size.dpr, base, flap, meta.flap]);
+
+  function drawStone(g: CanvasRenderingContext2D, st: Stone) {
+    const sc = st.scale * (1 + st.lift * 0.0016);
+    g.save();
+    g.translate(st.x, st.y + (st.inBag && !st.above ? st.shownSettle : 0));
+    g.rotate(st.rot);
+    g.scale(sc, sc);
+    g.drawImage(st.sprite.img, -st.sprite.w / 2, -st.sprite.h / 2);
+    g.restore();
+  }
+
+  function drawLabel(g: CanvasRenderingContext2D, st: Stone, s: number) {
+    const text = st.label ?? "";
+    const sub = st.tag ? st.tag.toLowerCase() : "";
+    const fs = 13 / s; // однаковий розмір тексту на екрані
+    g.save();
+    g.font = `600 ${fs}px system-ui, -apple-system, sans-serif`;
+    const tw = Math.max(
+      g.measureText(text).width,
+      sub ? g.measureText(sub).width * 0.8 : 0,
+    );
+    const padX = 9 / s;
+    const h = (sub && text ? 36 : 23) / s;
+    const y = st.y + (st.inBag && !st.above ? st.shownSettle : 0) - h / 2;
+    g.fillStyle = "rgba(14,16,18,0.78)";
+    g.beginPath();
+    g.roundRect(st.x - tw / 2 - padX, y, tw + padX * 2, h, 8 / s);
+    g.fill();
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillStyle = "#eceeee";
+    if (text) g.fillText(text, st.x, y + (sub ? 12 / s : h / 2));
+    if (sub) {
+      g.font = `500 ${fs * 0.78}px system-ui, -apple-system, sans-serif`;
+      g.fillStyle = "#aab3b8";
+      g.fillText(sub, st.x, y + (text ? 26 / s : h / 2));
+    }
+    g.restore();
+  }
 
   const wake = useFrameLoop(rootRef, (dt) => {
+    let busy = false;
     const d = drag.current;
-    if (!d) return false;
-    const el = ghostRef.current;
-    if (!el) return true; // предмет ще монтується — наступний кадр
-    const item = itemsRef.current.find((i) => i.id === d.id);
-    const w = item?.weight ?? 1;
-    // Важче — мʼякша пружина й більше запізнення.
-    const k = reducedMotion ? 400 : 260 / w;
-    const c = reducedMotion ? 40 : 22 / Math.sqrt(w);
-    d.vx += ((d.tx - d.x) * k - d.vx * c) * dt;
-    d.vy += ((d.ty - d.y) * k - d.vy * c) * dt;
-    d.x += d.vx * dt;
-    d.y += d.vy * dt;
-    const tilt = reducedMotion ? 0 : Math.max(-25, Math.min(25, d.vx * 0.03 * w));
-    el.style.transform = `translate3d(${d.x - d.ox}px, ${d.y - d.oy}px, 0) rotate(${tilt}deg)`;
-    return true;
+    for (const st of stones.current) {
+      if (d && d.key === st.key) {
+        // Тягнемо: пружина за пальцем, нахил від швидкості (вага, інерція).
+        let tx = d.tx - d.ox;
+        let ty = d.ty - d.oy;
+        if (st.inBag && !st.above) {
+          // Ще в рюкзаку: виходить лише через отвір — угору.
+          tx = Math.max(
+            400 + st.sprite.w * 0.25,
+            Math.min(950 - st.sprite.w * 0.25, tx),
+          );
+          const bottom = ty + st.sprite.h * 0.42;
+          // Підняли над краєм клапана — або просто рішуче потягли: камінь виходить через отвір.
+          const pulled = Math.hypot(d.tx - d.sx, d.ty - d.sy);
+          if (bottom < flapEdgeY(tx) - 40 || pulled > 120) st.above = true;
+        }
+        const k = reducedMotion ? 120 : 75; // камінь важкий — відстає більше за купюру
+        const c = reducedMotion ? 22 : 14;
+        st.vx += ((tx - st.x) * k - st.vx * c) * dt;
+        st.vy += ((ty - st.y) * k - st.vy * c) * dt;
+        st.x += st.vx * dt;
+        st.y += st.vy * dt;
+        const targetRot = reducedMotion
+          ? 0
+          : Math.max(-0.35, Math.min(0.35, st.vx * 0.0006));
+        st.vr += ((targetRot - st.rot) * 50 - st.vr * 9) * dt;
+        st.rot += st.vr * dt;
+        st.lift += (40 - st.lift) * Math.min(1, dt * 8);
+        busy = true;
+        continue;
+      }
+      if (st.dropTo) {
+        // Падає на підлогу або повертається в рюкзак.
+        const k = 90;
+        const c = 13;
+        st.vx += ((st.dropTo.x - st.x) * k - st.vx * c) * dt;
+        st.vy += ((st.dropTo.y - st.y) * k - st.vy * c) * dt;
+        st.x += st.vx * dt;
+        st.y += st.vy * dt;
+        st.lift += (0 - st.lift) * Math.min(1, dt * 10);
+        st.rot += (st.rot > 0 ? -1 : 1) * Math.min(Math.abs(st.rot), dt * 0.4);
+        const targetScale = st.inBag ? 1 : floorScale(st.dropTo.y);
+        st.scale += (targetScale - st.scale) * Math.min(1, dt * 8);
+        busy = true;
+        if (
+          Math.hypot(st.dropTo.x - st.x, st.dropTo.y - st.y) < 0.8 &&
+          Math.hypot(st.vx, st.vy) < 8 &&
+          st.lift < 0.5
+        ) {
+          if (!st.inBag) {
+            sound.play("thud", 0.7);
+            haptic(10);
+          }
+          if (st.inBag) {
+            st.above = false;
+            st.y = st.restY;
+            st.x = st.restX;
+            st.shownSettle = st.settle;
+            st.sv = 0;
+          }
+          st.dropTo = null;
+          st.lift = 0;
+        }
+      }
+    }
+    // Осідання тих, що лишились (з легким пружинним відскоком).
+    const target = bagLoad.current;
+    if (Math.abs(relax.current - target) > 0.002) {
+      relax.current += (target - relax.current) * Math.min(1, dt * 3);
+      busy = true;
+    }
+    for (const st of stones.current) {
+      if (!st.inBag || st.above) continue;
+      if (Math.abs(st.shownSettle - st.settle) > 0.2 || Math.abs(st.sv) > 1) {
+        st.sv +=
+          ((st.settle - st.shownSettle) * 160 -
+            st.sv * (reducedMotion ? 40 : 15)) *
+          dt;
+        st.shownSettle += st.sv * dt;
+        busy = true;
+      }
+    }
+    draw();
+    return busy;
   });
 
   useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-    return bindPointer(root, {
-      down: (p, e) => {
-        const target = e.target as HTMLElement;
-        const r = root.getBoundingClientRect();
-        // Бігунок блискавки.
-        if (target.closest("[data-zip]")) {
-          zip.current = { pointer: p.id };
-          return;
+    draw();
+    wake();
+  }, [draw, wake]);
+
+  const takeOut = useCallback(
+    (st: Stone, at?: { x: number; y: number }) => {
+      st.inBag = false;
+      st.above = true;
+      st.order = 100 + stones.current.filter((s) => !s.inBag).length;
+      st.dropTo = at ?? freeSpot(stones.current, st);
+      recomputeSettle();
+      const out = stones.current.filter((s) => !s.inBag).length;
+      setOutCount(out);
+      if (out === stones.current.length) {
+        onSettled();
+        setHint("Рюкзак порожній. Можна побути тут скільки треба.");
+      } else if (out === 1)
+        setHint(
+          "Решта осіла. Можна торкнутися вийнятого каменя — і вирішити, що з ним.",
+        );
+      else setHint("Не обовʼязково виймати все.");
+    },
+    [recomputeSettle, onSettled, setHint],
+  );
+
+  {
+    const pick = (wx: number, wy: number) => {
+      const list = [...stones.current].sort((a, b) => {
+        const za = a.inBag && !a.above ? a.order : 1000 + a.y;
+        const zb = b.inBag && !b.above ? b.order : 1000 + b.y;
+        return zb - za;
+      });
+      for (const st of list) {
+        if (st.dropTo) continue;
+        const sc = st.scale;
+        const lx = (wx - st.x) / sc + st.sprite.w / 2;
+        const ly =
+          (wy - st.y - (st.inBag && !st.above ? st.shownSettle : 0)) / sc +
+          st.sprite.h / 2;
+        if (!opaqueAt(st.sprite, lx, ly)) continue;
+        // У рюкзаку: місце, закрите клапаном, не вхопити (видно лише відкриту частину).
+        if (st.inBag && !st.above && wy > flapEdgeY(wx) + 4) continue;
+        return st;
+      }
+      return null;
+    };
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    usePointer(rootRef, {
+      down: (p) => {
+        if (drag.current) return false;
+        const w = toWorld(p.x, p.y);
+        const st = pick(w.x, w.y);
+        if (!st) return false;
+        onInteract();
+        setMenu(null);
+        const lift = p.type === "touch" ? 30 / view.s : 0;
+        drag.current = {
+          key: st.key,
+          id: p.id,
+          ox: w.x - st.x,
+          oy: w.y - st.y + lift,
+          tx: w.x,
+          ty: w.y,
+          sx: w.x,
+          sy: w.y,
+          moved: 0,
+        };
+        if (st.inBag) {
+          st.order = 50; // піднятий — поверх інших каменів у рюкзаку
+          st.y += st.shownSettle;
+          st.shownSettle = 0;
+          drag.current.oy = w.y - st.y + lift;
         }
-        const el = target.closest<HTMLElement>("[data-item]");
-        if (!el) return false;
-        const id = Number(el.dataset.item);
-        const item = itemsRef.current.find((i) => i.id === id);
-        if (!item || (item.where === "bag" && openRef.current < 0.85)) {
-          setHint("Спершу відкрий блискавку.");
-          return false;
-        }
-        const b = el.getBoundingClientRect();
-        drag.current = { id, pointer: p.id, x: b.left - r.left + b.width / 2, y: b.top - r.top + b.height / 2, tx: p.x, ty: p.y - 30, vx: 0, vy: 0, ox: b.width / 2, oy: b.height / 2 };
-        setDragId(id);
-        sound.play("soft", 0.4);
+        st.vx = st.vy = 0;
+        sound.play("clay", 0.4);
         wake();
       },
       move: (p) => {
-        if (zip.current?.pointer === p.id) {
-          const t = trackRef.current?.getBoundingClientRect();
-          if (!t) return;
-          const r = root.getBoundingClientRect();
-          const v = Math.max(0, Math.min(1, (p.x + r.left - t.left) / t.width));
-          if (Math.abs(v - openRef.current) > 0.04) sound.play("zip", 0.5);
-          setOpen((o) => Math.max(o, v));
-          return;
-        }
         const d = drag.current;
-        if (!d || d.pointer !== p.id) return;
-        d.tx = p.x;
-        d.ty = p.y - 30;
+        if (!d || d.id !== p.id) return;
+        const w = toWorld(p.x, p.y);
+        d.moved += Math.hypot(w.x - d.tx, w.y - d.ty);
+        d.tx = w.x;
+        d.ty = w.y;
         wake();
       },
       up: (p, cancelled) => {
-        if (zip.current?.pointer === p.id) {
-          zip.current = null;
-          if (openRef.current > 0.85) {
-            setOpen(1);
-            setHint("Витягай справи й розкладай: сьогодні, потім, потрібна допомога.");
+        const d = drag.current;
+        if (!d || d.id !== p.id) return;
+        drag.current = null;
+        const st = stones.current.find((s) => s.key === d.key)!;
+        if (cancelled) {
+          // Перерваний дотик: повертаємо туди, де камінь був.
+          st.dropTo = st.inBag
+            ? { x: st.restX, y: st.restY + st.settle }
+            : { x: st.x, y: Math.max(st.y, FLOOR_Y - 120) };
+          if (st.inBag) {
+            st.above = false;
+            st.shownSettle = 0;
           }
+          if (st.inBag) st.order = meta.order.indexOf(st.key);
+          wake();
           return;
         }
-        const d = drag.current;
-        if (!d || d.pointer !== p.id) return;
-        const r = root.getBoundingClientRect();
-        const zone = cancelled ? null : zoneAt(d.x + r.left, d.y + r.top);
-        if (zone) moveItem(d.id, zone);
-        drag.current = null;
-        setDragId(null);
+        // Тап по вийнятому каменю — необовʼязкове «що з ним».
+        if (!st.inBag && d.moved < 6 / view.s) {
+          setMenu({
+            key: st.key,
+            x: st.x * view.s + view.ox,
+            y: (st.y - st.sprite.h * 0.5) * view.s + view.oy,
+          });
+          st.dropTo = { x: st.x, y: st.y };
+          wake();
+          return;
+        }
+        const inOpening =
+          st.x > 420 && st.x < 940 && st.y > 260 && st.y < flapEdgeY(st.x);
+        if (st.inBag && (!st.above || inOpening)) {
+          // Не витягнули — камінь лягає назад.
+          st.above = false;
+          st.order = meta.order.indexOf(st.key);
+          st.dropTo = { x: st.restX, y: st.restY + st.settle };
+          st.shownSettle = 0;
+        } else if (!st.inBag && inOpening) {
+          // Повернули в рюкзак.
+          st.inBag = true;
+          st.above = false;
+          st.order = meta.order.indexOf(st.key);
+          recomputeSettle();
+          st.dropTo = { x: st.restX, y: st.restY + st.settle };
+          st.shownSettle = 0;
+          setOutCount(stones.current.filter((s) => !s.inBag).length);
+        } else if (st.inBag) {
+          takeOut(st, {
+            x: clampX(st.x, view, size.width),
+            y: Math.max(FLOOR_Y - 60, Math.min(1330, st.y + 40)),
+          });
+        } else {
+          st.dropTo = {
+            x: clampX(st.x, view, size.width),
+            y: Math.max(FLOOR_Y - 60, Math.min(1330, st.y + 30)),
+          };
+        }
+        force((n) => n + 1);
+        wake();
       },
     });
-  }, [moveItem, setHint, wake]);
+  }
 
-  const nextInBag = inBag[0];
-  const dragged = items.find((i) => i.id === dragId);
+  const keyboardOut = (key: string) => {
+    const st = stones.current.find((s) => s.key === key);
+    if (!st || !st.inBag) return;
+    onInteract();
+    takeOut(st);
+    wake();
+  };
+
+  const inBagList = stones.current.filter((s) => s.inBag);
+  const menuStone = menu
+    ? stones.current.find((s) => s.key === menu.key)
+    : null;
 
   return (
-    <div ref={rootRef} className="scene-surface relative flex h-full flex-col items-center justify-between gap-3 px-3">
-      {/* Рюкзак */}
-      <div className="relative flex min-h-0 w-full flex-1 items-center justify-center">
-        <div ref={bagRef} className="relative" style={{ width: "min(70vw, 300px)", aspectRatio: "0.9" }}>
-          <div aria-hidden className="absolute inset-x-[8%] bottom-[-4%] h-[10%] rounded-[50%] bg-black/60 blur-lg" />
-          {/* Шар 1: лямки й темне нутро в отворі */}
-          <svg viewBox="0 0 300 330" className="absolute inset-0 h-full w-full overflow-visible" aria-hidden>
-            <path d="M95 70 C70 40 90 10 120 18 M205 70 C230 40 210 10 180 18" stroke="#1c2f3a" strokeWidth="14" fill="none" strokeLinecap="round" />
-            <ellipse cx="150" cy={78 - 10 * fullness} rx={82 * Math.max(0.05, open)} ry={6 + 20 * open} fill="#050b10" />
-          </svg>
+    <div
+      ref={rootRef}
+      className="scene-surface relative h-full w-full overflow-hidden"
+    >
+      <canvas
+        ref={canvasRef}
+        aria-hidden
+        className="absolute inset-0 h-full w-full"
+      />
+      {ctx === null && (
+        <p className="absolute inset-x-0 top-1/3 text-center text-sm text-mist">
+          Анімація недоступна — скористайся кнопками нижче.
+        </p>
+      )}
 
-          {/* Шар 2: справи визирають з отвору (решта — всередині) */}
-          <div className={cn("absolute inset-x-[20%] top-[1%] flex h-[25%] items-end justify-center transition-opacity duration-500", zipped ? "pointer-events-none opacity-0" : "opacity-100")}>
-            {inBag.slice(0, 4).map((it, i, arr) => (
-              <ItemView
-                key={it.id}
-                item={it}
-                hidden={dragId === it.id}
-                style={{
-                  marginInline: -6,
-                  zIndex: arr.length - Math.abs(i - (arr.length - 1) / 2),
-                  transform: `translateY(${18 + Math.abs(i - (arr.length - 1) / 2) * 8}px) rotate(${(i - (arr.length - 1) / 2) * 9}deg)`,
-                }}
-              />
-            ))}
-          </div>
-
-          {/* Шар 3: передня стінка рюкзака */}
-          <svg viewBox="0 0 300 330" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden>
-            <defs>
-              <linearGradient id="bp-fabric" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor="#3e5a6b" />
-                <stop offset="0.55" stopColor="#2a4352" />
-                <stop offset="1" stopColor="#1a2c37" />
-              </linearGradient>
-              <radialGradient id="bp-light" cx="0.32" cy="0.28" r="0.75">
-                <stop offset="0" stopColor="#9fb0ba" stopOpacity="0.35" />
-                <stop offset="1" stopColor="#9fb0ba" stopOpacity="0" />
-              </radialGradient>
-            </defs>
-            <g style={{ transform: `scale(${1 + 0.1 * fullness}, ${0.92 + 0.08 * fullness})`, transformOrigin: "150px 320px", transition: "transform 900ms cubic-bezier(.16,1,.3,1)" }}>
-              {/* Корпус: що повніший, то опукліший. Верхній край — по блискавці. */}
-              <path
-                d={`M64 ${86 - 10 * fullness} Q150 ${70 - 10 * fullness} 236 ${86 - 10 * fullness} L${252 + 12 * fullness} 290 C${252 + 12 * fullness} 322 ${48 - 12 * fullness} 322 ${48 - 12 * fullness} 290 Z`}
-                fill="url(#bp-fabric)"
-              />
-              <path
-                d={`M64 ${86 - 10 * fullness} Q150 ${70 - 10 * fullness} 236 ${86 - 10 * fullness} L${252 + 12 * fullness} 290 C${252 + 12 * fullness} 322 ${48 - 12 * fullness} 322 ${48 - 12 * fullness} 290 Z`}
-                fill="url(#bp-light)"
-              />
-              {/* Кишеня */}
-              <rect x="92" y="190" width="116" height="88" rx="18" fill="#2f4958" stroke="#1a2a33" strokeWidth="1.5" />
-              <rect x="98" y="196" width="104" height="76" rx="14" fill="none" stroke="#7a95a3" strokeOpacity="0.35" strokeDasharray="4 4" />
-              <path d={`M72 ${98 - 10 * fullness} Q150 ${84 - 10 * fullness} 228 ${98 - 10 * fullness}`} fill="none" stroke="#7a95a3" strokeOpacity="0.35" strokeDasharray="4 4" />
-              {/* Кромка отвору й зубці блискавки */}
-              <path d={`M64 ${86 - 10 * fullness} Q150 ${70 - 10 * fullness} 236 ${86 - 10 * fullness}`} stroke="#15232c" strokeWidth="5" fill="none" strokeLinecap="round" />
-              {Array.from({ length: 26 }, (_, i) => {
-                const t = i / 25;
-                const x = 66 + 168 * t;
-                const yEdge = 86 - 10 * fullness - Math.sin(Math.PI * t) * 8;
-                const parted = t < open;
-                return <rect key={i} x={x - 2} y={yEdge - 2 - (parted ? 3 : 0)} width="4" height="4" rx="1" fill="#9fb0ba" opacity={parted ? 0.6 : 0.9} />;
-              })}
-            </g>
-          </svg>
-          {!zipped && inBag.length > 4 && (
-            <span className="absolute left-1/2 top-[34%] -translate-x-1/2 rounded-[var(--radius-hair)] bg-abyss/70 px-2 py-0.5 text-xs text-frost/85">ще {inBag.length - 4} всередині</span>
-          )}
-
-          {/* Доріжка й бігунок */}
-          <div ref={trackRef} className="absolute left-[23%] right-[23%] top-[11%] h-10">
+      {menu && menuStone && (
+        <div
+          role="dialog"
+          aria-label={
+            menuStone.label ? `Камінь «${menuStone.label}»` : "Камінь"
+          }
+          className="absolute z-20 flex w-60 -translate-x-1/2 -translate-y-full flex-col gap-1 rounded-[8px] border border-steel/60 bg-night/95 p-2 shadow-[0_20px_40px_-20px_rgb(0_0_0/0.9)]"
+          style={{
+            left: Math.max(130, Math.min(size.width - 130, menu.x)),
+            top: Math.max(170, menu.y),
+          }}
+        >
+          <p className="px-1 pb-1 text-xs text-mist">
+            Що з цим каменем? (необовʼязково)
+          </p>
+          {TAGS.map((t) => (
             <button
+              key={t}
               type="button"
-              data-zip
-              aria-label="Відкрити блискавку"
+              aria-pressed={menuStone.tag === t}
               onClick={() => {
-                setOpen(1);
-                sound.play("zip", 0.6);
-                setHint("Витягай справи й розкладай: сьогодні, потім, потрібна допомога.");
+                menuStone.tag = menuStone.tag === t ? null : t;
+                setMenu(null);
+                draw();
               }}
-              className="absolute top-1/2 grid size-11 -translate-x-1/2 -translate-y-1/2 cursor-grab place-items-center touch-none"
-              style={{ left: `${open * 100}%` }}
+              className={`min-h-10 rounded-[4px] px-2 text-left text-sm ${menuStone.tag === t ? "bg-frost text-abyss" : "text-frost hover:bg-slate"}`}
             >
-              <span className="block h-7 w-4 rounded-[3px] bg-gradient-to-b from-frost to-steel shadow-[0_4px_8px_rgb(0_0_0/0.6)] ring-1 ring-black/40" />
+              {t}
             </button>
-          </div>
-
-        </div>
-      </div>
-
-      {/* Три зони */}
-      <div className="grid w-full max-w-2xl grid-cols-3 gap-2">
-        {ZONES.map((z) => {
-          const here = items.filter((i) => i.where === z.id);
-          return (
-            <div
-              key={z.id}
-              ref={(el) => {
-                zoneRefs.current[z.id] = el;
-              }}
-              className={cn(
-                "flex min-h-28 flex-col gap-1.5 rounded-[var(--radius-edge)] border p-2 transition-colors",
-                "border-steel/45 bg-[linear-gradient(180deg,rgb(8_19_28/0.6),rgb(17_28_38/0.85))] shadow-[inset_0_6px_14px_rgb(0_0_0/0.45)]",
-                inBag.length === 0 && z.id === "today" && "border-tide",
-              )}
-            >
-              <span className="text-center text-[0.72rem] uppercase leading-tight tracking-[0.08em] text-frost/80">{z.label}</span>
-              <div className="flex flex-wrap justify-center gap-1">
-                {here.map((it) => (
-                  <ItemView key={it.id} item={it} small hidden={dragId === it.id} />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Клавіатурна альтернатива */}
-      <div className="flex min-h-24 w-full flex-wrap content-start items-center justify-center gap-2 pb-1" aria-live="polite">
-        {zipped ? (
-          <button type="button" className="scene-btn border border-steel/50" onClick={() => setOpen(1)}>
-            Відкрити рюкзак
+          ))}
+          <button
+            type="button"
+            onClick={() => setMenu(null)}
+            className="min-h-9 text-xs text-mist hover:text-frost"
+          >
+            Закрити
           </button>
-        ) : nextInBag ? (
-          <>
-            <span className="text-sm text-frost/80">«{nextInBag.label}» →</span>
-            {ZONES.map((z) => (
-              <button key={z.id} type="button" className="scene-btn border border-steel/50 text-xs" onClick={() => moveItem(nextInBag.id, z.id)}>
-                {z.label}
-              </button>
-            ))}
-          </>
-        ) : null}
-      </div>
-
-      {/* Предмет у руці */}
-      {dragged && (
-        <div ref={ghostRef} aria-hidden className="pointer-events-none absolute left-0 top-0 z-30 drop-shadow-[0_18px_18px_rgb(0_0_0/0.6)]" style={{ willChange: "transform" }}>
-          <ItemView item={dragged} />
         </div>
       )}
+
+      {/* Альтернатива перетягуванню (клавіатура, скрінрідер). */}
+      <div className="absolute inset-x-0 bottom-1 z-10 flex flex-wrap items-center justify-center gap-1.5 px-2">
+        {inBagList.length > 0 ? (
+          <details className="group">
+            <summary className="scene-btn cursor-pointer list-none border border-steel/50 text-sm">
+              Витягнути камінь кнопкою
+            </summary>
+            <div className="absolute inset-x-2 bottom-12 flex flex-wrap justify-center gap-1.5 rounded-[6px] bg-night/95 p-2">
+              {inBagList.map((s, i) => (
+                <button
+                  key={s.key}
+                  type="button"
+                  onClick={() => keyboardOut(s.key)}
+                  className="scene-btn border border-steel/50 text-sm"
+                >
+                  {s.label ?? `Камінь ${i + 1}`}
+                </button>
+              ))}
+            </div>
+          </details>
+        ) : null}
+        <span className="sr-only" aria-live="polite">
+          Вийнято каменів: {outCount} з {stones.current.length}
+        </span>
+      </div>
     </div>
   );
 }
 
-/** Предмет: форма й обʼєм залежать від типу; підпис — назва справи. */
-function ItemView({ item, small, hidden, style }: { item: Item; small?: boolean; hidden?: boolean; style?: React.CSSProperties }) {
-  const base = "relative flex select-none items-center justify-center text-center font-medium leading-tight text-abyss";
-  const size = small ? "min-h-9 min-w-14 px-2 text-[0.68rem]" : "min-h-14 min-w-20 px-3 text-xs";
-  const shapes: Record<Shape, string> = {
-    book: "rounded-[3px] bg-[linear-gradient(90deg,#7d8f9a_0_10%,#c9d4d8_10%_100%)] shadow-[inset_-3px_-3px_0_rgb(0_0_0/0.15)]",
-    box: "rounded-[2px] bg-[linear-gradient(160deg,#d8c0a5,#a98f72)] shadow-[inset_0_6px_0_rgb(255_255_255/0.25),inset_0_-4px_0_rgb(0_0_0/0.2)]",
-    ball: "rounded-full bg-[radial-gradient(circle_at_35%_30%,#e7ebed,#8fa6b0_70%,#5f7581)]",
-    bottle: "rounded-[14px_14px_8px_8px] bg-[linear-gradient(90deg,#8fb3b4,#c6dcdc_40%,#6f9a9c)]",
-    folder: "rounded-[2px_8px_2px_2px] bg-[linear-gradient(180deg,#b9c7c4,#93a7a5)] shadow-[inset_0_5px_0_rgb(255_255_255/0.3)]",
-    weight: "rounded-[4px] bg-[linear-gradient(180deg,#6c8291,#3c5263)] text-frost [clip-path:polygon(12%_0,88%_0,100%_100%,0_100%)]",
-  };
+/** Ближче до глядача (нижче) — трохи більший. */
+function floorScale(y: number) {
+  return Math.max(0.92, Math.min(1.14, 0.95 + (y - 1000) / 1600));
+}
+
+function clampX(x: number, view: { s: number; ox: number }, width: number) {
+  const minX = (16 - view.ox) / view.s + 60;
+  const maxX = (width - 16 - view.ox) / view.s - 60;
+  return Math.max(minX, Math.min(maxX, x));
+}
+
+/** Вільне місце на підлозі поруч із рюкзаком (для кнопки). */
+function freeSpot(all: Stone[], st: Stone) {
+  const spots = [
+    { x: 170, y: 1180 },
+    { x: 1090, y: 1180 },
+    { x: 380, y: 1290 },
+    { x: 880, y: 1290 },
+    { x: 630, y: 1320 },
+    { x: 140, y: 1320 },
+  ];
+  const taken = all.filter((s) => !s.inBag && s !== st);
   return (
-    <div
-      data-item={item.id}
-      className={cn(base, size, shapes[item.shape], "cursor-grab touch-none shadow-[0_6px_10px_-4px_rgb(0_0_0/0.6)]", hidden && "opacity-0")}
-      style={style}
-    >
-      <span className="max-w-[7rem] break-words">{item.label}</span>
-    </div>
+    spots.find((p) =>
+      taken.every(
+        (t) =>
+          Math.hypot((t.dropTo?.x ?? t.x) - p.x, (t.dropTo?.y ?? t.y) - p.y) >
+          160,
+      ),
+    ) ?? spots[0]!
   );
 }

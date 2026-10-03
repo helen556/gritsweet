@@ -1,21 +1,24 @@
 import type { Currency } from "@/lib/topics";
 
-export type Intensity = 1 | 2 | 3;
-
 /** Дані, що сцена отримує з потоку (уже підтверджені людиною). */
 export interface SceneInput {
   amount?: number;
   currency?: Currency | null;
-  /** Короткі назви (задачі для рюкзака, фрази для наліпок). */
+  /** Короткі підписи (камені рюкзака). */
   labels?: string[];
 }
 
 export interface SceneProps {
   input: SceneInput;
-  intensity: Intensity;
   reducedMotion: boolean;
-  /** Сцена дійшла природного кінця (сума = 0, рюкзак порожній…). Не примус — лише сигнал оболонці. */
+  /** Сцена дійшла природного кінця (сума = 0, клубок змотано…). Не примус — лише сигнал оболонці. */
   onSettled: () => void;
   /** Змінити підказку внизу. */
   setHint: (hint: string) => void;
+  /** Перша взаємодія: вступ згортається. */
+  onInteract: () => void;
+  /** Відкрити мʼяке завершення (кнопка «Завершити» всередині сцени). */
+  onFinish: () => void;
+  /** Змінити дані налаштування (суму/валюту) без повторного вибору теми. */
+  onEditInput?: () => void;
 }

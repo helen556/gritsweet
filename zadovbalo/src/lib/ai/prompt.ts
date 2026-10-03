@@ -15,10 +15,10 @@ categories (1-3, topics, not emotions):
 - financial_debt: debts, loans, credit, money pressure, unpaid bills.
 - overload: too many tasks/responsibilities, "everything is on me".
 - rumination: same thoughts looping, can't stop thinking, overthinking.
-- anger: rage/irritation as the main thing (at people, situations).
-- hurtful_words: someone's words/insults/criticism that stick.
+- anger: rage/irritation as the main thing (at people, situations). Prefer a concrete topic (debt, overload, war…) over anger when the anger is clearly about it.
+- unsaid_words: words left unsaid — something the person wanted to tell someone (after a hurt, an unfinished conversation, someone unreachable or someone who died) but never did.
 - control: feeling of losing control, chaos, wanting a pause or calm.
-- war_anger: ANGER specifically directed at the war/aggressor. NOT fear, grief or loss due to war (use general or needs_support for those).
+- war_anger: ANGER specifically directed at the war/aggressor/russia. NOT fear, grief or loss due to war (use general, or unsaid_words for words to someone lost; emotion fear/sadness).
 - general: vague "everything is too much" with no clear topic.
 - needs_support: ONLY explicit intent or plan to hurt oneself or someone else, or immediate danger. Figures of speech ("I want this debt to disappear", "I'll kill my boss" as venting) are NOT needs_support.
 

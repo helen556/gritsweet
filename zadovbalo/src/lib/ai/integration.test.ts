@@ -193,6 +193,6 @@ describe("confirmPhrase", () => {
   it("builds natural Ukrainian", () => {
     expect(confirmPhrase(["financial_debt", "overload"], "financial_debt")).toBe("Схоже, зараз найбільше тиснуть гроші й те, що все на тобі.");
     expect(confirmPhrase(["anger"], "anger")).toBe("Схоже, зараз найбільше тисне злість.");
-    expect(confirmPhrase(["hurtful_words", "rumination"], null)).toBe("Схоже, зараз найбільше тиснуть чужі слова й думки, що крутяться по колу.");
+    expect(confirmPhrase(["unsaid_words", "rumination"], null)).toBe("Схоже, зараз найбільше тиснуть невисловлені слова й думки, що крутяться по колу.");
   });
 });

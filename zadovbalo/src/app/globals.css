@@ -2,13 +2,14 @@
 
 /* ── Токени дизайн-системи «Задовбало» ─────────────────────────────── */
 @theme {
-  /* Холодна база: глибокий синьо-чорний → графіт → димчастий синій → сталь → срібло. */
-  --color-abyss: #08131c;
-  --color-night: #111c26;
-  --color-slate: #223543;
-  --color-steel: #567487;
-  --color-mist: #9fb0ba;
-  --color-frost: #e7ebed;
+  /* Графітова база (як тло фото-матеріалів сцен) → сталь → срібло. Легкий холодний відтінок. */
+  --color-abyss: #0f1214;
+  --color-night: #181c1f;
+  --color-slate: #2a3034;
+  --color-steel: #626d74;
+  --color-mist: #aab3b8;
+  --color-frost: #eceeee;
+  --color-graphite: #26282a;
   /* Приглушений бірюзовий — для «легше» станів і фокусу. */
   --color-tide: #6f9a9c;
   /* Тепле світло. Рідкісний акцент: не більше одного елемента на екран. */
@@ -159,12 +160,12 @@
 }
 
 /* ── Сцени ─────────────────────────────────────────────────────────── */
-/* Студійний фон: мʼяке верхнє світло, глибокі краї. */
+/* Студійний графітовий фон (той самий тон, що й на фото матеріалів): мʼяке верхнє світло, глибокі краї. */
 .scene-backdrop {
   background:
-    radial-gradient(70% 55% at 50% 30%, rgb(86 116 135 / 0.22), transparent 70%),
-    radial-gradient(120% 90% at 50% 110%, rgb(8 19 28 / 0.9), transparent 60%),
-    linear-gradient(180deg, #0e1b25 0%, #0a151e 55%, #070f16 100%);
+    radial-gradient(75% 60% at 50% 38%, rgb(70 72 74 / 0.55), transparent 72%),
+    radial-gradient(130% 90% at 50% 112%, rgb(10 11 12 / 0.92), transparent 62%),
+    linear-gradient(180deg, #2a2c2e 0%, #222426 55%, #18191b 100%);
 }
 
 @utility scene-btn {
@@ -190,6 +191,20 @@
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+}
+
+@keyframes debt-delta {
+  from {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-26px);
+    opacity: 0;
+  }
 }
 
 @keyframes debt-ripple {

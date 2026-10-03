@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { CATEGORIES, CURRENCIES, EMOTIONS } from "@/lib/topics";
-import { SCENE_IDS } from "@/lib/scenes/registry";
+import { CATEGORIES, CURRENCIES, EMOTIONS, migrateCategory } from "@/lib/topics";
+import { migrateScene, SCENE_IDS } from "@/lib/scenes/registry";
 
 export const MIN_TEXT_LENGTH = 2;
 export const MAX_TEXT_LENGTH = 2000;
@@ -10,8 +10,18 @@ export const analyzeRequestSchema = z
   .object({ text: z.string().trim().min(MIN_TEXT_LENGTH).max(MAX_TEXT_LENGTH) })
   .strict();
 
+/** Старі назви тем/сцен (hurtful_words, stickers…) → нинішні, до перевірки. Інших змін не робить. */
+function migrateLegacy(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const o = { ...(raw as Record<string, unknown>) };
+  if (Array.isArray(o.categories)) o.categories = o.categories.map(migrateCategory);
+  if ("primaryCategory" in o) o.primaryCategory = migrateCategory(o.primaryCategory);
+  if (Array.isArray(o.sceneIds)) o.sceneIds = [...new Set(o.sceneIds.map(migrateScene))];
+  return o;
+}
+
 /** Що мусить повернути модель. Перевіряється на сервері; відповідь моделі не довіряємо. */
-export const modelOutputSchema = z
+const modelOutputObject = z
   .object({
     categories: z.array(z.enum(CATEGORIES)).min(1).max(MAX_CATEGORIES),
     primaryCategory: z.enum(CATEGORIES).nullable(),
@@ -23,7 +33,9 @@ export const modelOutputSchema = z
   })
   .strict();
 
-export type ModelOutput = z.infer<typeof modelOutputSchema>;
+export const modelOutputSchema = z.preprocess(migrateLegacy, modelOutputObject);
+
+export type ModelOutput = z.infer<typeof modelOutputObject>;
 
 /** Та сама схема у форматі JSON Schema для JSON Mode Workers AI. */
 export const modelOutputJsonSchema = {

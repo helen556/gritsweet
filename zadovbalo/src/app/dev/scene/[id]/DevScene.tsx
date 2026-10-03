@@ -11,9 +11,9 @@ export function DevScene({ id, amount, currency }: { id: SceneId; amount?: numbe
   return (
     <SceneHost
       id={id}
-      input={{ amount: amount ?? 48500, currency: currency === undefined ? "UAH" : cur, labels: ["Звіт до пʼятниці", "Подзвонити мамі", "Лікар", "Податкова", "Прибрати", "Подарунок"] }}
-      onChangeAction={() => history.back()}
-      onFinish={() => router.push("/")}
+      input={{ amount: amount ?? 48500, currency: currency === undefined ? "UAH" : cur, labels: ["Робота", "Рахунки", "Чужі очікування"] }}
+      topicNote="Службовий перегляд сцени."
+      onExit={(kind) => (kind === "change" ? history.back() : router.push("/"))}
     />
   );
 }

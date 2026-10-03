@@ -76,7 +76,7 @@ export function StormHero({ scene, still = false }: { scene: HeroScene; still?: 
       />
 
       {/* Віньєтка і підкладка під текст */}
-      <div className="absolute inset-0 bg-[radial-gradient(120%_85%_at_50%_42%,transparent_35%,rgb(8_19_28/0.78)_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(120%_85%_at_50%_42%,transparent_35%,rgb(12_13_14/0.8)_100%)]" />
       <div className="absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-abyss/90 via-abyss/35 to-transparent" />
 
       {/* Плівкове зерно */}
