@@ -1,0 +1,98 @@
+{
+  "project": "Видихни",
+  "assets": [
+    {
+      "path": "assets/01_money/uah_500_reference.jpg",
+      "role": "Банкнота 500 грн; референс текстури",
+      "dimensions": [
+        1200,
+        578
+      ],
+      "sha256": "eacb09389eaeef72b8ebefc10c76c08b9237df9d4fc1600579d08beaf4993e0b"
+    },
+    {
+      "path": "assets/01_money/uah_1000_reference.jpg",
+      "role": "Банкнота 1000 грн; референс текстури",
+      "dimensions": [
+        1080,
+        654
+      ],
+      "sha256": "0a08bae1670cb1b436d708da58e69bdb98e96dce0c3ee23f900b71c400cd690d"
+    },
+    {
+      "path": "assets/02_backpack/backpack_empty.png",
+      "role": "Порожній рюкзак; кінцевий стан",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "sha256": "26aa875add4e3f046cc095d612c700769687343248d2c5b0816f5200335047cb"
+    },
+    {
+      "path": "assets/02_backpack/backpack_full_stones.png",
+      "role": "Рюкзак із каменями; початковий стан",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "sha256": "748cbd8609976f3a9a249ee1f99f1e91b5ac67aa89bc7d2d82a26fe58e1123c0"
+    },
+    {
+      "path": "assets/03_yarn/yarn_tangled_start.png",
+      "role": "Заплутана пряжа з доступним кінцем; початковий стан",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "sha256": "d15a0ea8e507dfcd97ea81d0abea5c88d4c28ebcc5cf82d1bc03b9375ded4bd1"
+    },
+    {
+      "path": "assets/03_yarn/yarn_wound_finish.png",
+      "role": "Змотаний клубок; кінцевий стан",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "sha256": "563a90475bd11be09066e1d803a32178e0ba4feeef8dabe1d9e946b6ba1c8f08"
+    },
+    {
+      "path": "assets/04_sand/sand_mixed_stones_start.png",
+      "role": "Погоджена сцена: камені в піску та вільне дерево для рядочка",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "sha256": "fb24636c0a9c00135607b1dc37ac4801638424f864791bb8884902cd8c84b66b"
+    },
+    {
+      "path": "assets/05_clay/clay_material_reference.jpg",
+      "role": "Фото реалістичної глини; референс матеріалу",
+      "dimensions": [
+        849,
+        1057
+      ],
+      "sha256": "098be9ce7f9e69dcd3e74a25e51fc0df193725d16a38224d1467bc316747e3bd"
+    },
+    {
+      "path": "assets/06_map/russia_paper_intact.png",
+      "role": "Паперова карта без українських територій; перевірити географію",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "sha256": "93f2f4cdea534d981c8f22077427ace9ce2ef47e5a493b29653ff76e8f6307b9"
+    },
+    {
+      "path": "assets/06_map/russia_paper_burning.png",
+      "role": "Та сама карта у вогні; кінцевий візуальний орієнтир",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "sha256": "1029a73869aa2a702e72897e62777ac89a5ff540661714511b8ed93f498ede58"
+    }
+  ],
+  "programmatic_scenes": [
+    "07_unsaid_message"
+  ]
+}
