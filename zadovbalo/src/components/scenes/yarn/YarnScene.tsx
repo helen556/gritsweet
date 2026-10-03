@@ -145,27 +145,10 @@ function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
       p.x += vx;
       p.y += vy;
     }
-    // Кінці. Поки є маса — нитка виходить з неї; коли змотано все, лишається вільний хвостик.
-    const headFree = phaseRef.current === "done";
-    if (!headFree) {
-      const e = exitPoint();
-      pts[0]!.x = pts[0]!.px = e.x;
-      pts[0]!.y = pts[0]!.py = e.y;
-    } else {
-      // Залишок нитки плавно лягає S-подібним хвостиком (як на фото змотаного клубка).
-      const tgt = s.tailTarget;
-      if (tgt) {
-        const k = Math.min(1, dt * 5);
-        for (let i = 0; i < pts.length - 1; i++) {
-          const p = pts[i]!;
-          const q = tgt[Math.min(i, tgt.length - 1)]!;
-          p.x += (q.x - p.x) * k;
-          p.y += (q.y - p.y) * k;
-          p.px = p.x;
-          p.py = p.y;
-        }
-      }
-    }
+    // Кінці: нитка виходить із маси.
+    const e = exitPoint();
+    pts[0]!.x = pts[0]!.px = e.x;
+    pts[0]!.y = pts[0]!.py = e.y;
     const last = pts[pts.length - 1]!;
     if (phaseRef.current === "free") {
       if (s.tipDrag) {

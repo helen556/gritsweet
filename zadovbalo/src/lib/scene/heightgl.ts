@@ -84,10 +84,14 @@ void main() {
   vec3 det = vec3(0.0);
   float dAlb = 0.0;
   if (hasDetail == 1) {
+    // Два шари рельєфу різного масштабу й під кутом — без помітного повтору.
     vec2 dt = uv * detailScale * G / 64.0;
-    float d0 = texture(D, dt).r;
-    float dx = texture(D, dt + vec2(1.0 / 512.0, 0.0)).r - d0;
-    float dy = texture(D, dt + vec2(0.0, 1.0 / 512.0)).r - d0;
+    vec2 dt2 = mat2(0.80, -0.60, 0.60, 0.80) * dt * 0.63 + vec2(0.37, 0.71);
+    vec2 o1 = vec2(1.0 / 512.0, 0.0);
+    vec2 o2 = vec2(0.0, 1.0 / 512.0);
+    float d0 = 0.6 * texture(D, dt).r + 0.4 * texture(D, dt2).r;
+    float dx = 0.6 * texture(D, dt + o1).r + 0.4 * texture(D, dt2 + o1).r - d0;
+    float dy = 0.6 * texture(D, dt + o2).r + 0.4 * texture(D, dt2 + o2).r - d0;
     det = vec3(-dx, -dy, 0.0) * detailStrength;
     dAlb = (d0 - 0.5);
   }
@@ -103,12 +107,16 @@ void main() {
   float shade = mix(1.0, diff * ao, mask);
   vec3 col = alb * shade + sp * mask;
   if (solid == 1) {
-    float presence = smoothstep(0.15, 1.2, c);
+    float presence = smoothstep(0.05, 0.9, c);
     // Тінь на стіл: чи затуляє матеріал світло (кілька кроків у бік світла).
+    // Тінь на стіл: промінь до світла піднімається на d·tg(кута); якщо глина вища — тінь.
     float sh = 0.0;
-    for (int k = 1; k <= 6; k++) {
-      vec2 q = uv + L.xy * e * float(k) * 3.0;
-      sh = max(sh, smoothstep(0.2, 6.0, h(q) - float(k) * 0.9));
+    float rise = L.z / max(length(L.xy), 0.05);
+    vec2 dir = normalize(L.xy);
+    for (int k = 1; k <= 8; k++) {
+      float d = float(k) * 3.0;
+      vec2 q = uv + dir * e * d;
+      sh = max(sh, smoothstep(0.0, 4.0, h(q) - c - d * rise));
     }
     vec4 table = vec4(0.0, 0.0, 0.0, sh * 0.55);
     o = mix(table, vec4(col, 1.0), presence);

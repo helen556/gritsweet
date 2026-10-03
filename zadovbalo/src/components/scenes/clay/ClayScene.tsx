@@ -1,264 +1,293 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
-import { createHeightfield, dent, fillLump, shade, smooth, smudge, squeeze, type Heightfield, type Material } from "@/lib/scene/heightfield";
+import { loadImage, loadJson, useSceneAssets } from "@/lib/scene/assets";
+import { createHeightfield, dent, fbm, shade, smooth, smudge, type Heightfield } from "@/lib/scene/heightfield";
+import { createHeightGL, type HeightGL } from "@/lib/scene/heightgl";
 import { useFrameLoop } from "@/lib/scene/loop";
-import { bindPointer } from "@/lib/scene/pointer";
+import { usePointer } from "@/lib/scene/pointer";
 import { detectQuality } from "@/lib/scene/quality";
 import { haptic, sound } from "@/lib/scene/sound";
 import type { SceneProps } from "../types";
 
-type Tool = "knead" | "smooth";
+type Tool = "shape" | "smooth";
 
-const CLAY: Material = { base: [164, 170, 172], grain: 0.06, specular: 0.05, shininess: 22, relief: 95 };
+/** Світло збоку зліва, як на фото глини. */
+const LIGHT: [number, number, number] = (() => {
+  const v = [-0.62, -0.42, 0.66];
+  const n = Math.hypot(v[0]!, v[1]!, v[2]!);
+  return [v[0]! / n, v[1]! / n, v[2]! / n] as [number, number, number];
+})();
 
-interface Touch {
-  x: number;
-  y: number;
-  gx: number;
-  gy: number;
-  pressure: number;
-  still: number;
+async function loadClay() {
+  const [meta, detail] = await Promise.all([loadJson<{ albedo: [number, number, number] }>("/scenes/clay/clay.json"), loadImage("/scenes/clay/detail.webp")]);
+  return { meta, detail };
 }
 
-export default function ClayScene({ intensity, setHint, onSettled }: SceneProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const clayRef = useRef<HTMLCanvasElement>(null);
-  const shadowRef = useRef<HTMLCanvasElement>(null);
-  const [tool, setTool] = useState<Tool>("knead");
-  const [failed, setFailed] = useState(false);
-  const toolRef = useRef(tool);
-  const intensityRef = useRef(intensity);
-  useEffect(() => {
-    toolRef.current = tool;
-    intensityRef.current = intensity;
-  });
+export default function ClayScene(props: SceneProps) {
+  const assets = useSceneAssets(loadClay);
+  if (assets.status === "loading") return <div role="status" className="grid h-full place-items-center text-sm text-mist">Готую глину…</div>;
+  if (assets.status === "error")
+    return (
+      <div className="grid h-full place-items-center gap-3 px-6 text-center text-mist">
+        <p>Не вдалося завантажити глину.</p>
+        <button type="button" onClick={assets.retry} className="scene-btn border border-steel/60">
+          Спробувати ще
+        </button>
+      </div>
+    );
+  return <Clay {...props} data={assets.data} />;
+}
 
-  const st = useRef<{
-    hf: Heightfield;
-    off: HTMLCanvasElement;
-    offShadow: HTMLCanvasElement;
-    img: ImageData;
-    imgShadow: ImageData;
-    rect: { x: number; y: number; size: number };
-    touches: Map<number, Touch>;
-    dirty: boolean;
-    actions: number;
-    lastSound: number;
-  } | null>(null);
-
-  // Ініціалізація поля й офскрін-буферів.
-  useEffect(() => {
-    const n = detectQuality().tier === "low" ? 168 : 256;
-    const hf = createHeightfield(n, n);
-    fillLump(hf, 1.7, 1);
-    const off = document.createElement("canvas");
-    off.width = off.height = n;
-    const offShadow = document.createElement("canvas");
-    offShadow.width = offShadow.height = n;
-    const octx = off.getContext("2d");
-    if (!octx) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- немає 2D-контексту: спрощений варіант
-      setFailed(true);
-      return;
+/** Брила глини: опукла «подушка» з заокругленими краями, як на фото, з помітними нерівностями. */
+function fillBlock(hf: Heightfield, height: number) {
+  const { w, h, data } = hf;
+  const cx = w / 2;
+  const cy = h / 2;
+  const rx = w * 0.3;
+  const ry = Math.min(h * 0.34, w * 0.34);
+  const band = Math.max(5, Math.min(rx, ry) * 0.22); // ширина заокруглення краю, клітинки
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const dx = Math.abs(x - cx) / rx;
+      const dy = Math.abs(y - cy) / ry;
+      // Суперелипс: майже квадрат із мʼякими кутами; край трохи «гуляє».
+      const r = Math.pow(Math.pow(dx, 4) + Math.pow(dy, 4), 0.25) * (1 + 0.06 * (fbm(x * 0.04, y * 0.04) - 0.5));
+      const dist = (1 - r) * Math.min(rx, ry); // відстань до краю в клітинках
+      if (dist <= 0) {
+        data[y * w + x] = 0;
+        continue;
+      }
+      const t = Math.min(1, dist / band);
+      const edge = Math.sin((t * Math.PI) / 2); // чверть кола — круглий бік без сходинок
+      const crown = 1 - 0.18 * r * r;
+      const lumps = 1 + 0.16 * (fbm(x * 0.035 + 3, y * 0.035) - 0.5) + 0.05 * (fbm(x * 0.12, y * 0.12 + 7) - 0.5);
+      data[y * w + x] = height * edge * crown * lumps;
     }
-    st.current = {
-      hf,
-      off,
-      offShadow,
-      img: octx.createImageData(n, n),
-      imgShadow: octx.createImageData(n, n),
-      rect: { x: 0, y: 0, size: 1 },
-      touches: new Map(),
-      dirty: true,
-      actions: 0,
-      lastSound: 0,
-    };
+}
+
+function Clay({ reducedMotion, setHint, onInteract, data }: SceneProps & { data: Awaited<ReturnType<typeof loadClay>> }) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fallbackRef = useRef<HTMLCanvasElement>(null);
+  const [tool, setTool] = useState<Tool>("shape");
+  const toolRef = useRef<Tool>("shape");
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [mode, setMode] = useState<"gl" | "fallback">("gl");
+  const quality = useMemo(() => detectQuality(), []);
+  // Деталізація під пристрій: менше клітинок на слабких, але освітлення попіксельне.
+  const cell = quality.tier === "low" ? 3.2 : 2.4;
+  const gw = Math.max(32, Math.round(size.w / cell));
+  const gh = Math.max(32, Math.round(size.h / cell));
+  const hf = useMemo(() => {
+    const f = createHeightfield(gw, gh);
+    fillBlock(f, Math.min(gw, gh) * 0.2);
+    return f;
+  }, [gw, gh]);
+  const gl = useRef<HeightGL | null>(null);
+  const dirty = useRef(true);
+  const touches = useRef(new Map<number, { x: number; y: number; px: number; py: number; t0: number; hold: number; moved: number }>());
+
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+    ro.observe(el);
+    setSize({ w: el.clientWidth, h: el.clientHeight });
+    return () => ro.disconnect();
   }, []);
 
-  const layout = () => {
-    const s = st.current;
-    const root = rootRef.current;
-    if (!s || !root) return;
-    const w = root.clientWidth;
-    const h = root.clientHeight;
-    const size = Math.min(w * 0.96, h * 0.9, 640);
-    s.rect = { x: (w - size) / 2, y: (h - size) / 2, size };
-    const dpr = detectQuality().dpr;
-    for (const c of [clayRef.current, shadowRef.current]) {
-      if (!c) continue;
-      c.width = Math.round(w * dpr);
-      c.height = Math.round(h * dpr);
-      c.getContext("2d")?.setTransform(dpr, 0, 0, dpr, 0, 0);
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c || !size.w) return;
+    const r = createHeightGL(c, {
+      gw: hf.w,
+      gh: hf.h,
+      albedo: null,
+      baseColor: [data.meta.albedo[0] * 0.98, data.meta.albedo[1] * 0.98, data.meta.albedo[2]],
+      detail: data.detail,
+      detailScale: 1.1,
+      detailStrength: 0.55,
+      light: LIGHT,
+      relief: 1,
+      specular: 0.06,
+      shininess: 24,
+      solid: true,
+      ao: 0.05,
+    });
+    if (!r) {
+      setMode("fallback");
+      return;
     }
-    s.dirty = true;
-  };
+    gl.current = r;
+    setMode("gl");
+    dirty.current = true;
+    const onLost = () => setMode("fallback");
+    const onRestored = () => setMode("gl");
+    c.addEventListener("webglcontextlost", onLost);
+    c.addEventListener("webglcontextrestored", onRestored);
+    return () => {
+      c.removeEventListener("webglcontextlost", onLost);
+      c.removeEventListener("webglcontextrestored", onRestored);
+      r.dispose();
+      gl.current = null;
+    };
+  }, [hf, size.w, data]);
 
-  const draw = () => {
-    const s = st.current;
-    const c = clayRef.current?.getContext("2d");
-    const sc = shadowRef.current?.getContext("2d");
-    if (!s || !c) return;
-    shade(s.hf, s.img.data, CLAY, s.imgShadow.data);
-    s.off.getContext("2d")!.putImageData(s.img, 0, 0);
-    s.offShadow.getContext("2d")!.putImageData(s.imgShadow, 0, 0);
-    const { x, y, size } = s.rect;
-    c.clearRect(0, 0, c.canvas.width, c.canvas.height);
-    c.imageSmoothingEnabled = true;
-    c.imageSmoothingQuality = "high";
-    c.drawImage(s.off, x, y, size, size);
-    if (sc) {
-      sc.clearRect(0, 0, sc.canvas.width, sc.canvas.height);
-      sc.drawImage(s.offShadow, x + size * 0.03, y + size * 0.06, size, size);
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c || !gl.current || !size.w) return;
+    gl.current.resize(Math.round(size.w * quality.dpr), Math.round(size.h * quality.dpr));
+    dirty.current = true;
+  }, [size, quality.dpr, hf]);
+
+  const render = useCallback(() => {
+    if (!dirty.current) return;
+    dirty.current = false;
+    if (mode === "gl" && gl.current && !gl.current.lost()) {
+      gl.current.upload(hf.data);
+      gl.current.render();
+      return;
     }
-  };
+    // Запасний варіант без WebGL: те саме поле висот, освітлення на процесорі.
+    const c = fallbackRef.current;
+    if (!c) return;
+    if (c.width !== hf.w) {
+      c.width = hf.w;
+      c.height = hf.h;
+    }
+    const g = c.getContext("2d");
+    if (!g) return;
+    const img = g.createImageData(hf.w, hf.h);
+    const base = data.meta.albedo.map((v) => v * 255) as [number, number, number];
+    const scaled: Heightfield = { w: hf.w, h: hf.h, data: hf.data.map((v) => v / (Math.min(gw, gh) * 0.2)), gloss: hf.gloss };
+    shade(scaled, img.data, { base, grain: 0.18, specular: 0.05, shininess: 20, relief: Math.min(gw, gh) * 0.2 });
+    g.putImageData(img, 0, 0);
+  }, [mode, hf, data.meta.albedo, gw, gh]);
 
-  const toGrid = (px: number, py: number) => {
-    const s = st.current!;
-    return { gx: ((px - s.rect.x) / s.rect.size) * s.hf.w, gy: ((py - s.rect.y) / s.rect.size) * s.hf.h };
-  };
+  const toGrid = (x: number, y: number) => ({ x: (x / size.w) * hf.w, y: (y / size.h) * hf.h });
+  const R = Math.max(5, 22 / cell); // палець ≈ 22 css px
 
   const wake = useFrameLoop(rootRef, (dt) => {
-    const s = st.current;
-    if (!s) return false;
-    const k = intensityRef.current;
-    // Утримання пальця поглиблює вмʼятину (тиск накопичується).
-    for (const t of s.touches.values()) {
-      if (toolRef.current === "knead") {
-        t.still += dt;
-        const r = s.hf.w * (0.035 + 0.012 * k);
-        dent(s.hf, t.gx, t.gy, r, dt * (0.18 + 0.12 * k) * (0.6 + t.pressure) * Math.min(1, 0.3 + t.still));
-      } else smooth(s.hf, t.gx, t.gy, s.hf.w * 0.07, 0.35);
-      s.dirty = true;
-      if (performance.now() - s.lastSound > 380) {
-        s.lastSound = performance.now();
-        sound.play("clay", 0.25 + 0.15 * k);
+    let busy = false;
+    const now = performance.now();
+    if (toolRef.current === "shape") {
+      for (const t of touches.current.values()) {
+        // Утримання на місці — вмʼятина глибшає під пальцем.
+        if (t.moved < 3) {
+          t.hold += dt;
+          dent(hf, t.x, t.y, R * (0.8 + Math.min(0.4, t.hold * 0.2)), (reducedMotion ? 0.5 : 0.35) * Math.min(1.2, 0.25 + t.hold));
+          dirty.current = true;
+          busy = true;
+          if (now - t.t0 > 160 && Math.random() < dt * 3) sound.play("clay", 0.3);
+        }
       }
     }
-    if (s.dirty) {
-      draw();
-      s.dirty = false;
-    }
-    return s.touches.size > 0;
+    render();
+    return busy || touches.current.size > 0;
   });
 
   useEffect(() => {
-    const root = rootRef.current;
-    if (!root || !st.current) return;
-    layout();
-    draw();
-    const ro = new ResizeObserver(() => {
-      layout();
-      wake();
-    });
-    ro.observe(root);
-    const unbind = bindPointer(root, {
-      down: (p) => {
-        const s = st.current;
-        if (!s) return false;
-        const { gx, gy } = toGrid(p.x, p.y);
-        const i = Math.floor(gy) * s.hf.w + Math.floor(gx);
-        if (gx < 0 || gy < 0 || gx >= s.hf.w || gy >= s.hf.h || (s.hf.data[i] ?? 0) < 0.02) return false; // повз глину
-        s.touches.set(p.id, { x: p.x, y: p.y, gx, gy, pressure: p.pressure, still: 0 });
-        sound.play("clay", 0.4);
-        haptic(10);
-        s.actions++;
-        if (s.actions === 1) setHint("Тримай довше — вмʼятина глибшає. Тягни — глина піде за пальцем.");
-        if (s.actions === 8) setHint("Двома пальцями можна стиснути. «Розгладити» — щоб вирівняти.");
-        if (s.actions === 14) onSettled();
-        wake();
-      },
-      move: (p) => {
-        const s = st.current;
-        const t = s?.touches.get(p.id);
-        if (!s || !t) return;
-        const { gx, gy } = toGrid(p.x, p.y);
-        const dx = gx - t.gx;
-        const dy = gy - t.gy;
-        if (Math.hypot(dx, dy) < 0.15) return;
-        const k = intensityRef.current;
-        if (toolRef.current === "knead") smudge(s.hf, gx, gy, dx, dy, s.hf.w * (0.045 + 0.01 * k), 0.85);
-        else smooth(s.hf, gx, gy, s.hf.w * 0.08, 0.6);
-        t.gx = gx;
-        t.gy = gy;
-        t.pressure = p.pressure;
-        t.still = 0;
-        s.dirty = true;
-        wake();
-      },
-      up: (p) => {
-        st.current?.touches.delete(p.id);
-      },
-    });
-    return () => {
-      ro.disconnect();
-      unbind();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- привʼязка один раз; свіжі значення через refs
-  }, [failed]);
+    dirty.current = true;
+    render();
+  }, [render, size]);
 
-  // Кнопки — доступна альтернатива жестам.
-  const act = (fn: (hf: Heightfield) => void) => {
-    const s = st.current;
-    if (!s) return;
-    fn(s.hf);
-    s.dirty = true;
-    s.actions++;
+  usePointer(rootRef, {
+    down: (p) => {
+      onInteract();
+      const g = toGrid(p.x, p.y);
+      touches.current.set(p.id, { x: g.x, y: g.y, px: g.x, py: g.y, t0: performance.now(), hold: 0, moved: 0 });
+      if (toolRef.current === "shape") {
+        dent(hf, g.x, g.y, R * 0.8, 0.6);
+        dirty.current = true;
+        sound.play("clay", 0.45);
+        haptic(6);
+      }
+      wake();
+    },
+    move: (p) => {
+      const t = touches.current.get(p.id);
+      if (!t) return;
+      const g = toGrid(p.x, p.y);
+      const dx = g.x - t.x;
+      const dy = g.y - t.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 0.05) return;
+      t.moved += dist;
+      if (toolRef.current === "smooth") {
+        const steps = Math.ceil(dist / (R * 0.5));
+        for (let k = 1; k <= steps; k++) {
+          smooth(hf, t.x + (dx * k) / steps, t.y + (dy * k) / steps, R * 2, 0.9);
+          smooth(hf, t.x + (dx * k) / steps, t.y + (dy * k) / steps, R * 1.4, 0.9);
+        }
+      } else if (touches.current.size >= 2) {
+        // Двома пальцями — стискати: матеріал між пальцями видавлюється в гребінь.
+        smudge(hf, g.x, g.y, dx, dy, R * 1.5, 0.9);
+      } else {
+        // Тягнути: матеріал іде за пальцем, позаду лишається борозна.
+        const steps = Math.ceil(dist / (R * 0.4));
+        for (let k = 1; k <= steps; k++) {
+          const x = t.x + (dx * k) / steps;
+          const y = t.y + (dy * k) / steps;
+          smudge(hf, x, y, dx / steps, dy / steps, R * 1.25, 0.85);
+          dent(hf, x, y, R * 0.7, 0.18);
+        }
+      }
+      t.px = t.x;
+      t.py = t.y;
+      t.x = g.x;
+      t.y = g.y;
+      dirty.current = true;
+      wake();
+    },
+    up: (p) => {
+      touches.current.delete(p.id);
+      wake();
+    },
+  });
+
+  const setToolBoth = (t: Tool) => {
+    setTool(t);
+    toolRef.current = t;
+    setHint(t === "smooth" ? "Проведи по поверхні — вона поступово вирівнюється." : "Натискай і тягни. Двома пальцями можна стискати.");
+  };
+
+  /** Кнопкова альтернатива: вмʼятина в довільному місці / розгладити все. */
+  const pressCenter = () => {
+    onInteract();
+    for (let i = 0; i < 4; i++) dent(hf, hf.w / 2 + (Math.random() - 0.5) * hf.w * 0.3, hf.h / 2 + (Math.random() - 0.5) * hf.h * 0.3, R, 1.4);
+    dirty.current = true;
     sound.play("clay", 0.5);
     wake();
   };
-  const press = () =>
-    act((hf) => {
-      const a = Math.random() * Math.PI * 2;
-      const r = hf.w * 0.12 * Math.random();
-      for (let i = 0; i < 6; i++) dent(hf, hf.w / 2 + Math.cos(a) * r, hf.h / 2 + Math.sin(a) * r, hf.w * 0.06, 0.12 + 0.05 * intensity);
-    });
-
-  if (failed) {
-    return <div className="grid h-full place-items-center px-6 text-center text-mist">Цей пристрій не показує глину. Спробуй іншу дію.</div>;
-  }
+  const smoothAll = () => {
+    onInteract();
+    for (let y = 4; y < hf.h; y += Math.max(3, R)) for (let x = 4; x < hf.w; x += Math.max(3, R)) smooth(hf, x, y, R * 2, 0.5);
+    dirty.current = true;
+    wake();
+  };
 
   return (
-    <div className="flex h-full flex-col">
-      <div ref={rootRef} className="scene-surface relative min-h-0 flex-1 cursor-pointer">
-        {/* Освітлена поверхня столу */}
-        <div aria-hidden className="pointer-events-none absolute inset-x-[8%] bottom-[6%] top-[30%] rounded-[50%] bg-[radial-gradient(closest-side,rgb(86_116_135/0.28),transparent)]" />
-        <canvas ref={shadowRef} aria-hidden className="pointer-events-none absolute inset-0 h-full w-full opacity-80 [filter:blur(16px)]" />
-        <canvas ref={clayRef} role="img" aria-label="Шматок глини. Натискай, тягни, розгладжуй." className="absolute inset-0 h-full w-full" />
-      </div>
-      <div className="flex flex-wrap items-center justify-center gap-2 px-3 pt-2">
-        <div role="radiogroup" aria-label="Інструмент" className="flex overflow-hidden rounded-[var(--radius-hair)] border border-steel/50">
+    <div ref={rootRef} className="scene-surface relative h-full w-full overflow-hidden">
+      <canvas ref={canvasRef} aria-hidden className={cn("absolute inset-0 h-full w-full", mode !== "gl" && "hidden")} />
+      <canvas ref={fallbackRef} aria-hidden className={cn("absolute inset-0 h-full w-full", mode === "gl" && "hidden")} style={{ imageRendering: "auto" }} />
+      {mode === "fallback" && <p className="absolute inset-x-0 top-2 text-center text-xs text-mist">Спрощений рендер (WebGL недоступний) — механіка та сама.</p>}
+      <div className="absolute inset-x-0 bottom-1 z-10 flex flex-wrap items-center justify-center gap-2 px-2">
+        <div role="radiogroup" aria-label="Інструмент" className="flex overflow-hidden rounded-[var(--radius-hair)] border border-steel/50 bg-night/70">
           {(
             [
-              ["knead", "Мʼяти"],
+              ["shape", "Мʼяти й тягнути"],
               ["smooth", "Розгладити"],
             ] as const
-          ).map(([v, label]) => (
-            <button key={v} type="button" role="radio" aria-checked={tool === v} onClick={() => setTool(v)} className={cn("min-h-11 px-3 text-sm", tool === v ? "bg-frost text-abyss" : "text-frost/80 hover:bg-night")}>
-              {label}
+          ).map(([t, l]) => (
+            <button key={t} type="button" role="radio" aria-checked={tool === t} onClick={() => setToolBoth(t)} className={cn("min-h-11 px-3 text-sm", tool === t ? "bg-frost text-abyss" : "text-frost/85 hover:bg-night")}>
+              {l}
             </button>
           ))}
         </div>
-        <button type="button" className="scene-btn border border-steel/50" onClick={press}>
-          Натиснути
-        </button>
-        <button type="button" className="scene-btn border border-steel/50" onClick={() => act((hf) => squeeze(hf, "x", 0.06))}>
-          Стиснути
-        </button>
-        <button type="button" className="scene-btn border border-steel/50" onClick={() => act((hf) => squeeze(hf, "x", -0.05))}>
-          Розтягнути
-        </button>
-        <button
-          type="button"
-          className="scene-btn border border-steel/50"
-          onClick={() =>
-            act((hf) => {
-              for (let y = 6; y < hf.h; y += 10) for (let x = 6; x < hf.w; x += 10) smooth(hf, x, y, 9, 0.7);
-            })
-          }
-        >
-          Розгладити все
+        <button type="button" onClick={tool === "smooth" ? smoothAll : pressCenter} className="scene-btn border border-steel/50 bg-night/70 text-sm">
+          {tool === "smooth" ? "Пригладити все" : "Натиснути"}
         </button>
       </div>
     </div>
