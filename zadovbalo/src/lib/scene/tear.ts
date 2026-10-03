@@ -16,7 +16,11 @@ export function pointInPoly(p: Pt, poly: Pt[]) {
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const a = poly[i]!;
     const b = poly[j]!;
-    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+    if (
+      a.y > p.y !== b.y > p.y &&
+      p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x
+    )
+      inside = !inside;
   }
   return inside;
 }
@@ -41,7 +45,14 @@ export function crossings(poly: Pt[], path: Pt[]): Crossing[] {
       const c = poly[e]!;
       const d = poly[(e + 1) % poly.length]!;
       const hit = segHit(a, b, c, d);
-      if (hit) out.push({ edge: e, t: hit.u, point: { x: a.x + (b.x - a.x) * hit.t, y: a.y + (b.y - a.y) * hit.t }, seg: s, order: s + hit.t });
+      if (hit)
+        out.push({
+          edge: e,
+          t: hit.u,
+          point: { x: a.x + (b.x - a.x) * hit.t, y: a.y + (b.y - a.y) * hit.t },
+          seg: s,
+          order: s + hit.t,
+        });
     }
   }
   return out.sort((x, y) => x.order - y.order);
@@ -56,7 +67,11 @@ export function splitByPath(poly: Pt[], path: Pt[]): [Pt[], Pt[]] | null {
   if (xs.length < 2) return null;
   const enter = xs[0]!;
   const exit = xs[1]!;
-  const inner = [enter.point, ...path.slice(enter.seg + 1, exit.seg + 1), exit.point];
+  const inner = [
+    enter.point,
+    ...path.slice(enter.seg + 1, exit.seg + 1),
+    exit.point,
+  ];
   if (inner.length < 2) return null;
   const n = poly.length;
   // Ланцюг межі від точки виходу до точки входу (вперед по вершинах).
@@ -100,7 +115,10 @@ export function jagged(path: Pt[], amp: number, seed: number): Pt[] {
       // дрібні волоконця (часті) + повільна хвиля (рідка)
       const fine = (rnd(n) - 0.5) * amp * (rnd(n + 999) > 0.8 ? 1.8 : 0.9);
       const wander = Math.sin(n * 0.11 + seed) * amp * 0.6;
-      out.push({ x: a.x + (b.x - a.x) * t + nx * (fine + wander), y: a.y + (b.y - a.y) * t + ny * (fine + wander) });
+      out.push({
+        x: a.x + (b.x - a.x) * t + nx * (fine + wander),
+        y: a.y + (b.y - a.y) * t + ny * (fine + wander),
+      });
     }
   }
   out.push(path[path.length - 1]!);

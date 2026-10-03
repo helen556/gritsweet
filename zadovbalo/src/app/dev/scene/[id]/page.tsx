@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { isSceneId, LEGACY_SCENES } from "@/lib/scenes/registry";
-import { DevScene } from "./DevScene";
+import { DevSceneClient as DevScene } from "./DevSceneClient";
 
 export const metadata = { robots: { index: false, follow: false } };
 

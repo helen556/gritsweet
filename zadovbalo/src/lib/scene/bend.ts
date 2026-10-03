@@ -30,7 +30,13 @@ function zAt(u: number, p: BendParams) {
   return -p.sag * d * d - p.lag * d * Math.abs(d);
 }
 
-export function drawBent(ctx: CanvasRenderingContext2D, img: CanvasImageSource, iw: number, ih: number, p: BendParams) {
+export function drawBent(
+  ctx: CanvasRenderingContext2D,
+  img: CanvasImageSource,
+  iw: number,
+  ih: number,
+  p: BendParams,
+) {
   const scale = 1 + p.lift * 0.0025;
   const w = p.w * scale;
   const h = p.h * scale;
@@ -45,14 +51,18 @@ export function drawBent(ctx: CanvasRenderingContext2D, img: CanvasImageSource, 
     const z1 = zAt(i / STRIPS, p) * w;
     zs[i] = z1;
     const ds = w / STRIPS;
-    xs[i] = xs[i - 1]! + Math.sqrt(Math.max(0, ds * ds - (z1 - z0) * (z1 - z0) * 0.5));
+    xs[i] =
+      xs[i - 1]! +
+      Math.sqrt(Math.max(0, ds * ds - (z1 - z0) * (z1 - z0) * 0.5));
   }
   for (let i = g - 1; i >= 0; i--) {
     const z0 = zs[i + 1]!;
     const z1 = zAt(i / STRIPS, p) * w;
     zs[i] = z1;
     const ds = w / STRIPS;
-    xs[i] = xs[i + 1]! - Math.sqrt(Math.max(0, ds * ds - (z1 - z0) * (z1 - z0) * 0.5));
+    xs[i] =
+      xs[i + 1]! -
+      Math.sqrt(Math.max(0, ds * ds - (z1 - z0) * (z1 - z0) * 0.5));
   }
   const base = ctx.getTransform();
   const dpr = base.a || 1;
@@ -72,34 +82,60 @@ export function drawBent(ctx: CanvasRenderingContext2D, img: CanvasImageSource, 
     const lw = x1 - x0 + 0.6; // перекриття проти щілин
     const tx = p.x + (lx * cos - (top + dy) * sin);
     const ty = p.y + (lx * sin + (top + dy) * cos);
-    ctx.setTransform(dpr * cos * k, dpr * sin * k, -dpr * sin * k, dpr * cos * k, base.e + dpr * tx, base.f + dpr * ty);
+    ctx.setTransform(
+      dpr * cos * k,
+      dpr * sin * k,
+      -dpr * sin * k,
+      dpr * cos * k,
+      base.e + dpr * tx,
+      base.f + dpr * ty,
+    );
     ctx.drawImage(img, i * sw, 0, sw + 0.5, ih, 0, 0, lw / k, h);
     // Світлотінь: світло зверху зліва.
     const shade = Math.max(-0.35, Math.min(0.25, -slope * 0.9));
     if (Math.abs(shade) > 0.01) {
-      ctx.fillStyle = shade < 0 ? `rgba(0,0,0,${-shade})` : `rgba(255,255,255,${shade * 0.6})`;
+      ctx.fillStyle =
+        shade < 0
+          ? `rgba(0,0,0,${-shade})`
+          : `rgba(255,255,255,${shade * 0.6})`;
       ctx.fillRect(0, 0, lw / k, h);
     }
   }
   ctx.setTransform(base);
 }
 
-/** Мʼяка тінь прямокутника (через shadowBlur — працює й у Safari, на відміну від ctx.filter). */
-export function drawSoftShadow(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, angle: number, blur: number, alpha: number, radius = 3) {
-  const base = ctx.getTransform();
-  const dpr = base.a || 1;
-  const OFF = 20000;
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
+let shadowSprite: HTMLCanvasElement | null = null;
+const SPR = 128;
+const SPR_PAD = 40;
+
+/** Розмита тінь рахується один раз; далі — лише масштабований малюнок (дешево щокадру, і в Safari). */
+function getShadowSprite() {
+  if (shadowSprite) return shadowSprite;
+  const c = document.createElement("canvas");
+  c.width = SPR + SPR_PAD * 2;
+  c.height = SPR + SPR_PAD * 2;
+  const g = c.getContext("2d")!;
+  g.shadowColor = "rgba(0,0,0,1)";
+  g.shadowBlur = SPR_PAD * 0.7;
+  g.shadowOffsetX = 10000;
+  g.fillStyle = "#000";
+  g.fillRect(SPR_PAD - 10000, SPR_PAD, SPR, SPR);
+  shadowSprite = c;
+  return c;
+}
+
+/** Мʼяка тінь прямокутника під предметом. blur — у CSS px. */
+export function drawSoftShadow(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, angle: number, blur: number, alpha: number) {
+  const spr = getShadowSprite();
+  // Масштаб так, щоб ядро відповідало w×h, а розмиття — приблизно blur.
+  const kx = w / SPR;
+  const ky = h / SPR;
+  const padX = Math.max(blur, 2) * 1.4;
+  const padY = Math.max(blur, 2) * 1.4;
   ctx.save();
-  // Сам прямокутник — далеко за полотном, на екрані лише його тінь (зсув — у пікселях пристрою).
-  ctx.setTransform(dpr * cos, dpr * sin, -dpr * sin, dpr * cos, base.e + dpr * x - OFF, base.f + dpr * y);
-  ctx.shadowColor = `rgba(0,0,0,${alpha})`;
-  ctx.shadowBlur = blur * dpr;
-  ctx.shadowOffsetX = OFF;
-  ctx.fillStyle = "#000";
-  ctx.beginPath();
-  ctx.roundRect(-w / 2, -h / 2, w, h, radius);
-  ctx.fill();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.globalAlpha *= alpha;
+  ctx.drawImage(spr, -w / 2 - padX, -h / 2 - padY, SPR * kx + padX * 2, SPR * ky + padY * 2);
   ctx.restore();
 }

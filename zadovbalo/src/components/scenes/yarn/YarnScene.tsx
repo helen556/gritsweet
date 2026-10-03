@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadImage, loadJson, useSceneAssets } from "@/lib/scene/assets";
 import { useCanvas2D } from "@/lib/scene/canvas";
+import { useLazyRef } from "@/lib/scene/lazyRef";
 import { useFrameLoop } from "@/lib/scene/loop";
 import { usePointer } from "@/lib/scene/pointer";
 import { haptic, sound } from "@/lib/scene/sound";
@@ -11,15 +12,42 @@ import type { SceneProps } from "../types";
 
 interface Meta {
   size: [number, number];
-  tangle: { x: number; y: number; w: number; h: number; exit: [number, number] };
-  ball: { x: number; y: number; w: number; h: number; cx: number; cy: number; r: number };
+  tangle: {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    exit: [number, number];
+  };
+  ball: {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    cx: number;
+    cy: number;
+    r: number;
+  };
   strand: { w: number; h: number; thickness: number };
 }
 
 /** Хвіст нитки точно як на фото (від маси до кінчика). */
 const TAIL: [number, number][] = [
-  [978, 796], [930, 830], [870, 850], [840, 870], [835, 895], [860, 915], [900, 928], [980, 930],
-  [1040, 928], [1100, 945], [1145, 980], [1160, 1020], [1140, 1065], [1100, 1100], [1080, 1130],
+  [978, 796],
+  [930, 830],
+  [870, 850],
+  [840, 870],
+  [835, 895],
+  [860, 915],
+  [900, 928],
+  [980, 930],
+  [1040, 928],
+  [1100, 945],
+  [1145, 980],
+  [1160, 1020],
+  [1140, 1065],
+  [1100, 1100],
+  [1080, 1130],
 ];
 const WORLD = { x0: 0, y0: 60, x1: 1520, y1: 1460 };
 const BALL_MAX_R = 215;
@@ -48,12 +76,24 @@ async function loadYarn() {
 
 export default function YarnScene(props: SceneProps) {
   const assets = useSceneAssets(loadYarn);
-  if (assets.status === "loading") return <div role="status" className="grid h-full place-items-center text-sm text-mist">Готую пряжу…</div>;
+  if (assets.status === "loading")
+    return (
+      <div
+        role="status"
+        className="grid h-full place-items-center text-sm text-mist"
+      >
+        Готую пряжу…
+      </div>
+    );
   if (assets.status === "error")
     return (
       <div className="grid h-full place-items-center gap-3 px-6 text-center text-mist">
         <p>Не вдалося завантажити пряжу.</p>
-        <button type="button" onClick={assets.retry} className="scene-btn border border-steel/60">
+        <button
+          type="button"
+          onClick={assets.retry}
+          className="scene-btn border border-steel/60"
+        >
           Спробувати ще
         </button>
       </div>
@@ -61,18 +101,22 @@ export default function YarnScene(props: SceneProps) {
   return <Yarn {...props} data={assets.data} />;
 }
 
-function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProps & { data: Awaited<ReturnType<typeof loadYarn>> }) {
+function Yarn({
+  onSettled,
+  setHint,
+  onInteract,
+  data,
+}: SceneProps & { data: Awaited<ReturnType<typeof loadYarn>> }) {
   const { meta, tangle, ball, strand } = data;
-  const { canvasRef, ctx, size } = useCanvas2D();
+  const { canvasRef, size } = useCanvas2D();
   const rootRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<"free" | "wind" | "done">("free");
   const phaseRef = useRef<"free" | "wind" | "done">("free");
   const [pct, setPct] = useState(0);
 
   // Нитка: ланцюжок точок (Верле). Перша — біля маси, остання — кінчик / точка на клубку.
-  const rope = useRef<Pt[]>([]);
-  if (rope.current.length === 0) rope.current = sampleTail();
-  const st = useRef({
+  const rope = useLazyRef<Pt[]>(sampleTail);
+  const st = useLazyRef(() => ({
     progress: 0,
     pulled: 0,
     ballX: 0,
@@ -88,24 +132,37 @@ function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
     tailTarget: null as null | { x: number; y: number }[],
     tailT: 0,
     settled: false,
-  });
+  }));
 
   const view = useMemo(() => {
     const W = size.width;
     const H = size.height;
     const s = Math.min(W / (WORLD.x1 - WORLD.x0), H / (WORLD.y1 - WORLD.y0));
-    return { s, ox: (W - (WORLD.x1 - WORLD.x0) * s) / 2 - WORLD.x0 * s, oy: (H - (WORLD.y1 - WORLD.y0) * s) / 2 - WORLD.y0 * s };
+    return {
+      s,
+      ox: (W - (WORLD.x1 - WORLD.x0) * s) / 2 - WORLD.x0 * s,
+      oy: (H - (WORLD.y1 - WORLD.y0) * s) / 2 - WORLD.y0 * s,
+    };
   }, [size]);
-  const toWorld = useCallback((x: number, y: number) => ({ x: (x - view.ox) / view.s, y: (y - view.oy) / view.s }), [view]);
+  const toWorld = useCallback(
+    (x: number, y: number) => ({
+      x: (x - view.ox) / view.s,
+      y: (y - view.oy) / view.s,
+    }),
+    [view],
+  );
 
   /** Маса зменшується з прогресом; точка виходу нитки рухається разом із нею. */
-  const massTransform = () => {
+  const massTransform = useCallback(() => {
     const s = st.current;
     const left = 1 - s.progress;
-    const k = Math.max(0, 0.22 + 0.78 * Math.sqrt(left) - Math.min(0.08, s.pulled / 6000));
+    const k = Math.max(
+      0,
+      0.22 + 0.78 * Math.sqrt(left) - Math.min(0.08, s.pulled / 6000),
+    );
     const pivot = { x: 560, y: 520 };
     return { k, pivot, dx: s.massDX, dy: s.massDY, rot: s.progress * 0.5 };
-  };
+  }, [st]);
   const exitPoint = () => {
     const m = massTransform();
     const [ex, ey] = meta.tangle.exit;
@@ -113,9 +170,16 @@ function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
     const sin = Math.sin(m.rot);
     const lx = (ex - m.pivot.x) * m.k;
     const ly = (ey - m.pivot.y) * m.k;
-    return { x: m.pivot.x + m.dx + lx * cos - ly * sin, y: m.pivot.y + m.dy + lx * sin + ly * cos };
+    return {
+      x: m.pivot.x + m.dx + lx * cos - ly * sin,
+      y: m.pivot.y + m.dy + lx * sin + ly * cos,
+    };
   };
-  const ballR = () => BALL_MIN_R + (BALL_MAX_R - BALL_MIN_R) * Math.cbrt(st.current.progress);
+  const ballR = useCallback(
+    () =>
+      BALL_MIN_R + (BALL_MAX_R - BALL_MIN_R) * Math.cbrt(st.current.progress),
+    [st],
+  );
 
   const step = (dt: number) => {
     const pts = rope.current;
@@ -188,12 +252,18 @@ function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
     const tail = pts[pts.length - 1]!;
     const prev = pts[pts.length - 2]!;
     let total = 0;
-    for (let i = 0; i < pts.length - 1; i++) total += Math.hypot(pts[i + 1]!.x - pts[i]!.x, pts[i + 1]!.y - pts[i]!.y);
+    for (let i = 0; i < pts.length - 1; i++)
+      total += Math.hypot(pts[i + 1]!.x - pts[i]!.x, pts[i + 1]!.y - pts[i]!.y);
     let extra = total - (pts.length - 1) * SEG;
     while (extra > SEG * 0.5 && pts.length < 260) {
       const head = pts[0]!;
       const next = pts[1]!;
-      pts.splice(1, 0, { x: (head.x + next.x) / 2, y: (head.y + next.y) / 2, px: (head.x + next.x) / 2, py: (head.y + next.y) / 2 });
+      pts.splice(1, 0, {
+        x: (head.x + next.x) / 2,
+        y: (head.y + next.y) / 2,
+        px: (head.x + next.x) / 2,
+        py: (head.y + next.y) / 2,
+      });
       s.pulled += SEG;
       extra -= SEG;
       s.tug = Math.min(1, s.tug + 0.25);
@@ -215,7 +285,7 @@ function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
   };
 
   const draw = useCallback(() => {
-    const g = ctx;
+    const g = canvasRef.current?.getContext("2d") ?? null;
     if (!g) return;
     const s = st.current;
     const { s: sc, ox, oy } = view;
@@ -261,7 +331,14 @@ function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
     // Клубок.
     if (phaseRef.current !== "free") {
       const r = ballR();
-      contactShadow(g, s.ballX + r * 0.25, s.ballY + r * 0.78, r * 1.05, r * 0.35, 0.6);
+      contactShadow(
+        g,
+        s.ballX + r * 0.25,
+        s.ballY + r * 0.78,
+        r * 1.05,
+        r * 0.35,
+        0.6,
+      );
       g.save();
       g.translate(s.ballX, s.ballY);
       g.beginPath();
@@ -269,12 +346,26 @@ function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
       g.clip();
       g.rotate(s.spin);
       const k = (r * 2) / Math.min(meta.ball.w, meta.ball.h);
-      g.drawImage(ball, (-meta.ball.w / 2) * k, (-meta.ball.h / 2) * k, meta.ball.w * k, meta.ball.h * k);
+      g.drawImage(
+        ball,
+        (-meta.ball.w / 2) * k,
+        (-meta.ball.h / 2) * k,
+        meta.ball.w * k,
+        meta.ball.h * k,
+      );
       g.restore();
       // Свіжі витки поверх клубка — нитка лягає з тією ж фактурою.
-      for (const w of s.wraps) drawWrap(g, s.ballX, s.ballY, r, w, strand, meta.strand);
+      for (const w of s.wraps)
+        drawWrap(g, s.ballX, s.ballY, r, w, strand, meta.strand);
       // Обʼєм: тінь знизу справа, світло зліва вгорі (як на фото).
-      const sh = g.createRadialGradient(s.ballX - r * 0.35, s.ballY - r * 0.4, r * 0.2, s.ballX, s.ballY, r * 1.02);
+      const sh = g.createRadialGradient(
+        s.ballX - r * 0.35,
+        s.ballY - r * 0.4,
+        r * 0.2,
+        s.ballX,
+        s.ballY,
+        r * 1.02,
+      );
       sh.addColorStop(0, "rgba(255,255,255,0.06)");
       sh.addColorStop(0.65, "rgba(0,0,0,0)");
       sh.addColorStop(1, "rgba(0,0,0,0.38)");
@@ -283,7 +374,19 @@ function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
       g.arc(s.ballX, s.ballY, r, 0, Math.PI * 2);
       g.fill();
     }
-  }, [ctx, view, size.dpr, tangle, ball, strand, meta]);
+  }, [
+    view,
+    size.dpr,
+    tangle,
+    ball,
+    strand,
+    meta,
+    canvasRef,
+    rope,
+    st,
+    ballR,
+    massTransform,
+  ]);
 
   const wake = useFrameLoop(rootRef, (dt) => {
     const s = st.current;
@@ -295,8 +398,18 @@ function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
     s.wraps = s.wraps.filter((w) => w.age < 6);
     draw();
     // Нитка заспокоїлась і ніхто не тягне — сплячий режим.
-    const moving = rope.current.some((p) => Math.abs(p.x - p.px) + Math.abs(p.y - p.py) > 0.05);
-    return moving || Boolean(s.tipDrag || s.wind) || Math.abs(s.spinV) > 0.01 || s.tug > 0.01 || (phaseRef.current === "done" && st.current.tailT < 1.5 && ((st.current.tailT += 1 / 60), true));
+    const moving = rope.current.some(
+      (p) => Math.abs(p.x - p.px) + Math.abs(p.y - p.py) > 0.05,
+    );
+    return (
+      moving ||
+      Boolean(s.tipDrag || s.wind) ||
+      Math.abs(s.spinV) > 0.01 ||
+      s.tug > 0.01 ||
+      (phaseRef.current === "done" &&
+        st.current.tailT < 1.5 &&
+        ((st.current.tailT += 1 / 60), true))
+    );
   });
 
   useEffect(() => {
@@ -308,14 +421,20 @@ function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
     (x: number, y: number) => {
       const s = st.current;
       // Повний клубок має вміститися в кадр.
-      s.ballX = Math.max(WORLD.x0 + BALL_MAX_R + 260, Math.min(WORLD.x1 - BALL_MAX_R - 30, x));
-      s.ballY = Math.max(WORLD.y0 + BALL_MAX_R + 30, Math.min(WORLD.y1 - BALL_MAX_R - 150, y));
+      s.ballX = Math.max(
+        WORLD.x0 + BALL_MAX_R + 260,
+        Math.min(WORLD.x1 - BALL_MAX_R - 30, x),
+      );
+      s.ballY = Math.max(
+        WORLD.y0 + BALL_MAX_R + 30,
+        Math.min(WORLD.y1 - BALL_MAX_R - 150, y),
+      );
       phaseRef.current = "wind";
       setPhase("wind");
       setHint("Тепер води пальцем по колу — нитка змотуватиметься.");
       sound.play("soft", 0.4);
     },
-    [setHint],
+    [setHint, st],
   );
 
   const addProgress = useCallback(
@@ -328,7 +447,13 @@ function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
       s.tug = Math.min(1, s.tug + Math.abs(rad) * 0.6);
       // Новий виток щочверть оберту.
       const last = s.wraps[s.wraps.length - 1];
-      if (!last || last.age > 0.35) s.wraps.push({ tilt: Math.random() * Math.PI, start: Math.random() * Math.PI * 2, len: 1.2 + Math.random() * 1.4, age: 0 });
+      if (!last || last.age > 0.35)
+        s.wraps.push({
+          tilt: Math.random() * Math.PI,
+          start: Math.random() * Math.PI * 2,
+          len: 1.2 + Math.random() * 1.4,
+          age: 0,
+        });
       setPct(Math.round(s.progress * 100));
       if (Math.random() < 0.2) sound.play("paper", 0.12);
       if (s.progress >= 1 && !s.settled) {
@@ -342,7 +467,10 @@ function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
         const tail: { x: number; y: number }[] = [];
         for (let i = 0; i < n; i++) {
           const t = 1 - i / (n - 1); // 0 — біля клубка
-          tail.push({ x: ax - t * 210 + Math.sin(t * Math.PI * 1.5) * 34, y: ay + t * 120 - Math.sin(t * Math.PI) * 46 });
+          tail.push({
+            x: ax - t * 210 + Math.sin(t * Math.PI * 1.5) * 34,
+            y: ay + t * 120 - Math.sin(t * Math.PI) * 46,
+          });
         }
         const cur = rope.current;
         rope.current = cur.slice(cur.length - n);
@@ -354,7 +482,7 @@ function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
         setHint("Клубок змотано. Можна побути тут скільки треба.");
       }
     },
-    [onSettled, setHint],
+    [onSettled, setHint, st, ballR, rope],
   );
 
   usePointer(rootRef, {
@@ -435,21 +563,38 @@ function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
   };
 
   return (
-    <div ref={rootRef} className="scene-surface relative h-full w-full overflow-hidden">
-      <canvas ref={canvasRef} aria-hidden className="absolute inset-0 h-full w-full" />
+    <div
+      ref={rootRef}
+      className="scene-surface relative h-full w-full overflow-hidden"
+    >
+      <canvas
+        ref={canvasRef}
+        aria-hidden
+        className="absolute inset-0 h-full w-full"
+      />
       <div className="absolute inset-x-0 bottom-1 z-10 flex flex-wrap items-center justify-center gap-2 px-2">
         {phase === "free" && (
-          <button type="button" onClick={pullByButton} className="scene-btn border border-steel/50 bg-night/70 text-sm">
+          <button
+            type="button"
+            onClick={pullByButton}
+            className="scene-btn border border-steel/50 bg-night/70 text-sm"
+          >
             Потягнути нитку
           </button>
         )}
         {phase === "wind" && (
-          <button type="button" onClick={windByButton} className="scene-btn border border-steel/50 bg-night/70 text-sm">
+          <button
+            type="button"
+            onClick={windByButton}
+            className="scene-btn border border-steel/50 bg-night/70 text-sm"
+          >
             Змотати оберт
           </button>
         )}
         <span className="sr-only" aria-live="polite">
-          {phase === "free" ? "Кінець нитки лежить праворуч унизу." : `Змотано приблизно ${pct}%`}
+          {phase === "free"
+            ? "Кінець нитки лежить праворуч унизу."
+            : `Змотано приблизно ${pct}%`}
         </span>
       </div>
     </div>
@@ -474,7 +619,12 @@ function sampleTail(): Pt[] {
 }
 
 /** Нитка з реальною фактурою: смуга зі знімка кладеться вздовж кожної ланки. */
-function drawRope(g: CanvasRenderingContext2D, pts: Pt[], strand: HTMLImageElement, m: { w: number; h: number }) {
+function drawRope(
+  g: CanvasRenderingContext2D,
+  pts: Pt[],
+  strand: HTMLImageElement,
+  m: { w: number; h: number },
+) {
   let u = 0;
   const k = m.h / THICK; // пікселів смуги на світовий px
   for (let i = 0; i < pts.length - 1; i++) {
@@ -491,7 +641,17 @@ function drawRope(g: CanvasRenderingContext2D, pts: Pt[], strand: HTMLImageEleme
     while (rest > 0) {
       const su = (u * k) % m.w;
       const take = Math.min(rest, (m.w - su) / k);
-      g.drawImage(strand, su, 0, Math.max(1, take * k), m.h, x, -THICK / 2, take, THICK);
+      g.drawImage(
+        strand,
+        su,
+        0,
+        Math.max(1, take * k),
+        m.h,
+        x,
+        -THICK / 2,
+        take,
+        THICK,
+      );
       x += take;
       rest -= take;
       u += take;
@@ -501,7 +661,15 @@ function drawRope(g: CanvasRenderingContext2D, pts: Pt[], strand: HTMLImageEleme
 }
 
 /** Виток на клубку: дуга-«меридіан» під нахилом, тією ж ниткою. */
-function drawWrap(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, w: { tilt: number; start: number; len: number; age: number }, strand: HTMLImageElement, m: { w: number; h: number }) {
+function drawWrap(
+  g: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  w: { tilt: number; start: number; len: number; age: number },
+  strand: HTMLImageElement,
+  m: { w: number; h: number },
+) {
   const alpha = Math.max(0, 1 - w.age / 6);
   if (alpha <= 0) return;
   const steps = 18;
@@ -526,7 +694,13 @@ function drawWrap(g: CanvasRenderingContext2D, cx: number, cy: number, r: number
   g.restore();
 }
 
-function drawRopeThin(g: CanvasRenderingContext2D, pts: Pt[], strand: HTMLImageElement, m: { w: number; h: number }, th: number) {
+function drawRopeThin(
+  g: CanvasRenderingContext2D,
+  pts: Pt[],
+  strand: HTMLImageElement,
+  m: { w: number; h: number },
+  th: number,
+) {
   let u = 0;
   const k = m.h / th;
   for (let i = 0; i < pts.length - 1; i++) {
@@ -538,7 +712,17 @@ function drawRopeThin(g: CanvasRenderingContext2D, pts: Pt[], strand: HTMLImageE
     g.translate(a.x, a.y);
     g.rotate(ang);
     const su = (u * k) % (m.w - len * k - 1 > 0 ? m.w - len * k - 1 : 1);
-    g.drawImage(strand, su, 0, Math.max(1, len * k), m.h, 0, -th / 2, len + 0.8, th);
+    g.drawImage(
+      strand,
+      su,
+      0,
+      Math.max(1, len * k),
+      m.h,
+      0,
+      -th / 2,
+      len + 0.8,
+      th,
+    );
     g.restore();
     u += len;
   }

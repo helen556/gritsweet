@@ -26,11 +26,19 @@ describe("tear", () => {
   });
 
   it("a path that does not cross the sheet twice does not split", () => {
-    expect(splitByPath(sheet, [{ x: -10, y: 50 }, { x: 100, y: 60 }])).toBeNull();
+    expect(
+      splitByPath(sheet, [
+        { x: -10, y: 50 },
+        { x: 100, y: 60 },
+      ]),
+    ).toBeNull();
   });
 
   it("finds crossings in order and tests points", () => {
-    const xs = crossings(sheet, [{ x: -10, y: 50 }, { x: 250, y: 50 }]);
+    const xs = crossings(sheet, [
+      { x: -10, y: 50 },
+      { x: 250, y: 50 },
+    ]);
     expect(xs.map((c) => Math.round(c.point.x))).toEqual([0, 200]);
     expect(pointInPoly({ x: 10, y: 10 }, sheet)).toBe(true);
     expect(pointInPoly({ x: -1, y: 10 }, sheet)).toBe(false);

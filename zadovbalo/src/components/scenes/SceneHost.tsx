@@ -15,13 +15,34 @@ function Loading() {
 
 /** Кожна сцена — окремий чанк; важкі ефекти й матеріали не потрапляють у перший екран. */
 const SCENE_COMPONENTS: Record<SceneId, React.ComponentType<SceneProps>> = {
-  debt: dynamic(() => import("./debt/DebtScene"), { ssr: false, loading: Loading }),
-  backpack: dynamic(() => import("./backpack/BackpackScene"), { ssr: false, loading: Loading }),
-  yarn: dynamic(() => import("./yarn/YarnScene"), { ssr: false, loading: Loading }),
-  sand: dynamic(() => import("./sand/SandScene"), { ssr: false, loading: Loading }),
-  clay: dynamic(() => import("./clay/ClayScene"), { ssr: false, loading: Loading }),
-  war_map: dynamic(() => import("./war/WarMapScene"), { ssr: false, loading: Loading }),
-  unsaid: dynamic(() => import("./unsaid/UnsaidScene"), { ssr: false, loading: Loading }),
+  debt: dynamic(() => import("./debt/DebtScene"), {
+    ssr: false,
+    loading: Loading,
+  }),
+  backpack: dynamic(() => import("./backpack/BackpackScene"), {
+    ssr: false,
+    loading: Loading,
+  }),
+  yarn: dynamic(() => import("./yarn/YarnScene"), {
+    ssr: false,
+    loading: Loading,
+  }),
+  sand: dynamic(() => import("./sand/SandScene"), {
+    ssr: false,
+    loading: Loading,
+  }),
+  clay: dynamic(() => import("./clay/ClayScene"), {
+    ssr: false,
+    loading: Loading,
+  }),
+  war_map: dynamic(() => import("./war/WarMapScene"), {
+    ssr: false,
+    loading: Loading,
+  }),
+  unsaid: dynamic(() => import("./unsaid/UnsaidScene"), {
+    ssr: false,
+    loading: Loading,
+  }),
 };
 
 export function SceneHost({
@@ -37,5 +58,14 @@ export function SceneHost({
   onExit: (kind: SceneExit) => void;
   onEditInput?: () => void;
 }) {
-  return <SceneShell meta={SCENES[id]} Scene={SCENE_COMPONENTS[id]} input={input} topicNote={topicNote} onExit={onExit} onEditInput={onEditInput} />;
+  return (
+    <SceneShell
+      meta={SCENES[id]}
+      Scene={SCENE_COMPONENTS[id]}
+      input={input}
+      topicNote={topicNote}
+      onExit={onExit}
+      onEditInput={onEditInput}
+    />
+  );
 }

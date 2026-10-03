@@ -46,7 +46,7 @@ export function SceneShell({
   // Вступ згортається сам за кілька секунд або з першим дотиком.
   useEffect(() => {
     if (!introOpen) return;
-    const t = window.setTimeout(() => setIntroOpen(false), 9000);
+    const t = window.setTimeout(() => setIntroOpen(false), 6500);
     return () => window.clearTimeout(t);
   }, [introOpen]);
 

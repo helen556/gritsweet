@@ -5,12 +5,23 @@ import { cn } from "@/lib/cn";
 import { loadImage, loadJson, useSceneAssets } from "@/lib/scene/assets";
 import { drawSoftShadow } from "@/lib/scene/bend";
 import { useCanvas2D } from "@/lib/scene/canvas";
-import { createHeightfield, dent, relax, type Heightfield } from "@/lib/scene/heightfield";
+import {
+  createHeightfield,
+  dent,
+  relax,
+  type Heightfield,
+} from "@/lib/scene/heightfield";
 import { createHeightGL, type HeightGL } from "@/lib/scene/heightgl";
+import { useLazyRef } from "@/lib/scene/lazyRef";
 import { useFrameLoop } from "@/lib/scene/loop";
 import { usePointer } from "@/lib/scene/pointer";
 import { haptic, sound } from "@/lib/scene/sound";
-import { contactShadow, makeSprite, opaqueAt, type Sprite } from "@/lib/scene/sprite";
+import {
+  contactShadow,
+  makeSprite,
+  opaqueAt,
+  type Sprite,
+} from "@/lib/scene/sprite";
 import type { SceneProps } from "../types";
 
 interface Meta {
@@ -20,7 +31,14 @@ interface Meta {
   light: [number, number, number];
   inner: [number, number, number, number];
   free: [number, number, number, number];
-  stones: { x: number; y: number; w: number; h: number; cx: number; cy: number }[];
+  stones: {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    cx: number;
+    cy: number;
+  }[];
 }
 
 type Tool = "stones" | "level";
@@ -51,7 +69,9 @@ async function loadSand() {
     loadImage("/scenes/sand/tray.webp"),
     loadImage("/scenes/sand/height.png"),
     loadImage("/scenes/sand/mask.png"),
-    ...meta.stones.map((_, i) => loadImage(`/scenes/sand/pebble-${String(i).padStart(2, "0")}.webp`)),
+    ...meta.stones.map((_, i) =>
+      loadImage(`/scenes/sand/pebble-${String(i).padStart(2, "0")}.webp`),
+    ),
   ]);
   // Висоти з PNG → світові пікселі.
   const gw = height.naturalWidth;
@@ -63,7 +83,8 @@ async function loadSand() {
   g.drawImage(height, 0, 0);
   const px = g.getImageData(0, 0, gw, gh).data;
   const hf = createHeightfield(gw, gh);
-  for (let i = 0; i < gw * gh; i++) hf.data[i] = ((px[i * 4]! - 127.5) / 127.5) * meta.heightScale;
+  for (let i = 0; i < gw * gh; i++)
+    hf.data[i] = ((px[i * 4]! - 127.5) / 127.5) * meta.heightScale;
   g.clearRect(0, 0, gw, gh);
   g.drawImage(mask, 0, 0);
   const md = g.getImageData(0, 0, gw, gh).data;
@@ -74,12 +95,24 @@ async function loadSand() {
 
 export default function SandScene(props: SceneProps) {
   const assets = useSceneAssets(loadSand);
-  if (assets.status === "loading") return <div role="status" className="grid h-full place-items-center text-sm text-mist">Готую пісок…</div>;
+  if (assets.status === "loading")
+    return (
+      <div
+        role="status"
+        className="grid h-full place-items-center text-sm text-mist"
+      >
+        Готую пісок…
+      </div>
+    );
   if (assets.status === "error")
     return (
       <div className="grid h-full place-items-center gap-3 px-6 text-center text-mist">
         <p>Не вдалося завантажити лоток.</p>
-        <button type="button" onClick={assets.retry} className="scene-btn border border-steel/60">
+        <button
+          type="button"
+          onClick={assets.retry}
+          className="scene-btn border border-steel/60"
+        >
           Спробувати ще
         </button>
       </div>
@@ -88,7 +121,14 @@ export default function SandScene(props: SceneProps) {
 }
 
 /** Чаша з мʼякими стінками (косинус) і валиком: обʼєм виймається й лягає довкола. */
-function bowl(hf: Heightfield, gx: number, gy: number, rx: number, ry: number, depth: number) {
+function bowl(
+  hf: Heightfield,
+  gx: number,
+  gy: number,
+  rx: number,
+  ry: number,
+  depth: number,
+) {
   const x0 = Math.max(1, Math.floor(gx - rx * 1.5));
   const x1 = Math.min(hf.w - 2, Math.ceil(gx + rx * 1.5));
   const y0 = Math.max(1, Math.floor(gy - ry * 1.5));
@@ -98,30 +138,48 @@ function bowl(hf: Heightfield, gx: number, gy: number, rx: number, ry: number, d
       const d = Math.hypot((x - gx) / rx, (y - gy) / ry);
       const i = y * hf.w + x;
       if (d < 1) hf.data[i]! -= depth * 0.5 * (1 + Math.cos(Math.PI * d));
-      else if (d < 1.45) hf.data[i]! += depth * 0.3 * Math.sin((Math.PI * (d - 1)) / 0.45);
+      else if (d < 1.45)
+        hf.data[i]! += depth * 0.3 * Math.sin((Math.PI * (d - 1)) / 0.45);
     }
 }
 
-function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProps & { data: Awaited<ReturnType<typeof loadSand>> }) {
+function Sand({
+  reducedMotion,
+  onSettled,
+  setHint,
+  onInteract,
+  data,
+}: SceneProps & { data: Awaited<ReturnType<typeof loadSand>> }) {
   const { meta, tray, mask, sprites } = data;
-  const { canvasRef, ctx, size } = useCanvas2D();
+  const { canvasRef, size } = useCanvas2D();
   const rootRef = useRef<HTMLDivElement>(null);
   const glCanvas = useRef<HTMLCanvasElement | null>(null);
   const gl = useRef<HeightGL | null>(null);
   const [tool, setTool] = useState<Tool>("stones");
   const toolRef = useRef<Tool>("stones");
   const [glFailed, setGlFailed] = useState(false);
-  const [counts, setCounts] = useState({ inSand: meta.stones.length, onWood: 0 });
+  const [counts, setCounts] = useState({
+    inSand: meta.stones.length,
+    onWood: 0,
+  });
   // Кожен запуск — власна копія висот (Заново = чистий стан).
-  const hf = useMemo<Heightfield>(() => ({ w: data.hf.w, h: data.hf.h, data: data.hf.data.slice(), gloss: new Float32Array(data.hf.data.length) }), [data.hf]);
+  // Кожен запуск — власна копія висот (Заново = чистий стан).
+  const hfRef = useLazyRef<Heightfield>(() => ({
+    w: data.hf.w,
+    h: data.hf.h,
+    data: data.hf.data.slice(),
+    gloss: new Float32Array(data.hf.data.length),
+  }));
+  const hf = hfRef.current;
   const G = meta.grid;
-  const dirty = useRef({ y0: 0, y1: hf.h - 1, any: true });
-  const settling = useRef<{ x0: number; y0: number; x1: number; y1: number; until: number }[]>([]);
+  const dirty = useLazyRef(() => ({ y0: 0, y1: data.hf.h - 1, any: true }));
+  const settling = useLazyRef<
+    { x0: number; y0: number; x1: number; y1: number; until: number }[]
+  >(() => []);
   const settledOnce = useRef(false);
 
-  const pebbles = useRef<Pebble[]>([]);
-  if (pebbles.current.length === 0) {
-    pebbles.current = meta.stones.map((m, i) => ({
+  const pebbles = useLazyRef<Pebble[]>(() =>
+    meta.stones.map((m, i) => ({
       sprite: sprites[i]!,
       x: m.x + m.w / 2,
       y: m.y + m.h / 2,
@@ -135,9 +193,21 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
       homeY: m.y + m.h / 2,
       dropTo: null,
       z: i,
-    }));
-  }
-  const drag = useRef<{ kind: "pebble"; i: number; id: number; ox: number; oy: number; tx: number; ty: number } | { kind: "sand"; id: number; lx: number; ly: number } | null>(null);
+    })),
+  );
+  const drag = useRef<
+    | {
+        kind: "pebble";
+        i: number;
+        id: number;
+        ox: number;
+        oy: number;
+        tx: number;
+        ty: number;
+      }
+    | { kind: "sand"; id: number; lx: number; ly: number }
+    | null
+  >(null);
 
   // Вид: на вузькому екрані лоток повертається на 90°, щоб камінці не були дрібними.
   const view = useMemo(() => {
@@ -170,9 +240,20 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
   useEffect(() => {
     const c = document.createElement("canvas");
     glCanvas.current = c;
-    const r = createHeightGL(c, { gw: hf.w, gh: hf.h, albedo: tray, mask, light: meta.light, relief: 1 / G, specular: 0.04, shininess: 30, solid: false });
+    const r = createHeightGL(c, {
+      gw: hf.w,
+      gh: hf.h,
+      albedo: tray,
+      mask,
+      light: meta.light,
+      relief: 1 / G,
+      specular: 0.04,
+      shininess: 30,
+      solid: false,
+    });
     if (!r) {
-      setGlFailed(true);
+      // Повідомляємо асинхронно (як подію), без каскаду рендерів в ефекті.
+      void Promise.resolve().then(() => setGlFailed(true));
       return;
     }
     gl.current = r;
@@ -185,7 +266,7 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
       r.dispose();
       gl.current = null;
     };
-  }, [hf, tray, mask, meta.light, G]);
+  }, [hf, tray, mask, meta.light, G, dirty]);
 
   // Розмір GL-полотна — під фактичний розмір на екрані (чітко, але без зайвих пікселів).
   useEffect(() => {
@@ -194,7 +275,7 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
     const k = Math.min(1, view.s * size.dpr);
     r.resize(Math.round(meta.size[0] * k), Math.round(meta.size[1] * k));
     dirty.current.any = true;
-  }, [view.s, size, meta.size]);
+  }, [view.s, size, meta.size, dirty]);
 
   /** Запасний рендер без WebGL: тінь рельєфу поверх фото (м'яке світло). */
   const fallbackShade = useRef<HTMLCanvasElement | null>(null);
@@ -223,13 +304,19 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
   }, [hf, G, meta.light, data.sandMask]);
 
   const draw = useCallback(() => {
-    const g = ctx;
+    const g = canvasRef.current?.getContext("2d") ?? null;
     if (!g) return;
     const { a, b, c, d, e, f } = view;
     const dpr = size.dpr;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, g.canvas.width, g.canvas.height);
     g.setTransform(dpr * a, dpr * b, dpr * c, dpr * d, dpr * e, dpr * f);
+    // Поверхня навколо лотка — у тон краю фото, щоб не було видно меж знімка.
+    const table = g.createLinearGradient(0, 0, 0, meta.size[1]);
+    table.addColorStop(0, "rgb(86,87,89)");
+    table.addColorStop(1, "rgb(71,72,74)");
+    g.fillStyle = table;
+    g.fillRect(-3000, -3000, meta.size[0] + 6000, meta.size[1] + 6000);
     // Лоток + пісок.
     if (dirty.current.any) {
       if (gl.current && !gl.current.lost()) {
@@ -238,7 +325,8 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
       } else renderFallback();
       dirty.current = { y0: hf.h, y1: -1, any: false };
     }
-    if (gl.current && !gl.current.lost() && glCanvas.current) g.drawImage(glCanvas.current, 0, 0, meta.size[0], meta.size[1]);
+    if (gl.current && !gl.current.lost() && glCanvas.current)
+      g.drawImage(glCanvas.current, 0, 0, meta.size[0], meta.size[1]);
     else {
       g.drawImage(tray, 0, 0);
       if (fallbackShade.current) {
@@ -249,14 +337,34 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
       }
     }
     // Камінці: ті, що лежать, — за порядком; піднятий — останнім.
-    const list = [...pebbles.current].sort((p, q) => p.z + p.lift * 100 - (q.z + q.lift * 100));
+    const list = [...pebbles.current].sort(
+      (p, q) => p.z + p.lift * 100 - (q.z + q.lift * 100),
+    );
     const Lx = -meta.light[0];
     const Ly = -meta.light[1];
     for (const p of list) {
       const w = p.sprite.w;
       const h = p.sprite.h;
-      if (p.lift > 1) drawSoftShadow(g, p.x + Lx * p.lift * 0.9, p.y + Ly * p.lift * 0.9 + 4, w * 0.9, h * 0.8, p.rot, 10 + p.lift * 0.5, Math.max(0.2, 0.5 - p.lift * 0.005), Math.min(w, h) / 2);
-      else contactShadow(g, p.x + Lx * 7, p.y + Ly * 7 + 3, w * 0.55, h * 0.5, p.onWood ? 0.6 : 0.5);
+      if (p.lift > 1)
+        drawSoftShadow(
+          g,
+          p.x + Lx * p.lift * 0.9,
+          p.y + Ly * p.lift * 0.9 + 4,
+          w * 0.9,
+          h * 0.8,
+          p.rot,
+          10 + p.lift * 0.5,
+          Math.max(0.2, 0.5 - p.lift * 0.005),
+        );
+      else
+        contactShadow(
+          g,
+          p.x + Lx * 7,
+          p.y + Ly * 7 + 3,
+          w * 0.55,
+          h * 0.5,
+          p.onWood ? 0.6 : 0.5,
+        );
       const sc = 1 + p.lift * 0.003;
       g.save();
       g.translate(p.x, p.y);
@@ -265,7 +373,18 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
       g.drawImage(p.sprite.img, -w / 2, -h / 2);
       g.restore();
     }
-  }, [ctx, view, size.dpr, hf, renderFallback, tray, meta.size, meta.light]);
+  }, [
+    view,
+    size.dpr,
+    hf,
+    renderFallback,
+    tray,
+    meta.size,
+    meta.light,
+    canvasRef,
+    dirty,
+    pebbles,
+  ]);
 
   const markDirty = (gy0: number, gy1: number) => {
     const dd = dirty.current;
@@ -287,7 +406,10 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
         p.vy += ((ty - p.y) * k - p.vy * c) * dt;
         p.x += p.vx * dt;
         p.y += p.vy * dt;
-        p.rot += ((reducedMotion ? 0 : Math.max(-0.3, Math.min(0.3, p.vx * 0.0008))) - p.rot) * Math.min(1, dt * 6);
+        p.rot +=
+          ((reducedMotion ? 0 : Math.max(-0.3, Math.min(0.3, p.vx * 0.0008))) -
+            p.rot) *
+          Math.min(1, dt * 6);
         p.lift += (34 - p.lift) * Math.min(1, dt * 10);
         busy = true;
       } else if (p.dropTo) {
@@ -298,7 +420,10 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
         p.lift += (0 - p.lift) * Math.min(1, dt * 12);
         p.rot *= 1 - Math.min(1, dt * 3);
         busy = true;
-        if (Math.hypot(p.dropTo.x - p.x, p.dropTo.y - p.y) < 0.6 && p.lift < 0.6) {
+        if (
+          Math.hypot(p.dropTo.x - p.x, p.dropTo.y - p.y) < 0.6 &&
+          p.lift < 0.6
+        ) {
           p.dropTo = null;
           p.lift = 0;
           sound.play(p.onWood ? "thud" : "clay", 0.5);
@@ -311,7 +436,9 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
     const act = settling.current.filter((r) => r.until > now);
     settling.current = act;
     for (const r of act) {
-      for (let k = 0; k < 2; k++) if (relax(hf, r.x0, r.y0, r.x1, r.y1, G * 0.45, 0.18)) markDirty(r.y0, r.y1);
+      for (let k = 0; k < 2; k++)
+        if (relax(hf, r.x0, r.y0, r.x1, r.y1, G * 0.45, 0.18))
+          markDirty(r.y0, r.y1);
       busy = true;
     }
     draw();
@@ -328,10 +455,22 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
     const gx = p.x / G;
     const gy = p.y / G;
     const r = (Math.min(p.sprite.w, p.sprite.h) * 0.48) / G;
-    const sx = p.sprite.w / p.sprite.h;
     // Ямка-чаша за формою камінця (еліпс), пісок — у мʼякий валик довкола.
-    bowl(hf, gx, gy, (p.sprite.w * 0.44) / G, (p.sprite.h * 0.44) / G, Math.min(p.sprite.w, p.sprite.h) * 0.085);
-    settling.current.push({ x0: gx - r * 2.6, y0: gy - r * 2.6, x1: gx + r * 2.6, y1: gy + r * 2.6, until: performance.now() + (reducedMotion ? 150 : 900) });
+    bowl(
+      hf,
+      gx,
+      gy,
+      (p.sprite.w * 0.44) / G,
+      (p.sprite.h * 0.44) / G,
+      Math.min(p.sprite.w, p.sprite.h) * 0.085,
+    );
+    settling.current.push({
+      x0: gx - r * 2.6,
+      y0: gy - r * 2.6,
+      x1: gx + r * 2.6,
+      y1: gy + r * 2.6,
+      until: performance.now() + (reducedMotion ? 150 : 900),
+    });
     markDirty(gy - r * 3, gy + r * 3);
   };
   /** Покладений на пісок — легко вдавлюється. */
@@ -341,7 +480,11 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
     markDirty(p.y / G - r * 3, p.y / G + r * 3);
   }
 
-  const inFree = (x: number, y: number) => x > meta.free[0] && x < meta.free[2] && y > meta.free[1] && y < meta.free[3];
+  const inFree = (x: number, y: number) =>
+    x > meta.free[0] &&
+    x < meta.free[2] &&
+    y > meta.free[1] &&
+    y < meta.free[3];
   const inSand = (x: number, y: number) => {
     const gx = Math.round(x / G);
     const gy = Math.round(y / G);
@@ -351,7 +494,9 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
 
   /** Делікатне вирівнювання в рядок на вільному дереві, без жорсткого «прилипання». */
   const alignOnWood = (p: Pebble, x: number, y: number) => {
-    const others = pebbles.current.filter((q) => q !== p && q.onWood && !q.dropTo);
+    const others = pebbles.current.filter(
+      (q) => q !== p && q.onWood && !q.dropTo,
+    );
     let nx = x;
     let ny = y;
     if (others.length) {
@@ -360,19 +505,35 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
     }
     // Не накладатися: відсунути вздовж рядка.
     for (let it = 0; it < 6; it++) {
-      const hit = others.find((q) => Math.abs(q.x - nx) < (q.sprite.w + p.sprite.w) * 0.42 && Math.abs(q.y - ny) < (q.sprite.h + p.sprite.h) * 0.5);
+      const hit = others.find(
+        (q) =>
+          Math.abs(q.x - nx) < (q.sprite.w + p.sprite.w) * 0.42 &&
+          Math.abs(q.y - ny) < (q.sprite.h + p.sprite.h) * 0.5,
+      );
       if (!hit) break;
-      ny = hit.y + Math.sign(ny - hit.y || 1) * ((hit.sprite.h + p.sprite.h) * 0.52);
+      ny =
+        hit.y +
+        Math.sign(ny - hit.y || 1) * ((hit.sprite.h + p.sprite.h) * 0.52);
     }
-    return { x: Math.max(meta.free[0] + p.sprite.w / 2, Math.min(meta.free[2] - p.sprite.w / 2, nx)), y: Math.max(meta.free[1] + p.sprite.h / 2, Math.min(meta.free[3] - p.sprite.h / 2, ny)) };
+    return {
+      x: Math.max(
+        meta.free[0] + p.sprite.w / 2,
+        Math.min(meta.free[2] - p.sprite.w / 2, nx),
+      ),
+      y: Math.max(
+        meta.free[1] + p.sprite.h / 2,
+        Math.min(meta.free[3] - p.sprite.h / 2, ny),
+      ),
+    };
   };
 
   const updateCounts = useCallback(() => {
     const onWood = pebbles.current.filter((p) => p.onWood).length;
     const inSandN = pebbles.current.length - onWood;
     setCounts({ inSand: inSandN, onWood });
-    if (inSandN === 0 && toolRef.current === "stones") setHint("Камінці на своїх місцях. Тепер можна розрівняти пісок.");
-  }, [setHint]);
+    if (inSandN === 0 && toolRef.current === "stones")
+      setHint("Камінці на своїх місцях. Тепер можна розрівняти пісок.");
+  }, [setHint, pebbles]);
 
   /** Наскільки пісок нерівний (середній модуль лапласіана). */
   const roughness = () => {
@@ -382,7 +543,13 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
       for (let x = 2; x < hf.w - 2; x += 2) {
         const i = y * hf.w + x;
         if (data.sandMask[i]! < 0.9) continue;
-        sum += Math.abs(hf.data[i - 1]! + hf.data[i + 1]! + hf.data[i - hf.w]! + hf.data[i + hf.w]! - 4 * hf.data[i]!);
+        sum += Math.abs(
+          hf.data[i - 1]! +
+            hf.data[i + 1]! +
+            hf.data[i - hf.w]! +
+            hf.data[i + hf.w]! -
+            4 * hf.data[i]!,
+        );
         n++;
       }
     return n ? sum / n : 0;
@@ -398,7 +565,14 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
     const x1 = Math.min(hf.w - 3, Math.ceil(gx + R));
     const y0 = Math.max(2, Math.floor(gy - R));
     const y1 = Math.min(hf.h - 3, Math.ceil(gy + R));
-    const src = hf.data.slice();
+    // Знімок лише потрібної ділянки (а не всього поля) — дешево на кожен крок пальця.
+    const sx0 = Math.max(0, x0 - 4);
+    const sy0 = Math.max(0, y0 - 4);
+    const sw = Math.min(hf.w - 1, x1 + 4) - sx0 + 1;
+    const sh = Math.min(hf.h - 1, y1 + 4) - sy0 + 1;
+    const src = new Float32Array(sw * sh);
+    for (let y = 0; y < sh; y++) src.set(hf.data.subarray((sy0 + y) * hf.w + sx0, (sy0 + y) * hf.w + sx0 + sw), y * sw);
+    const at = (x: number, y: number) => src[(y - sy0) * sw + (x - sx0)]!;
     for (let y = y0; y <= y1; y++)
       for (let x = x0; x <= x1; x++) {
         const i = y * hf.w + x;
@@ -410,11 +584,11 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
         let cnt = 0;
         for (let oy = -4; oy <= 4; oy += 2)
           for (let ox = -4; ox <= 4; ox += 2) {
-            acc += src[i + oy * hf.w + ox]!;
+            acc += at(x + ox, y + oy);
             cnt++;
           }
         const w = (1 - dd * dd) * 0.75 * m;
-        hf.data[i] = src[i]! + (acc / cnt - src[i]!) * w;
+        hf.data[i] = at(x, y) + (acc / cnt - at(x, y)) * w;
         hf.data[i] *= 1 - 0.12 * w; // поступово до рівної площини
       }
     markDirty(y0, y1);
@@ -426,14 +600,29 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
       const w = toWorld(p.x, p.y);
       onInteract();
       if (toolRef.current === "stones") {
-        const order = [...pebbles.current.entries()].sort((a, b) => b[1].z - a[1].z);
+        const order = [...pebbles.current.entries()].sort(
+          (a, b) => b[1].z - a[1].z,
+        );
         for (const [i, pb] of order) {
           if (pb.dropTo) continue;
           const lx = w.x - pb.x + pb.sprite.w / 2;
           const ly = w.y - pb.y + pb.sprite.h / 2;
-          if (!opaqueAt(pb.sprite, lx, ly, 60) && Math.hypot(w.x - pb.x, w.y - pb.y) > Math.min(pb.sprite.w, pb.sprite.h) * 0.55) continue;
+          if (
+            !opaqueAt(pb.sprite, lx, ly, 60) &&
+            Math.hypot(w.x - pb.x, w.y - pb.y) >
+              Math.min(pb.sprite.w, pb.sprite.h) * 0.55
+          )
+            continue;
           const lift = p.type === "touch" ? 26 / view.s : 0;
-          drag.current = { kind: "pebble", i, id: p.id, ox: w.x - pb.x, oy: w.y - pb.y + lift, tx: w.x, ty: w.y };
+          drag.current = {
+            kind: "pebble",
+            i,
+            id: p.id,
+            ox: w.x - pb.x,
+            oy: w.y - pb.y + lift,
+            tx: w.x,
+            ty: w.y,
+          };
           pb.z = 100 + i;
           pb.vx = pb.vy = 0;
           if (!pb.onWood) liftFromSand(pb);
@@ -469,7 +658,8 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
             markDirty(y / G - 8, y / G + 8);
           }
         }
-        if (toolRef.current === "level" && Math.random() < 0.08) sound.play("paper", 0.15);
+        if (toolRef.current === "level" && Math.random() < 0.08)
+          sound.play("paper", 0.15);
         d.lx = w.x;
         d.ly = w.y;
       }
@@ -480,9 +670,16 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
       if (!d || d.id !== p.id) return;
       drag.current = null;
       if (d.kind === "sand") {
-        if (toolRef.current === "level" && startRough.current !== null && !settledOnce.current) {
+        if (
+          toolRef.current === "level" &&
+          startRough.current !== null &&
+          !settledOnce.current
+        ) {
           const r = roughness();
-          if (r < startRough.current * 0.45 && pebbles.current.every((q) => q.onWood)) {
+          if (
+            r < startRough.current * 0.45 &&
+            pebbles.current.every((q) => q.onWood)
+          ) {
             settledOnce.current = true;
             onSettled();
             setHint("Рівно. Можна продовжувати скільки хочеш.");
@@ -507,7 +704,9 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
       }
       pb.homeX = pb.dropTo.x;
       pb.homeY = pb.dropTo.y;
-      pb.z = pb.onWood ? 50 + pebbles.current.filter((q) => q.onWood).length : d.i;
+      pb.z = pb.onWood
+        ? 50 + pebbles.current.filter((q) => q.onWood).length
+        : d.i;
       updateCounts();
       wake();
     },
@@ -516,7 +715,11 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
   const setToolBoth = (t: Tool) => {
     setTool(t);
     toolRef.current = t;
-    setHint(t === "level" ? "Веди пальцем по піску — він вирівнюється під рукою." : "Перенеси камінці на вільну частину дошки.");
+    setHint(
+      t === "level"
+        ? "Веди пальцем по піску — він вирівнюється під рукою."
+        : "Перенеси камінці на вільну частину дошки.",
+    );
   };
 
   /** Кнопкова альтернатива: наступний камінець — на вільне дерево. */
@@ -539,33 +742,71 @@ function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProp
   };
   const levelAll = () => {
     onInteract();
-    for (let y = 8; y < hf.h; y += 18) for (let x = 8; x < hf.w; x += 18) if (inSand(x * G, y * G)) level(x * G, y * G);
+    for (let y = 8; y < hf.h; y += 18)
+      for (let x = 8; x < hf.w; x += 18)
+        if (inSand(x * G, y * G)) level(x * G, y * G);
     wake();
   };
 
   return (
-    <div ref={rootRef} className="scene-surface relative h-full w-full overflow-hidden">
-      <canvas ref={canvasRef} aria-hidden className="absolute inset-0 h-full w-full" />
-      {glFailed && <p className="absolute inset-x-0 top-2 text-center text-xs text-mist">Спрощене освітлення піску (WebGL недоступний).</p>}
+    <div
+      ref={rootRef}
+      className="scene-surface relative h-full w-full overflow-hidden"
+    >
+      <canvas
+        ref={canvasRef}
+        aria-hidden
+        className="absolute inset-0 h-full w-full"
+      />
+      {glFailed && (
+        <p className="absolute inset-x-0 top-2 text-center text-xs text-mist">
+          Спрощене освітлення піску (WebGL недоступний).
+        </p>
+      )}
       <div className="absolute inset-x-0 bottom-1 z-10 flex flex-wrap items-center justify-center gap-2 px-2">
-        <div role="radiogroup" aria-label="Що робити" className="flex overflow-hidden rounded-[var(--radius-hair)] border border-steel/50 bg-night/70">
+        <div
+          role="radiogroup"
+          aria-label="Що робити"
+          className="flex overflow-hidden rounded-[var(--radius-hair)] border border-steel/50 bg-night/70"
+        >
           {(
             [
               ["stones", "Камінці"],
               ["level", "Розрівняти"],
             ] as const
           ).map(([t, l]) => (
-            <button key={t} type="button" role="radio" aria-checked={tool === t} onClick={() => setToolBoth(t)} className={cn("min-h-11 px-4 text-sm", tool === t ? "bg-frost text-abyss" : "text-frost/85 hover:bg-night")}>
+            <button
+              key={t}
+              type="button"
+              role="radio"
+              aria-checked={tool === t}
+              onClick={() => setToolBoth(t)}
+              className={cn(
+                "min-h-11 px-4 text-sm",
+                tool === t
+                  ? "bg-frost text-abyss"
+                  : "text-frost/85 hover:bg-night",
+              )}
+            >
               {l}
             </button>
           ))}
         </div>
         {tool === "stones" ? (
-          <button type="button" onClick={moveNext} disabled={counts.inSand === 0} className="scene-btn border border-steel/50 bg-night/70 text-sm disabled:opacity-40">
+          <button
+            type="button"
+            onClick={moveNext}
+            disabled={counts.inSand === 0}
+            className="scene-btn border border-steel/50 bg-night/70 text-sm disabled:opacity-40"
+          >
             Перекласти камінець
           </button>
         ) : (
-          <button type="button" onClick={levelAll} className="scene-btn border border-steel/50 bg-night/70 text-sm">
+          <button
+            type="button"
+            onClick={levelAll}
+            className="scene-btn border border-steel/50 bg-night/70 text-sm"
+          >
             Пригладити все
           </button>
         )}

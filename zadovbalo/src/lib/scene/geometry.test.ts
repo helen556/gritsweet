@@ -8,7 +8,10 @@ describe("peel geometry", () => {
     expect(area(half) / area(rect)).toBeCloseTo(0.5, 2);
   });
   it("reflects across the fold line", () => {
-    expect(reflect({ x: -10, y: 5 }, { x: 0, y: 0 }, { x: 1, y: 0 })).toEqual({ x: 10, y: 5 });
+    expect(reflect({ x: -10, y: 5 }, { x: 0, y: 0 }, { x: 1, y: 0 })).toEqual({
+      x: 10,
+      y: 5,
+    });
   });
   it("peeling from a corner grows with pull and conserves area", () => {
     const a = { x: -100, y: -50 };

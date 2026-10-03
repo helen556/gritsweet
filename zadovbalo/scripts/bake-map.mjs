@@ -47,3 +47,16 @@ console.error("rings:", flat.length, "points:", flat.reduce((s, r) => s + r.leng
 // Перевірка: жодна точка Криму не всередині.
 const ok = !polys.some((poly) => crimea.some((p) => inRing(p, poly[0])));
 console.error("crimea excluded:", ok);
+// Перевірка: міста тимчасово окупованих територій України — не в контурі (лише міжнародно визнані межі).
+const occupied = {
+  Sevastopol: [33.52, 44.6], Simferopol: [34.1, 44.95], Kerch: [36.47, 45.35],
+  Donetsk: [37.8, 48.0], Luhansk: [39.31, 48.57], Mariupol: [37.55, 47.1], Melitopol: [35.37, 46.85],
+  Berdiansk: [36.79, 46.76], NovaKakhovka: [33.37, 46.75], Henichesk: [34.82, 46.17], Sievierodonetsk: [38.49, 48.95],
+};
+const inside = Object.entries(occupied).filter(([, p]) => polys.some((poly) => inRing(p, poly[0])));
+console.error("occupied Ukrainian points inside outline:", inside.length ? inside.map(([n]) => n).join(", ") : "none");
+// А російські міста — всередині (контур не зламаний).
+const control = { Moscow: [37.62, 55.75], Rostov: [39.7, 47.23], Kaliningrad: [20.5, 54.71], Vladivostok: [131.9, 43.12] };
+const missing = Object.entries(control).filter(([, p]) => !polys.some((poly) => inRing(p, poly[0])));
+console.error("control points missing:", missing.length ? missing.map(([n]) => n).join(", ") : "none");
+if (!ok || inside.length || missing.length) process.exit(1);

@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { createHeightfield, dent, fillLump, smooth, smudge, squeeze, volume, shade } from "./heightfield";
+import {
+  createHeightfield,
+  dent,
+  fillLump,
+  smooth,
+  smudge,
+  squeeze,
+  volume,
+  shade,
+} from "./heightfield";
 
 describe("heightfield", () => {
   it("dent removes material at contact and pushes it to the rim (volume ~ preserved)", () => {
@@ -32,7 +41,13 @@ describe("heightfield", () => {
     squeeze(hf, "x", 0.05);
     expect(Number.isFinite(volume(hf))).toBe(true);
     const out = new Uint8ClampedArray(80 * 80 * 4);
-    shade(hf, out, { base: [130, 140, 145], grain: 0.1, specular: 0.1, shininess: 20, relief: 6 });
+    shade(hf, out, {
+      base: [130, 140, 145],
+      grain: 0.1,
+      specular: 0.1,
+      shininess: 20,
+      relief: 6,
+    });
     expect(out[(40 * 80 + 40) * 4 + 3]).toBe(255);
     expect(out[3]).toBe(0);
   });

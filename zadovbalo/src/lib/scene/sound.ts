@@ -4,7 +4,18 @@
  * Тихий синтезований звук (без файлів). AudioContext створюється лише після жесту
  * (увімкнення звуку), гучність обмежена, без різких атак.
  */
-export type SoundName = "paper" | "tear" | "clay" | "crack" | "peel" | "thud" | "water" | "fire" | "rumble" | "zip" | "soft";
+export type SoundName =
+  | "paper"
+  | "tear"
+  | "clay"
+  | "crack"
+  | "peel"
+  | "thud"
+  | "water"
+  | "fire"
+  | "rumble"
+  | "zip"
+  | "soft";
 
 class SoundEngine {
   private ctx: AudioContext | null = null;
@@ -15,7 +26,10 @@ class SoundEngine {
   /** Викликати з обробника жесту. */
   enable() {
     if (typeof window === "undefined") return;
-    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const Ctor =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
     if (!Ctor) return;
     this.ctx ??= new Ctor();
     void this.ctx.resume();
@@ -38,7 +52,14 @@ class SoundEngine {
     void this.ctx?.suspend();
   }
 
-  private noiseBurst(dur: number, filter: BiquadFilterType, f0: number, f1: number, gain: number, q = 0.8) {
+  private noiseBurst(
+    dur: number,
+    filter: BiquadFilterType,
+    f0: number,
+    f1: number,
+    gain: number,
+    q = 0.8,
+  ) {
     const { ctx, noise, master } = this;
     if (!ctx || !noise || !master) return;
     const t = ctx.currentTime;
@@ -57,7 +78,13 @@ class SoundEngine {
     src.start(t, Math.random() * 0.8, dur + 0.05);
   }
 
-  private tone(dur: number, f0: number, f1: number, gain: number, type: OscillatorType = "sine") {
+  private tone(
+    dur: number,
+    f0: number,
+    f1: number,
+    gain: number,
+    type: OscillatorType = "sine",
+  ) {
     const { ctx, master } = this;
     if (!ctx || !master) return;
     const t = ctx.currentTime;
@@ -79,7 +106,14 @@ class SoundEngine {
     const s = Math.max(0.15, Math.min(1, strength));
     switch (name) {
       case "paper":
-        return this.noiseBurst(0.12 + 0.1 * s, "bandpass", 2500, 4200, 0.05 * s, 1.2);
+        return this.noiseBurst(
+          0.12 + 0.1 * s,
+          "bandpass",
+          2500,
+          4200,
+          0.05 * s,
+          1.2,
+        );
       case "tear":
         return this.noiseBurst(0.18, "bandpass", 1800, 5200, 0.07 * s, 2);
       case "clay":

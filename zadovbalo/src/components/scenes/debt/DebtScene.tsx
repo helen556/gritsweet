@@ -12,6 +12,7 @@ import { cn } from "@/lib/cn";
 import { useSceneAssets } from "@/lib/scene/assets";
 import { drawBent, drawSoftShadow } from "@/lib/scene/bend";
 import { useCanvas2D } from "@/lib/scene/canvas";
+import { useLazyRef } from "@/lib/scene/lazyRef";
 import { useFrameLoop } from "@/lib/scene/loop";
 import { usePointer } from "@/lib/scene/pointer";
 import { haptic, sound } from "@/lib/scene/sound";
@@ -166,8 +167,8 @@ function Debt({
   const modeRef = useRef(mode);
   const [deltas, setDeltas] = useState<{ id: number; text: string }[]>([]);
   const [fontPx, setFontPx] = useState(64);
-  const pile = useRef<PileItem[]>([]);
-  const sim = useRef<Sim>({
+  const pile = useLazyRef<PileItem[]>(() => []);
+  const sim = useLazyRef<Sim>(() => ({
     phase: "idle",
     pointerId: -1,
     kind: "bill",
@@ -194,7 +195,7 @@ function Debt({
     homeX: 0,
     homeY: 0,
     committed: false,
-  });
+  }));
   const done = remaining <= 0;
   const label = useCallback(
     (v: number) => formatAmount(v, currency, total),
@@ -259,7 +260,7 @@ function Debt({
       y: p.cy - Math.min(n, 40) * 0.9 + ((n * 17) % 9) - 4,
       a: (((n * 53) % 21) - 10) * 0.012,
     };
-  }, [rel]);
+  }, [rel, pile]);
 
   /** Списати один перенос. Викликається рівно раз на жест (захист від подвійного списання). */
   const commit = useCallback(
@@ -341,7 +342,7 @@ function Debt({
   );
 
   const draw = useCallback(() => {
-    const g = ctx;
+    const g = canvasRef.current?.getContext("2d") ?? null;
     if (!g) return;
     g.clearRect(0, 0, size.width, size.height);
     const s = sim.current;
@@ -436,7 +437,7 @@ function Debt({
         });
       }
     }
-  }, [ctx, size, rel, drawFlat, noteW, noteH, note]);
+  }, [size, rel, drawFlat, noteW, noteH, note, canvasRef, pile, sim]);
 
   const wake = useFrameLoop(rootRef, (dt) => {
     const s = sim.current;
@@ -548,7 +549,7 @@ function Debt({
       s.toA = t.a;
       wake();
     },
-    [pileTarget, wake, noteW, noteH],
+    [pileTarget, wake, noteW, noteH, sim],
   );
 
   const commitRef = useRef(commit);

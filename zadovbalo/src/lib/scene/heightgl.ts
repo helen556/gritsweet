@@ -113,8 +113,8 @@ void main() {
     float sh = 0.0;
     float rise = L.z / max(length(L.xy), 0.05);
     vec2 dir = normalize(L.xy);
-    for (int k = 1; k <= 8; k++) {
-      float d = float(k) * 3.0;
+    for (int k = 1; k <= 5; k++) {
+      float d = float(k) * 4.5;
       vec2 q = uv + dir * e * d;
       sh = max(sh, smoothstep(0.0, 4.0, h(q) - c - d * rise));
     }
@@ -135,12 +135,25 @@ export interface HeightGL {
   lost(): boolean;
 }
 
-function tex(gl: WebGL2RenderingContext, unit: number, src: TexImageSource, repeat: boolean, single = false) {
+function tex(
+  gl: WebGL2RenderingContext,
+  unit: number,
+  src: TexImageSource,
+  repeat: boolean,
+  single = false,
+) {
   const t = gl.createTexture()!;
   gl.activeTexture(gl.TEXTURE0 + unit);
   gl.bindTexture(gl.TEXTURE_2D, t);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-  gl.texImage2D(gl.TEXTURE_2D, 0, single ? gl.R8 : gl.RGBA, single ? gl.RED : gl.RGBA, gl.UNSIGNED_BYTE, src);
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    single ? gl.R8 : gl.RGBA,
+    single ? gl.RED : gl.RGBA,
+    gl.UNSIGNED_BYTE,
+    src,
+  );
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   const wrap = repeat ? gl.REPEAT : gl.CLAMP_TO_EDGE;
@@ -149,10 +162,18 @@ function tex(gl: WebGL2RenderingContext, unit: number, src: TexImageSource, repe
   return t;
 }
 
-export function createHeightGL(canvas: HTMLCanvasElement, opt: HeightGLOptions): HeightGL | null {
+export function createHeightGL(
+  canvas: HTMLCanvasElement,
+  opt: HeightGLOptions,
+): HeightGL | null {
   let gl: WebGL2RenderingContext | null = null;
   try {
-    gl = canvas.getContext("webgl2", { premultipliedAlpha: false, alpha: true, antialias: false, preserveDrawingBuffer: false });
+    gl = canvas.getContext("webgl2", {
+      premultipliedAlpha: false,
+      alpha: true,
+      antialias: false,
+      preserveDrawingBuffer: false,
+    });
   } catch {
     gl = null;
   }
@@ -161,7 +182,8 @@ export function createHeightGL(canvas: HTMLCanvasElement, opt: HeightGLOptions):
     const s = gl!.createShader(type)!;
     gl!.shaderSource(s, src);
     gl!.compileShader(s);
-    if (!gl!.getShaderParameter(s, gl!.COMPILE_STATUS)) throw new Error(gl!.getShaderInfoLog(s) ?? "shader");
+    if (!gl!.getShaderParameter(s, gl!.COMPILE_STATUS))
+      throw new Error(gl!.getShaderInfoLog(s) ?? "shader");
     return s;
   };
   let prog: WebGLProgram;
@@ -170,14 +192,19 @@ export function createHeightGL(canvas: HTMLCanvasElement, opt: HeightGLOptions):
     gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
     gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
     gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog) ?? "link");
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS))
+      throw new Error(gl.getProgramInfoLog(prog) ?? "link");
   } catch {
     return null;
   }
   gl.useProgram(prog);
   const buf = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
+    gl.STATIC_DRAW,
+  );
   const loc = gl.getAttribLocation(prog, "p");
   gl.enableVertexAttribArray(loc);
   gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
@@ -189,7 +216,17 @@ export function createHeightGL(canvas: HTMLCanvasElement, opt: HeightGLOptions):
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, opt.gw, opt.gh, 0, gl.RED, gl.FLOAT, new Float32Array(opt.gw * opt.gh));
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.R32F,
+    opt.gw,
+    opt.gh,
+    0,
+    gl.RED,
+    gl.FLOAT,
+    new Float32Array(opt.gw * opt.gh),
+  );
   const textures = [hTex];
   if (opt.albedo) textures.push(tex(gl, 1, opt.albedo, false));
   if (opt.detail) textures.push(tex(gl, 2, opt.detail, true));
@@ -228,7 +265,17 @@ export function createHeightGL(canvas: HTMLCanvasElement, opt: HeightGLOptions):
       if (isLost) return;
       gl!.activeTexture(gl!.TEXTURE0);
       gl!.bindTexture(gl!.TEXTURE_2D, hTex);
-      gl!.texSubImage2D(gl!.TEXTURE_2D, 0, 0, 0, opt.gw, opt.gh, gl!.RED, gl!.FLOAT, data);
+      gl!.texSubImage2D(
+        gl!.TEXTURE_2D,
+        0,
+        0,
+        0,
+        opt.gw,
+        opt.gh,
+        gl!.RED,
+        gl!.FLOAT,
+        data,
+      );
     },
     uploadRows(data, y0, y1) {
       if (isLost) return;
@@ -237,7 +284,17 @@ export function createHeightGL(canvas: HTMLCanvasElement, opt: HeightGLOptions):
       if (b < a) return;
       gl!.activeTexture(gl!.TEXTURE0);
       gl!.bindTexture(gl!.TEXTURE_2D, hTex);
-      gl!.texSubImage2D(gl!.TEXTURE_2D, 0, 0, a, opt.gw, b - a + 1, gl!.RED, gl!.FLOAT, data.subarray(a * opt.gw, (b + 1) * opt.gw));
+      gl!.texSubImage2D(
+        gl!.TEXTURE_2D,
+        0,
+        0,
+        a,
+        opt.gw,
+        b - a + 1,
+        gl!.RED,
+        gl!.FLOAT,
+        data.subarray(a * opt.gw, (b + 1) * opt.gw),
+      );
     },
     render() {
       if (isLost) return;

@@ -32,7 +32,12 @@ export function makeSprite(img: HTMLImageElement): Sprite {
 }
 
 /** Чи непрозорий спрайт у точці (координати всередині спрайта, px). */
-export function opaqueAt(s: Sprite, x: number, y: number, threshold = 96): boolean {
+export function opaqueAt(
+  s: Sprite,
+  x: number,
+  y: number,
+  threshold = 96,
+): boolean {
   if (x < 0 || y < 0 || x >= s.w || y >= s.h) return false;
   const ix = Math.min(s.aw - 1, Math.floor(x / STEP));
   const iy = Math.min(s.ah - 1, Math.floor(y / STEP));
@@ -40,7 +45,14 @@ export function opaqueAt(s: Sprite, x: number, y: number, threshold = 96): boole
 }
 
 /** Мʼяка контактна тінь-еліпс під предметом. */
-export function contactShadow(g: CanvasRenderingContext2D, x: number, y: number, rx: number, ry: number, alpha: number) {
+export function contactShadow(
+  g: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  rx: number,
+  ry: number,
+  alpha: number,
+) {
   if (rx <= 0 || ry <= 0) return;
   g.save();
   g.translate(x, y);
@@ -57,7 +69,10 @@ export function contactShadow(g: CanvasRenderingContext2D, x: number, y: number,
 }
 
 /** Фото з мʼяко розчиненими краями — зливається з тлом сцени без видимих швів. */
-export function featherImage(img: HTMLImageElement, edge = 0.12): HTMLCanvasElement {
+export function featherImage(
+  img: HTMLImageElement,
+  edge = 0.12,
+): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = img.naturalWidth;
   c.height = img.naturalHeight;

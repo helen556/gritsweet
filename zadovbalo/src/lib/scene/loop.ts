@@ -6,7 +6,11 @@ import { useCallback, useEffect, useRef } from "react";
  * requestAnimationFrame, що працює лише поки сцена активна, вкладка видима й елемент на екрані.
  * `tick` повертає true, якщо потрібні ще кадри (інакше цикл засинає до `wake()`).
  */
-export function useFrameLoop(target: React.RefObject<Element | null>, tick: (dt: number, now: number) => boolean, active = true) {
+export function useFrameLoop(
+  target: React.RefObject<Element | null>,
+  tick: (dt: number, now: number) => boolean,
+  active = true,
+) {
   const tickRef = useRef(tick);
   const wakeRef = useRef<() => void>(() => {});
   useEffect(() => {

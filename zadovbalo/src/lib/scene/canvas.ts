@@ -15,7 +15,9 @@ export interface CanvasSize {
  */
 export function useCanvas2D() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [ctx, setCtx] = useState<CanvasRenderingContext2D | null | undefined>(undefined);
+  const [ctx, setCtx] = useState<CanvasRenderingContext2D | null | undefined>(
+    undefined,
+  );
   const [size, setSize] = useState<CanvasSize>({ width: 0, height: 0, dpr: 1 });
   const [quality] = useState<Quality>(() => detectQuality());
 
@@ -31,7 +33,11 @@ export function useCanvas2D() {
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       context?.setTransform(dpr, 0, 0, dpr, 0, 0);
-      setSize((s) => (s.width === width && s.height === height && s.dpr === dpr ? s : { width, height, dpr }));
+      setSize((s) =>
+        s.width === width && s.height === height && s.dpr === dpr
+          ? s
+          : { width, height, dpr },
+      );
     };
     const ro = new ResizeObserver(apply);
     ro.observe(canvas);

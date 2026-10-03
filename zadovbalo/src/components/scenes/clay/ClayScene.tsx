@@ -3,8 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { loadImage, loadJson, useSceneAssets } from "@/lib/scene/assets";
-import { createHeightfield, dent, fbm, shade, smooth, smudge, type Heightfield } from "@/lib/scene/heightfield";
+import {
+  createHeightfield,
+  dent,
+  fbm,
+  shade,
+  smooth,
+  smudge,
+  type Heightfield,
+} from "@/lib/scene/heightfield";
 import { createHeightGL, type HeightGL } from "@/lib/scene/heightgl";
+import { useLazyRef } from "@/lib/scene/lazyRef";
 import { useFrameLoop } from "@/lib/scene/loop";
 import { usePointer } from "@/lib/scene/pointer";
 import { detectQuality } from "@/lib/scene/quality";
@@ -21,18 +30,33 @@ const LIGHT: [number, number, number] = (() => {
 })();
 
 async function loadClay() {
-  const [meta, detail] = await Promise.all([loadJson<{ albedo: [number, number, number] }>("/scenes/clay/clay.json"), loadImage("/scenes/clay/detail.webp")]);
+  const [meta, detail] = await Promise.all([
+    loadJson<{ albedo: [number, number, number] }>("/scenes/clay/clay.json"),
+    loadImage("/scenes/clay/detail.webp"),
+  ]);
   return { meta, detail };
 }
 
 export default function ClayScene(props: SceneProps) {
   const assets = useSceneAssets(loadClay);
-  if (assets.status === "loading") return <div role="status" className="grid h-full place-items-center text-sm text-mist">Готую глину…</div>;
+  if (assets.status === "loading")
+    return (
+      <div
+        role="status"
+        className="grid h-full place-items-center text-sm text-mist"
+      >
+        Готую глину…
+      </div>
+    );
   if (assets.status === "error")
     return (
       <div className="grid h-full place-items-center gap-3 px-6 text-center text-mist">
         <p>Не вдалося завантажити глину.</p>
-        <button type="button" onClick={assets.retry} className="scene-btn border border-steel/60">
+        <button
+          type="button"
+          onClick={assets.retry}
+          className="scene-btn border border-steel/60"
+        >
           Спробувати ще
         </button>
       </div>
@@ -53,7 +77,9 @@ function fillBlock(hf: Heightfield, height: number) {
       const dx = Math.abs(x - cx) / rx;
       const dy = Math.abs(y - cy) / ry;
       // Суперелипс: майже квадрат із мʼякими кутами; край трохи «гуляє».
-      const r = Math.pow(Math.pow(dx, 4) + Math.pow(dy, 4), 0.25) * (1 + 0.06 * (fbm(x * 0.04, y * 0.04) - 0.5));
+      const r =
+        Math.pow(Math.pow(dx, 4) + Math.pow(dy, 4), 0.25) *
+        (1 + 0.06 * (fbm(x * 0.04, y * 0.04) - 0.5));
       const dist = (1 - r) * Math.min(rx, ry); // відстань до краю в клітинках
       if (dist <= 0) {
         data[y * w + x] = 0;
@@ -62,12 +88,20 @@ function fillBlock(hf: Heightfield, height: number) {
       const t = Math.min(1, dist / band);
       const edge = Math.sin((t * Math.PI) / 2); // чверть кола — круглий бік без сходинок
       const crown = 1 - 0.18 * r * r;
-      const lumps = 1 + 0.16 * (fbm(x * 0.035 + 3, y * 0.035) - 0.5) + 0.05 * (fbm(x * 0.12, y * 0.12 + 7) - 0.5);
+      const lumps =
+        1 +
+        0.16 * (fbm(x * 0.035 + 3, y * 0.035) - 0.5) +
+        0.05 * (fbm(x * 0.12, y * 0.12 + 7) - 0.5);
       data[y * w + x] = height * edge * crown * lumps;
     }
 }
 
-function Clay({ reducedMotion, setHint, onInteract, data }: SceneProps & { data: Awaited<ReturnType<typeof loadClay>> }) {
+function Clay({
+  reducedMotion,
+  setHint,
+  onInteract,
+  data,
+}: SceneProps & { data: Awaited<ReturnType<typeof loadClay>> }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fallbackRef = useRef<HTMLCanvasElement>(null);
@@ -87,12 +121,28 @@ function Clay({ reducedMotion, setHint, onInteract, data }: SceneProps & { data:
   }, [gw, gh]);
   const gl = useRef<HeightGL | null>(null);
   const dirty = useRef(true);
-  const touches = useRef(new Map<number, { x: number; y: number; px: number; py: number; t0: number; hold: number; moved: number }>());
+  const touches = useLazyRef(
+    () =>
+      new Map<
+        number,
+        {
+          x: number;
+          y: number;
+          px: number;
+          py: number;
+          t0: number;
+          hold: number;
+          moved: number;
+        }
+      >(),
+  );
 
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+    const ro = new ResizeObserver(() =>
+      setSize({ w: el.clientWidth, h: el.clientHeight }),
+    );
     ro.observe(el);
     setSize({ w: el.clientWidth, h: el.clientHeight });
     return () => ro.disconnect();
@@ -105,7 +155,11 @@ function Clay({ reducedMotion, setHint, onInteract, data }: SceneProps & { data:
       gw: hf.w,
       gh: hf.h,
       albedo: null,
-      baseColor: [data.meta.albedo[0] * 0.98, data.meta.albedo[1] * 0.98, data.meta.albedo[2]],
+      baseColor: [
+        data.meta.albedo[0] * 0.98,
+        data.meta.albedo[1] * 0.98,
+        data.meta.albedo[2],
+      ],
       detail: data.detail,
       detailScale: 1.1,
       detailStrength: 0.55,
@@ -138,7 +192,10 @@ function Clay({ reducedMotion, setHint, onInteract, data }: SceneProps & { data:
   useEffect(() => {
     const c = canvasRef.current;
     if (!c || !gl.current || !size.w) return;
-    gl.current.resize(Math.round(size.w * quality.dpr), Math.round(size.h * quality.dpr));
+    gl.current.resize(
+      Math.round(size.w * quality.dpr),
+      Math.round(size.h * quality.dpr),
+    );
     dirty.current = true;
   }, [size, quality.dpr, hf]);
 
@@ -160,13 +217,31 @@ function Clay({ reducedMotion, setHint, onInteract, data }: SceneProps & { data:
     const g = c.getContext("2d");
     if (!g) return;
     const img = g.createImageData(hf.w, hf.h);
-    const base = data.meta.albedo.map((v) => v * 255) as [number, number, number];
-    const scaled: Heightfield = { w: hf.w, h: hf.h, data: hf.data.map((v) => v / (Math.min(gw, gh) * 0.2)), gloss: hf.gloss };
-    shade(scaled, img.data, { base, grain: 0.18, specular: 0.05, shininess: 20, relief: Math.min(gw, gh) * 0.2 });
+    const base = data.meta.albedo.map((v) => v * 255) as [
+      number,
+      number,
+      number,
+    ];
+    const scaled: Heightfield = {
+      w: hf.w,
+      h: hf.h,
+      data: hf.data.map((v) => v / (Math.min(gw, gh) * 0.2)),
+      gloss: hf.gloss,
+    };
+    shade(scaled, img.data, {
+      base,
+      grain: 0.18,
+      specular: 0.05,
+      shininess: 20,
+      relief: Math.min(gw, gh) * 0.2,
+    });
     g.putImageData(img, 0, 0);
   }, [mode, hf, data.meta.albedo, gw, gh]);
 
-  const toGrid = (x: number, y: number) => ({ x: (x / size.w) * hf.w, y: (y / size.h) * hf.h });
+  const toGrid = (x: number, y: number) => ({
+    x: (x / size.w) * hf.w,
+    y: (y / size.h) * hf.h,
+  });
   const R = Math.max(5, 22 / cell); // палець ≈ 22 css px
 
   const wake = useFrameLoop(rootRef, (dt) => {
@@ -177,10 +252,17 @@ function Clay({ reducedMotion, setHint, onInteract, data }: SceneProps & { data:
         // Утримання на місці — вмʼятина глибшає під пальцем.
         if (t.moved < 3) {
           t.hold += dt;
-          dent(hf, t.x, t.y, R * (0.8 + Math.min(0.4, t.hold * 0.2)), (reducedMotion ? 0.5 : 0.35) * Math.min(1.2, 0.25 + t.hold));
+          dent(
+            hf,
+            t.x,
+            t.y,
+            R * (0.8 + Math.min(0.4, t.hold * 0.2)),
+            (reducedMotion ? 0.5 : 0.35) * Math.min(1.2, 0.25 + t.hold),
+          );
           dirty.current = true;
           busy = true;
-          if (now - t.t0 > 160 && Math.random() < dt * 3) sound.play("clay", 0.3);
+          if (now - t.t0 > 160 && Math.random() < dt * 3)
+            sound.play("clay", 0.3);
         }
       }
     }
@@ -197,7 +279,15 @@ function Clay({ reducedMotion, setHint, onInteract, data }: SceneProps & { data:
     down: (p) => {
       onInteract();
       const g = toGrid(p.x, p.y);
-      touches.current.set(p.id, { x: g.x, y: g.y, px: g.x, py: g.y, t0: performance.now(), hold: 0, moved: 0 });
+      touches.current.set(p.id, {
+        x: g.x,
+        y: g.y,
+        px: g.x,
+        py: g.y,
+        t0: performance.now(),
+        hold: 0,
+        moved: 0,
+      });
       if (toolRef.current === "shape") {
         dent(hf, g.x, g.y, R * 0.8, 0.6);
         dirty.current = true;
@@ -218,8 +308,20 @@ function Clay({ reducedMotion, setHint, onInteract, data }: SceneProps & { data:
       if (toolRef.current === "smooth") {
         const steps = Math.ceil(dist / (R * 0.5));
         for (let k = 1; k <= steps; k++) {
-          smooth(hf, t.x + (dx * k) / steps, t.y + (dy * k) / steps, R * 2, 0.9);
-          smooth(hf, t.x + (dx * k) / steps, t.y + (dy * k) / steps, R * 1.4, 0.9);
+          smooth(
+            hf,
+            t.x + (dx * k) / steps,
+            t.y + (dy * k) / steps,
+            R * 2,
+            0.9,
+          );
+          smooth(
+            hf,
+            t.x + (dx * k) / steps,
+            t.y + (dy * k) / steps,
+            R * 1.4,
+            0.9,
+          );
         }
       } else if (touches.current.size >= 2) {
         // Двома пальцями — стискати: матеріал між пальцями видавлюється в гребінь.
@@ -250,43 +352,98 @@ function Clay({ reducedMotion, setHint, onInteract, data }: SceneProps & { data:
   const setToolBoth = (t: Tool) => {
     setTool(t);
     toolRef.current = t;
-    setHint(t === "smooth" ? "Проведи по поверхні — вона поступово вирівнюється." : "Натискай і тягни. Двома пальцями можна стискати.");
+    setHint(
+      t === "smooth"
+        ? "Проведи по поверхні — вона поступово вирівнюється."
+        : "Натискай і тягни. Двома пальцями можна стискати.",
+    );
   };
 
   /** Кнопкова альтернатива: вмʼятина в довільному місці / розгладити все. */
   const pressCenter = () => {
     onInteract();
-    for (let i = 0; i < 4; i++) dent(hf, hf.w / 2 + (Math.random() - 0.5) * hf.w * 0.3, hf.h / 2 + (Math.random() - 0.5) * hf.h * 0.3, R, 1.4);
+    for (let i = 0; i < 4; i++)
+      dent(
+        hf,
+        hf.w / 2 + (Math.random() - 0.5) * hf.w * 0.3,
+        hf.h / 2 + (Math.random() - 0.5) * hf.h * 0.3,
+        R,
+        1.4,
+      );
     dirty.current = true;
     sound.play("clay", 0.5);
     wake();
   };
   const smoothAll = () => {
     onInteract();
-    for (let y = 4; y < hf.h; y += Math.max(3, R)) for (let x = 4; x < hf.w; x += Math.max(3, R)) smooth(hf, x, y, R * 2, 0.5);
+    for (let y = 4; y < hf.h; y += Math.max(3, R))
+      for (let x = 4; x < hf.w; x += Math.max(3, R))
+        smooth(hf, x, y, R * 2, 0.5);
     dirty.current = true;
     wake();
   };
 
   return (
-    <div ref={rootRef} className="scene-surface relative h-full w-full overflow-hidden">
-      <canvas ref={canvasRef} aria-hidden className={cn("absolute inset-0 h-full w-full", mode !== "gl" && "hidden")} />
-      <canvas ref={fallbackRef} aria-hidden className={cn("absolute inset-0 h-full w-full", mode === "gl" && "hidden")} style={{ imageRendering: "auto" }} />
-      {mode === "fallback" && <p className="absolute inset-x-0 top-2 text-center text-xs text-mist">Спрощений рендер (WebGL недоступний) — механіка та сама.</p>}
+    <div
+      ref={rootRef}
+      className="scene-surface relative h-full w-full overflow-hidden"
+    >
+      <canvas
+        ref={canvasRef}
+        aria-hidden
+        className={cn(
+          "absolute inset-0 h-full w-full",
+          mode !== "gl" && "hidden",
+        )}
+      />
+      <canvas
+        ref={fallbackRef}
+        aria-hidden
+        className={cn(
+          "absolute inset-0 h-full w-full",
+          mode === "gl" && "hidden",
+        )}
+        style={{ imageRendering: "auto" }}
+      />
+      {mode === "fallback" && (
+        <p className="absolute inset-x-0 top-2 text-center text-xs text-mist">
+          Спрощений рендер (WebGL недоступний) — механіка та сама.
+        </p>
+      )}
       <div className="absolute inset-x-0 bottom-1 z-10 flex flex-wrap items-center justify-center gap-2 px-2">
-        <div role="radiogroup" aria-label="Інструмент" className="flex overflow-hidden rounded-[var(--radius-hair)] border border-steel/50 bg-night/70">
+        <div
+          role="radiogroup"
+          aria-label="Інструмент"
+          className="flex overflow-hidden rounded-[var(--radius-hair)] border border-steel/50 bg-night/70"
+        >
           {(
             [
               ["shape", "Мʼяти й тягнути"],
               ["smooth", "Розгладити"],
             ] as const
           ).map(([t, l]) => (
-            <button key={t} type="button" role="radio" aria-checked={tool === t} onClick={() => setToolBoth(t)} className={cn("min-h-11 px-3 text-sm", tool === t ? "bg-frost text-abyss" : "text-frost/85 hover:bg-night")}>
+            <button
+              key={t}
+              type="button"
+              role="radio"
+              aria-checked={tool === t}
+              onClick={() => setToolBoth(t)}
+              className={cn(
+                "min-h-11 px-3 text-sm",
+                tool === t
+                  ? "bg-frost text-abyss"
+                  : "text-frost/85 hover:bg-night",
+              )}
+            >
               {l}
             </button>
           ))}
         </div>
-        <button type="button" onClick={tool === "smooth" ? smoothAll : pressCenter} className="scene-btn border border-steel/50 bg-night/70 text-sm">
+        <button
+          type="button"
+          onClick={tool === "smooth" ? smoothAll : pressCenter}
+          className="scene-btn border border-steel/50 bg-night/70 text-sm"
+        >
           {tool === "smooth" ? "Пригладити все" : "Натиснути"}
         </button>
       </div>

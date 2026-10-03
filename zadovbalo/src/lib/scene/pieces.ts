@@ -21,8 +21,27 @@ export interface Piece {
 }
 
 let nextId = 1;
-export function makePiece(poly: Pt[], torn: Pt[][] = [], base?: Partial<Piece>): Piece {
-  return { id: nextId++, poly, torn, c: centroid(poly), x: 0, y: 0, rot: 0, vx: 0, vy: 0, vr: 0, crumple: 0, held: false, ballSeed: Math.random() * 100, ...base };
+export function makePiece(
+  poly: Pt[],
+  torn: Pt[][] = [],
+  base?: Partial<Piece>,
+): Piece {
+  return {
+    id: nextId++,
+    poly,
+    torn,
+    c: centroid(poly),
+    x: 0,
+    y: 0,
+    rot: 0,
+    vx: 0,
+    vy: 0,
+    vr: 0,
+    crumple: 0,
+    held: false,
+    ballSeed: Math.random() * 100,
+    ...base,
+  };
 }
 
 /** Світ ← локальні координати шматка. */
@@ -64,7 +83,11 @@ export function ballRadius(p: Piece) {
 }
 
 /** Розірвати шматок ламаною (у світових координатах). Нові краї — нерівні, повторюють рух. */
-export function tearPiece(p: Piece, worldPath: Pt[], amp: number): [Piece, Piece] | null {
+export function tearPiece(
+  p: Piece,
+  worldPath: Pt[],
+  amp: number,
+): [Piece, Piece] | null {
   const local = worldPath.map((q) => toLocal(p, q));
   const rough = jagged(local, amp, p.id);
   const res = splitByPath(p.poly, rough);
@@ -102,8 +125,14 @@ function distToPoly(q: Pt, poly: Pt[]) {
     const a = poly[i]!;
     const b = poly[(i + 1) % poly.length]!;
     const L = (b.x - a.x) ** 2 + (b.y - a.y) ** 2 || 1;
-    const t = Math.max(0, Math.min(1, ((q.x - a.x) * (b.x - a.x) + (q.y - a.y) * (b.y - a.y)) / L));
-    best = Math.min(best, Math.hypot(q.x - (a.x + (b.x - a.x) * t), q.y - (a.y + (b.y - a.y) * t)));
+    const t = Math.max(
+      0,
+      Math.min(1, ((q.x - a.x) * (b.x - a.x) + (q.y - a.y) * (b.y - a.y)) / L),
+    );
+    best = Math.min(
+      best,
+      Math.hypot(q.x - (a.x + (b.x - a.x) * t), q.y - (a.y + (b.y - a.y) * t)),
+    );
   }
   return best;
 }
@@ -175,7 +204,8 @@ function shapeOf(p: Piece): Pt[] {
   const t = p.crumple;
   return p.poly.map((q, i) => {
     const a = Math.atan2(q.y - p.c.y, q.x - p.c.x);
-    const rr = R * (0.8 + 0.35 * hash2(p.ballSeed, Math.floor((a + Math.PI) * 2.2)));
+    const rr =
+      R * (0.8 + 0.35 * hash2(p.ballSeed, Math.floor((a + Math.PI) * 2.2)));
     const tx = p.c.x + Math.cos(a) * rr;
     const ty = p.c.y + Math.sin(a) * rr;
     const wob = Math.sin(i * 2.3 + p.ballSeed) * 3 * t;
@@ -190,7 +220,11 @@ export interface DrawOptions {
   lift?: (p: Piece) => number;
 }
 
-export function drawPiece(ctx: CanvasRenderingContext2D, p: Piece, o: DrawOptions) {
+export function drawPiece(
+  ctx: CanvasRenderingContext2D,
+  p: Piece,
+  o: DrawOptions,
+) {
   const shape = shapeOf(p);
   const lift = o.lift?.(p) ?? (p.held ? 14 : 3);
   ctx.save();
@@ -216,7 +250,12 @@ export function drawPiece(ctx: CanvasRenderingContext2D, p: Piece, o: DrawOption
     ctx.fillRect(p.c.x - 600, p.c.y - 600, 1200, 1200);
   }
   // Освітлення аркуша: світло зліва згори, легкий спад до краю.
-  const light = ctx.createLinearGradient(p.c.x - 260, p.c.y - 320, p.c.x + 260, p.c.y + 320);
+  const light = ctx.createLinearGradient(
+    p.c.x - 260,
+    p.c.y - 320,
+    p.c.x + 260,
+    p.c.y + 320,
+  );
   light.addColorStop(0, "rgba(255,255,255,0.18)");
   light.addColorStop(0.55, "rgba(255,255,255,0)");
   light.addColorStop(1, "rgba(40,55,65,0.16)");
@@ -260,7 +299,14 @@ export function drawPiece(ctx: CanvasRenderingContext2D, p: Piece, o: DrawOption
       ctx.stroke();
     }
     // Загальне затінення кульки.
-    const g = ctx.createRadialGradient(p.c.x - 20, p.c.y - 24, 4, p.c.x, p.c.y, ballRadius(p) * 1.6 + 60 * (1 - p.crumple));
+    const g = ctx.createRadialGradient(
+      p.c.x - 20,
+      p.c.y - 24,
+      4,
+      p.c.x,
+      p.c.y,
+      ballRadius(p) * 1.6 + 60 * (1 - p.crumple),
+    );
     g.addColorStop(0, "rgba(255,255,255,0.0)");
     g.addColorStop(1, `rgba(10,18,24,${0.45 * p.crumple})`);
     ctx.fillStyle = g;
@@ -286,7 +332,11 @@ export function drawPiece(ctx: CanvasRenderingContext2D, p: Piece, o: DrawOption
 }
 
 /** Волокна, що стирчать із краю розриву. */
-export function drawFibers(ctx: CanvasRenderingContext2D, edge: Pt[], seed: number) {
+export function drawFibers(
+  ctx: CanvasRenderingContext2D,
+  edge: Pt[],
+  seed: number,
+) {
   ctx.save();
   ctx.strokeStyle = "rgba(240,242,240,0.7)";
   ctx.lineWidth = 0.7;
@@ -300,14 +350,21 @@ export function drawFibers(ctx: CanvasRenderingContext2D, edge: Pt[], seed: numb
     const l = 1.5 + hash2(i, seed) * 3.5;
     ctx.beginPath();
     ctx.moveTo(b.x, b.y);
-    ctx.lineTo(b.x + nx * l * side + (b.x - a.x) * 0.1, b.y + ny * l * side + (b.y - a.y) * 0.1);
+    ctx.lineTo(
+      b.x + nx * l * side + (b.x - a.x) * 0.1,
+      b.y + ny * l * side + (b.y - a.y) * 0.1,
+    );
     ctx.stroke();
   }
   ctx.restore();
 }
 
 /** Частковий розрив під час жесту: темна щілина з волокнами від входу до пальця. */
-export function drawTearInProgress(ctx: CanvasRenderingContext2D, worldPath: Pt[], seed: number) {
+export function drawTearInProgress(
+  ctx: CanvasRenderingContext2D,
+  worldPath: Pt[],
+  seed: number,
+) {
   if (worldPath.length < 2) return;
   const rough = jagged(worldPath, 1.2, seed);
   ctx.save();

@@ -39,7 +39,12 @@ export function bindPointer(el: HTMLElement, h: PointerHandlers) {
   const onDown = (e: PointerEvent) => {
     if (e.button > 0) return;
     // Кнопки, поля й меню всередині сцени — не жест: інакше захоплення «краде» їхній клік.
-    if ((e.target as Element | null)?.closest?.("button, a, input, textarea, select, summary, label, [role=radio], [role=dialog]")) return;
+    if (
+      (e.target as Element | null)?.closest?.(
+        "button, a, input, textarea, select, summary, label, [role=radio], [role=dialog]",
+      )
+    )
+      return;
     if (h.down?.(info(e), e) === false) return;
     active.add(e.pointerId);
     el.setPointerCapture(e.pointerId);

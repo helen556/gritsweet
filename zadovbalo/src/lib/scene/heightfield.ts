@@ -11,7 +11,12 @@ export interface Heightfield {
 }
 
 export function createHeightfield(w: number, h: number): Heightfield {
-  return { w, h, data: new Float32Array(w * h), gloss: new Float32Array(w * h) };
+  return {
+    w,
+    h,
+    data: new Float32Array(w * h),
+    gloss: new Float32Array(w * h),
+  };
 }
 
 /** Детермінований шум для органічної форми без Math.random у рендері. */
@@ -35,7 +40,11 @@ function smoothNoise(x: number, y: number) {
 }
 
 export function fbm(x: number, y: number) {
-  return smoothNoise(x, y) * 0.6 + smoothNoise(x * 2.1, y * 2.1) * 0.28 + smoothNoise(x * 4.3, y * 4.3) * 0.12;
+  return (
+    smoothNoise(x, y) * 0.6 +
+    smoothNoise(x * 2.1, y * 2.1) * 0.28 +
+    smoothNoise(x * 4.3, y * 4.3) * 0.12
+  );
 }
 
 /** Грудка: сплюснутий купол із неідеальним краєм. */
@@ -48,10 +57,16 @@ export function fillLump(hf: Heightfield, seed = 1, height = 1) {
       const dx = (x - cx) / (w * 0.4);
       const dy = (y - cy) / (h * 0.34);
       const ang = Math.atan2(dy, dx);
-      const wobble = 1 + 0.08 * Math.sin(ang * 3 + seed) + 0.05 * Math.sin(ang * 5 + seed * 2);
+      const wobble =
+        1 +
+        0.08 * Math.sin(ang * 3 + seed) +
+        0.05 * Math.sin(ang * 5 + seed * 2);
       const r = Math.hypot(dx, dy) / wobble;
       const dome = r < 1 ? Math.pow(1 - r * r, 0.55) : 0;
-      data[y * w + x] = dome > 0 ? dome * height * (0.97 + 0.05 * fbm(x * 0.04 + seed, y * 0.04)) : 0;
+      data[y * w + x] =
+        dome > 0
+          ? dome * height * (0.97 + 0.05 * fbm(x * 0.04 + seed, y * 0.04))
+          : 0;
     }
 }
 
@@ -64,11 +79,19 @@ export function volume(hf: Heightfield) {
 /** Профіль валика навколо вмʼятини: мʼякий підйом і довгий спад. */
 const rim = (d: number) => Math.pow(Math.sin(((d - 1) / 1.4) * Math.PI), 1.5);
 
-const clampI = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
+const clampI = (v: number, lo: number, hi: number) =>
+  v < lo ? lo : v > hi ? hi : v;
 
 let scratch = new Float32Array(0);
 /** Копія лише прямокутника (з запасом), а не всього поля. */
-function snapshot(hf: Heightfield, x0: number, y0: number, x1: number, y1: number, pad: number) {
+function snapshot(
+  hf: Heightfield,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  pad: number,
+) {
   const { w, h, data } = hf;
   const ax = clampI(x0 - pad, 0, w - 1);
   const ay = clampI(y0 - pad, 0, h - 1);
@@ -77,7 +100,8 @@ function snapshot(hf: Heightfield, x0: number, y0: number, x1: number, y1: numbe
   const sw = bx - ax + 1;
   const need = sw * (by - ay + 1);
   if (scratch.length < need) scratch = new Float32Array(need * 2);
-  for (let y = ay; y <= by; y++) scratch.set(data.subarray(y * w + ax, y * w + bx + 1), (y - ay) * sw);
+  for (let y = ay; y <= by; y++)
+    scratch.set(data.subarray(y * w + ax, y * w + bx + 1), (y - ay) * sw);
   return (x: number, y: number) => {
     const cx = clampI(x, ax, bx);
     const cy = clampI(y, ay, by);
@@ -89,7 +113,13 @@ function snapshot(hf: Heightfield, x0: number, y0: number, x1: number, y1: numbe
  * Вмʼятина: виймає матеріал під пальцем і видавлює його валиком по краю (обʼєм приблизно зберігається).
  * Працює лише там, де є матеріал.
  */
-export function dent(hf: Heightfield, gx: number, gy: number, radius: number, amount: number) {
+export function dent(
+  hf: Heightfield,
+  gx: number,
+  gy: number,
+  radius: number,
+  amount: number,
+) {
   const { w, h, data, gloss } = hf;
   const r2 = radius * 2.5;
   const x0 = clampI(Math.floor(gx - r2), 0, w - 1);
@@ -103,7 +133,10 @@ export function dent(hf: Heightfield, gx: number, gy: number, radius: number, am
       const i = y * w + x;
       const d = Math.hypot(x - gx, y - gy) / radius;
       if (d < 1 && data[i]! > 0.02) {
-        const take = Math.min(data[i]! - 0.02, amount * (1 - d * d) * (1 - d * d));
+        const take = Math.min(
+          data[i]! - 0.02,
+          amount * (1 - d * d) * (1 - d * d),
+        );
         data[i]! -= take;
         removed += take;
         gloss[i] = Math.max(0, gloss[i]! - 0.05);
@@ -114,13 +147,22 @@ export function dent(hf: Heightfield, gx: number, gy: number, radius: number, am
     for (let x = x0; x <= x1; x++) {
       const i = y * w + x;
       const d = Math.hypot(x - gx, y - gy) / radius;
-      if (d >= 1 && d < 2.4 && data[i]! > 0.02) data[i]! += (removed * rim(d)) / ringWeight;
+      if (d >= 1 && d < 2.4 && data[i]! > 0.02)
+        data[i]! += (removed * rim(d)) / ringWeight;
     }
   return removed;
 }
 
 /** Розмазування: матеріал тягнеться за пальцем (розтягування / стискання). */
-export function smudge(hf: Heightfield, gx: number, gy: number, dx: number, dy: number, radius: number, strength: number) {
+export function smudge(
+  hf: Heightfield,
+  gx: number,
+  gy: number,
+  dx: number,
+  dy: number,
+  radius: number,
+  strength: number,
+) {
   const { w, h, data } = hf;
   const reach = radius + Math.hypot(dx, dy) + 2;
   const x0 = clampI(Math.floor(gx - reach), 1, w - 2);
@@ -145,7 +187,11 @@ export function smudge(hf: Heightfield, gx: number, gy: number, dx: number, dy: 
       const b = at(ix + 1, iy);
       const c = at(ix, iy + 1);
       const e = at(ix + 1, iy + 1);
-      const sample = a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + e * fx * fy;
+      const sample =
+        a * (1 - fx) * (1 - fy) +
+        b * fx * (1 - fy) +
+        c * (1 - fx) * fy +
+        e * fx * fy;
       const i = y * w + x;
       const cur = at(x, y);
       data[i] = cur + (sample - cur) * wgt;
@@ -153,7 +199,13 @@ export function smudge(hf: Heightfield, gx: number, gy: number, dx: number, dy: 
 }
 
 /** Згладжування: розмиття висот + глянець. */
-export function smooth(hf: Heightfield, gx: number, gy: number, radius: number, strength: number) {
+export function smooth(
+  hf: Heightfield,
+  gx: number,
+  gy: number,
+  radius: number,
+  strength: number,
+) {
   const { w, h, data, gloss } = hf;
   const x0 = clampI(Math.floor(gx - radius), 1, w - 2);
   const x1 = clampI(Math.ceil(gx + radius), 1, w - 2);
@@ -167,7 +219,8 @@ export function smooth(hf: Heightfield, gx: number, gy: number, radius: number, 
       if (c <= 0.01) continue;
       const d = Math.hypot(x - gx, y - gy) / radius;
       if (d >= 1) continue;
-      const avg = (at(x - 1, y) + at(x + 1, y) + at(x, y - 1) + at(x, y + 1) + c * 4) / 8;
+      const avg =
+        (at(x - 1, y) + at(x + 1, y) + at(x, y - 1) + at(x, y + 1) + c * 4) / 8;
       const k = strength * (1 - d);
       data[i] = c + (avg - c) * k;
       gloss[i] = Math.min(1, gloss[i]! + 0.04 * k);
@@ -208,7 +261,15 @@ export function squeeze(hf: Heightfield, axis: "x" | "y", amount: number) {
  * Осипання: де схил крутіший за кут природного укосу, частина матеріалу сповзає вниз.
  * Працює в прямокутнику; повертає true, якщо щось зрушилось.
  */
-export function relax(hf: Heightfield, x0: number, y0: number, x1: number, y1: number, talus: number, rate = 0.25) {
+export function relax(
+  hf: Heightfield,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  talus: number,
+  rate = 0.25,
+) {
   const { w, h, data } = hf;
   let moved = false;
   const ax = clampI(Math.floor(x0), 1, w - 2);
@@ -242,7 +303,11 @@ export interface Material {
   relief: number;
 }
 
-function norm3(x: number, y: number, z: number): readonly [number, number, number] {
+function norm3(
+  x: number,
+  y: number,
+  z: number,
+): readonly [number, number, number] {
   const n = Math.hypot(x, y, z);
   return [x / n, y / n, z / n];
 }
@@ -253,7 +318,13 @@ const H = norm3(L[0], L[1], L[2] + 1);
  * Освітлення поля висот у RGBA: дифузне + відблиск (сильніший на глянці) + затінення западин.
  * Якщо передано shadow — пише туди силует для мʼякої контактної тіні.
  */
-export function shade(hf: Heightfield, out: Uint8ClampedArray, m: Material, shadow?: Uint8ClampedArray, tint?: Float32Array) {
+export function shade(
+  hf: Heightfield,
+  out: Uint8ClampedArray,
+  m: Material,
+  shadow?: Uint8ClampedArray,
+  tint?: Float32Array,
+) {
   const { w, h, data, gloss } = hf;
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
@@ -278,12 +349,18 @@ export function shade(hf: Heightfield, out: Uint8ClampedArray, m: Material, shad
       nz /= len;
       const diff = Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]);
       const g = gloss[i]!;
-      const spec = Math.pow(Math.max(0, nx * H[0] + ny * H[1] + nz * H[2]), m.shininess) * (m.specular + g * 0.45);
+      const spec =
+        Math.pow(Math.max(0, nx * H[0] + ny * H[1] + nz * H[2]), m.shininess) *
+        (m.specular + g * 0.45);
       // Западини темніші (опуклість через лапласіан).
       const lap = l + r + u + d - 4 * v;
       const ao = Math.max(0.55, Math.min(1.08, 1 - lap * 1.6));
       const n = 1 + (fbm(x * 0.35, y * 0.35) - 0.5) * m.grain;
-      const lightK = (0.42 + 0.7 * diff) * ao * n * (tint ? 1 - 0.38 * Math.min(1, tint[i]!) : 1);
+      const lightK =
+        (0.42 + 0.7 * diff) *
+        ao *
+        n *
+        (tint ? 1 - 0.38 * Math.min(1, tint[i]!) : 1);
       const edge = Math.min(1, v / 0.12);
       out[o] = m.base[0] * lightK + 255 * spec;
       out[o + 1] = m.base[1] * lightK + 255 * spec;

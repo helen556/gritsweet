@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadImage, loadJson, useSceneAssets } from "@/lib/scene/assets";
 import { drawSoftShadow } from "@/lib/scene/bend";
 import { useCanvas2D } from "@/lib/scene/canvas";
+import { useLazyRef } from "@/lib/scene/lazyRef";
 import { useFrameLoop } from "@/lib/scene/loop";
 import { usePointer } from "@/lib/scene/pointer";
 import { haptic, sound } from "@/lib/scene/sound";
@@ -126,6 +127,7 @@ function Backpack({
     key: string;
     x: number;
     y: number;
+    tag: Tag | null;
   } | null>(null);
   const [outCount, setOutCount] = useState(0);
   const [, force] = useState(0);
@@ -134,9 +136,8 @@ function Backpack({
     () => (input.labels ?? []).slice(0, 6),
     [input.labels],
   );
-  const stones = useRef<Stone[]>([]);
-  if (stones.current.length === 0) {
-    stones.current = meta.order.map((k, i) => {
+  const stones = useLazyRef<Stone[]>(() =>
+    meta.order.map((k, i) => {
       const m = meta.stones[k]!;
       const li = LABEL_ORDER.indexOf(k);
       return {
@@ -162,8 +163,14 @@ function Backpack({
         order: i,
         dropTo: null,
       };
-    });
-  }
+    }),
+  );
+  /** Для інтерфейсу (кнопки, меню) — копія в стані, не читаємо ref під час рендеру. */
+  const [inBagKeys, setInBagKeys] = useState<string[]>(meta.order);
+  const syncUi = useCallback(() => {
+    setInBagKeys(stones.current.filter((s) => s.inBag).map((s) => s.key));
+    setOutCount(stones.current.filter((s) => !s.inBag).length);
+  }, [stones]);
   const drag = useRef<{
     key: string;
     id: number;
@@ -212,49 +219,85 @@ function Backpack({
    * Осідання: кожен камінь у рюкзаку падає, доки не ляже на камінь під ним або на дно.
    * Рахуємо знизу вгору; базовий стан (повний рюкзак) віднімаємо, щоб на старті нічого не рухалось.
    */
-  const stackBottoms = useCallback((present: (st: Stone) => boolean) => {
-    const list = stones.current.filter(present).sort((a, b) => b.restY + b.sprite.h / 2 - (a.restY + a.sprite.h / 2));
-    const placed: { key: string; x0: number; x1: number; top: number; depth: number }[] = [];
-    const out = new Map<string, number>();
-    for (const st of list) {
-      const depth = meta.order.indexOf(st.key);
-      const x0 = st.restX - st.sprite.w * 0.36;
-      const x1 = st.restX + st.sprite.w * 0.36;
-      // Дно рюкзака в перспективі: що далі від нас, то вище на екрані.
-      let floor = 850 - (meta.order.length - 1 - depth) * 42;
-      // Опора — камені позаду або ті, на яких він лежить на фото; ближчі — ні: камінь ковзає вниз позаду них.
-      const own = meta.supports[st.key] ?? {};
-      for (const q of placed) if ((q.depth <= depth || q.key in own) && Math.min(x1, q.x1) - Math.max(x0, q.x0) > 20) floor = Math.min(floor, q.top);
-      // Нижня точка не нижче опори, але й не вище, ніж лежить зараз (камені не злітають).
-      const restBottom = st.restY + st.sprite.h * 0.42;
-      const bottom = Math.max(restBottom, floor);
-      out.set(st.key, bottom - restBottom);
-      placed.push({ key: st.key, x0, x1, top: bottom - st.sprite.h * 0.58, depth });
-    }
-    return out;
-  }, [meta.order, meta.supports]);
+  const stackBottoms = useCallback(
+    (present: (st: Stone) => boolean) => {
+      const list = stones.current
+        .filter(present)
+        .sort((a, b) => b.restY + b.sprite.h / 2 - (a.restY + a.sprite.h / 2));
+      const placed: {
+        key: string;
+        x0: number;
+        x1: number;
+        top: number;
+        depth: number;
+      }[] = [];
+      const out = new Map<string, number>();
+      for (const st of list) {
+        const depth = meta.order.indexOf(st.key);
+        const x0 = st.restX - st.sprite.w * 0.36;
+        const x1 = st.restX + st.sprite.w * 0.36;
+        // Дно рюкзака в перспективі: що далі від нас, то вище на екрані.
+        let floor = 850 - (meta.order.length - 1 - depth) * 42;
+        // Опора — камені позаду або ті, на яких він лежить на фото; ближчі — ні: камінь ковзає вниз позаду них.
+        const own = meta.supports[st.key] ?? {};
+        for (const q of placed)
+          if (
+            (q.depth <= depth || q.key in own) &&
+            Math.min(x1, q.x1) - Math.max(x0, q.x0) > 20
+          )
+            floor = Math.min(floor, q.top);
+        // Нижня точка не нижче опори, але й не вище, ніж лежить зараз (камені не злітають).
+        const restBottom = st.restY + st.sprite.h * 0.42;
+        const bottom = Math.max(restBottom, floor);
+        out.set(st.key, bottom - restBottom);
+        placed.push({
+          key: st.key,
+          x0,
+          x1,
+          top: bottom - st.sprite.h * 0.58,
+          depth,
+        });
+      }
+      return out;
+    },
+    [meta.order, meta.supports, stones],
+  );
   const baseline = useRef<Map<string, number> | null>(null);
 
   const recomputeSettle = useCallback(() => {
     baseline.current ??= stackBottoms(() => true);
     const now = stackBottoms((st) => st.inBag);
-    for (const s of stones.current) s.settle = Math.max(0, (now.get(s.key) ?? 0) - (baseline.current.get(s.key) ?? 0));
-    const total = stones.current.reduce((a, s) => a + s.sprite.w * s.sprite.h, 0);
-    const left = stones.current.filter((s) => s.inBag).reduce((a, s) => a + s.sprite.w * s.sprite.h, 0);
+    for (const s of stones.current)
+      s.settle = Math.max(
+        0,
+        (now.get(s.key) ?? 0) - (baseline.current.get(s.key) ?? 0),
+      );
+    const total = stones.current.reduce(
+      (a, s) => a + s.sprite.w * s.sprite.h,
+      0,
+    );
+    const left = stones.current
+      .filter((s) => s.inBag)
+      .reduce((a, s) => a + s.sprite.w * s.sprite.h, 0);
     bagLoad.current = left / total;
-  }, [stackBottoms]);
+  }, [stackBottoms, stones]);
 
   const relax = useRef(1); // плавне «розправляння» тканини (1 — повний рюкзак)
 
   const draw = useCallback(() => {
-    const g = ctx;
+    const g = canvasRef.current?.getContext("2d") ?? null;
     if (!g) return;
     const { s, ox, oy } = view;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, g.canvas.width, g.canvas.height);
     const dpr = size.dpr;
     g.setTransform(dpr * s, 0, 0, dpr * s, dpr * ox, dpr * oy);
-    // Тло-підлога (тон фото), рюкзак.
+    // Тло-підлога в тон краю фото — без видимих швів, потім рюкзак.
+    const floor = g.createLinearGradient(0, 0, 0, 1254);
+    floor.addColorStop(0, "rgb(30,30,31)");
+    floor.addColorStop(1, "rgb(57,57,58)");
+    g.fillStyle = floor;
+    g.fillRect(-3000, -3000, 7254, 7254);
     const load = relax.current;
     const cx = 660;
     // Повний рюкзак трохи роздутий; з кожним каменем тканина розправляється.
@@ -299,7 +342,6 @@ function Backpack({
           0,
           16 + st.lift * 0.6,
           Math.max(0.18, 0.5 - st.lift * 0.004),
-          ry,
         );
       else
         contactShadow(
@@ -314,7 +356,7 @@ function Backpack({
     }
     // Підписи — шар сайту, не частина фото.
     for (const st of list) if (st.label || st.tag) drawLabel(g, st, s);
-  }, [ctx, view, size.dpr, base, flap, meta.flap]);
+  }, [view, size.dpr, base, flap, meta.flap, canvasRef, stones]);
 
   function drawStone(g: CanvasRenderingContext2D, st: Stone) {
     const sc = st.scale * (1 + st.lift * 0.0016);
@@ -362,7 +404,7 @@ function Backpack({
       if (d && d.key === st.key) {
         // Тягнемо: пружина за пальцем, нахил від швидкості (вага, інерція).
         let tx = d.tx - d.ox;
-        let ty = d.ty - d.oy;
+        const ty = d.ty - d.oy;
         if (st.inBag && !st.above) {
           // Ще в рюкзаку: виходить лише через отвір — угору.
           tx = Math.max(
@@ -457,7 +499,7 @@ function Backpack({
       st.dropTo = at ?? freeSpot(stones.current, st);
       recomputeSettle();
       const out = stones.current.filter((s) => !s.inBag).length;
-      setOutCount(out);
+      syncUi();
       if (out === stones.current.length) {
         onSettled();
         setHint("Рюкзак порожній. Можна побути тут скільки треба.");
@@ -467,7 +509,7 @@ function Backpack({
         );
       else setHint("Не обовʼязково виймати все.");
     },
-    [recomputeSettle, onSettled, setHint],
+    [recomputeSettle, onSettled, setHint, stones, syncUi],
   );
 
   {
@@ -491,7 +533,6 @@ function Backpack({
       }
       return null;
     };
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     usePointer(rootRef, {
       down: (p) => {
         if (drag.current) return false;
@@ -555,6 +596,7 @@ function Backpack({
             key: st.key,
             x: st.x * view.s + view.ox,
             y: (st.y - st.sprite.h * 0.5) * view.s + view.oy,
+            tag: st.tag,
           });
           st.dropTo = { x: st.x, y: st.y };
           wake();
@@ -576,7 +618,7 @@ function Backpack({
           recomputeSettle();
           st.dropTo = { x: st.restX, y: st.restY + st.settle };
           st.shownSettle = 0;
-          setOutCount(stones.current.filter((s) => !s.inBag).length);
+          syncUi();
         } else if (st.inBag) {
           takeOut(st, {
             x: clampX(st.x, view, size.width),
@@ -602,9 +644,19 @@ function Backpack({
     wake();
   };
 
-  const inBagList = stones.current.filter((s) => s.inBag);
+  const labelOf = (key: string) => labels[LABEL_ORDER.indexOf(key)] ?? null;
+  const inBagList = inBagKeys.map((key) => ({
+    key,
+    label: LABEL_ORDER.indexOf(key) < labels.length ? labelOf(key) : null,
+  }));
   const menuStone = menu
-    ? stones.current.find((s) => s.key === menu.key)
+    ? {
+        label:
+          LABEL_ORDER.indexOf(menu.key) < labels.length
+            ? labelOf(menu.key)
+            : null,
+        tag: menu.tag,
+      }
     : null;
 
   return (
@@ -644,7 +696,8 @@ function Backpack({
               type="button"
               aria-pressed={menuStone.tag === t}
               onClick={() => {
-                menuStone.tag = menuStone.tag === t ? null : t;
+                const stone = stones.current.find((x) => x.key === menu.key);
+                if (stone) stone.tag = stone.tag === t ? null : t;
                 setMenu(null);
                 draw();
               }}
@@ -685,7 +738,7 @@ function Backpack({
           </details>
         ) : null}
         <span className="sr-only" aria-live="polite">
-          Вийнято каменів: {outCount} з {stones.current.length}
+          Вийнято каменів: {outCount} з {meta.order.length}
         </span>
       </div>
     </div>

@@ -73,10 +73,19 @@ export function neutralNote(label: string): NoteArt {
   return { img: c, w: W, h: H, neutral: true };
 }
 
-export async function loadNote(kind: NoteKind, neutralLabel: string, manifest: MoneyManifest): Promise<NoteArt> {
+export async function loadNote(
+  kind: NoteKind,
+  neutralLabel: string,
+  manifest: MoneyManifest,
+): Promise<NoteArt> {
   if (kind !== "neutral" && manifest.notes[kind]) {
     const m = manifest.notes[kind]!;
-    return { img: await loadImage(`/scenes/money/${kind}.webp`), w: m.w, h: m.h, neutral: false };
+    return {
+      img: await loadImage(`/scenes/money/${kind}.webp`),
+      w: m.w,
+      h: m.h,
+      neutral: false,
+    };
   }
   return neutralNote(neutralLabel);
 }

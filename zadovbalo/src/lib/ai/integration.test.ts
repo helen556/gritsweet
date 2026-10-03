@@ -54,6 +54,10 @@ describe("analyzeText", () => {
     expect(r.status === "ok" && r.analysis.sceneIds).toEqual(["backpack"]);
   });
 
+  it("migrates legacy names from the model (hurtful_words → unsaid_words, stickers → unsaid)", async () => {
+    const r = await analyzeText("я так і не сказала йому", deps(fixed(ok({ categories: ["hurtful_words"], primaryCategory: "hurtful_words", sceneIds: ["stickers"] }))));
+    expect(r).toMatchObject({ status: "ok", analysis: { categories: ["unsaid_words"], primaryCategory: "unsaid_words", sceneIds: ["unsaid"] } });
+  });
   it("rejects unknown scene ids or urls from the model", async () => {
     const r = await analyzeText("щось", deps(fixed(ok({ sceneIds: ["https://evil.example"] }))));
     expect(r).toMatchObject({ status: "manual", reason: "invalid_response" });
@@ -91,7 +95,8 @@ describe("analyzeText", () => {
   it("missing env → manual not_configured, with keyword hints labelled separately", async () => {
     const r = await analyzeText("бісить, кредит душить", deps(null));
     expect(r).toMatchObject({ status: "manual", reason: "not_configured" });
-    expect(r.status === "manual" && r.keywordSuggestions).toEqual(expect.arrayContaining(["financial_debt", "anger"]));
+    // Конкретна тема важливіша за загальне «бісить».
+    expect(r.status === "manual" && r.keywordSuggestions).toEqual(["financial_debt"]);
   });
 
   it("keyword hints respect negation", async () => {

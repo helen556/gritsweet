@@ -57,13 +57,19 @@ export function peel(poly: Pt[], a: Pt, p: Pt) {
   const dx = p.x - a.x;
   const dy = p.y - a.y;
   const len = Math.hypot(dx, dy);
-  if (len < 0.5) return { stuck: poly, flap: [] as Pt[], fold: null, peeledFraction: 0 };
+  if (len < 0.5)
+    return { stuck: poly, flap: [] as Pt[], fold: null, peeledFraction: 0 };
   const n = { x: dx / len, y: dy / len };
   const m = { x: (a.x + p.x) / 2, y: (a.y + p.y) / 2 };
   const stuck = clipHalfPlane(poly, m, n);
   const peeled = clipHalfPlane(poly, m, { x: -n.x, y: -n.y });
   const flap = peeled.map((q) => reflect(q, m, n));
-  return { stuck, flap, fold: { m, n }, peeledFraction: area(peeled) / area(poly) };
+  return {
+    stuck,
+    flap,
+    fold: { m, n },
+    peeledFraction: area(peeled) / area(poly),
+  };
 }
 
 /** Комірки Вороного всередині полігона (для уламків). O(n²), для n ≤ ~30. */
@@ -77,7 +83,11 @@ export function voronoiCells(poly: Pt[], seeds: Pt[]): Pt[][] {
       const dy = si.y - sj.y;
       const len = Math.hypot(dx, dy);
       if (len < 1e-6) continue;
-      cell = clipHalfPlane(cell, { x: (si.x + sj.x) / 2, y: (si.y + sj.y) / 2 }, { x: dx / len, y: dy / len });
+      cell = clipHalfPlane(
+        cell,
+        { x: (si.x + sj.x) / 2, y: (si.y + sj.y) / 2 },
+        { x: dx / len, y: dy / len },
+      );
     }
     return cell;
   });
