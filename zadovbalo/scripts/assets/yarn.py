@@ -112,10 +112,10 @@ def run():
     st = strip(tangle, soft_alpha(tangle, tail_only), TAIL_CENTER)
     save_webp(out / "strand.webp", st, 88)
 
-    # фон (поверхня) — без пряжі, для узгодженого тла сцени
-    bg = cv2.inpaint(cv2.resize(tangle, (314, 314), interpolation=cv2.INTER_AREA), cv2.resize(cv2.dilate(tm, np.ones((9, 9), np.uint8)), (314, 314)), 9, cv2.INPAINT_TELEA)
-    bg = cv2.GaussianBlur(bg, (0, 0), 3)
-    save_webp(out / "surface.webp", cv2.resize(bg, (628, 628), interpolation=cv2.INTER_CUBIC), 70)
+
+
+
+
 
     write_json(out / "yarn.json", {
         "size": [tangle.shape[1], tangle.shape[0]],

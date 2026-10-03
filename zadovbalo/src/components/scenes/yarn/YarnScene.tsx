@@ -1,482 +1,562 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/cn";
-import { hash2 } from "@/lib/scene/heightfield";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { loadImage, loadJson, useSceneAssets } from "@/lib/scene/assets";
+import { useCanvas2D } from "@/lib/scene/canvas";
 import { useFrameLoop } from "@/lib/scene/loop";
-import { bindPointer } from "@/lib/scene/pointer";
-import { detectQuality } from "@/lib/scene/quality";
+import { usePointer } from "@/lib/scene/pointer";
 import { haptic, sound } from "@/lib/scene/sound";
+import { contactShadow } from "@/lib/scene/sprite";
 import type { SceneProps } from "../types";
 
-const SEG = 7;
-const TOTAL_SEGMENTS = 170;
-const FAST = 950; // px/с — різкий ривок
+interface Meta {
+  size: [number, number];
+  tangle: { x: number; y: number; w: number; h: number; exit: [number, number] };
+  ball: { x: number; y: number; w: number; h: number; cx: number; cy: number; r: number };
+  strand: { w: number; h: number; thickness: number };
+}
 
-interface P {
+/** Хвіст нитки точно як на фото (від маси до кінчика). */
+const TAIL: [number, number][] = [
+  [978, 796], [930, 830], [870, 850], [840, 870], [835, 895], [860, 915], [900, 928], [980, 930],
+  [1040, 928], [1100, 945], [1145, 980], [1160, 1020], [1140, 1065], [1100, 1100], [1080, 1130],
+];
+const WORLD = { x0: 0, y0: 60, x1: 1520, y1: 1460 };
+const BALL_MAX_R = 215;
+const BALL_MIN_R = 26;
+const THICK = 22;
+const SEG = 14; // довжина ланки нитки (світові px)
+/** Скільки прогресу дає один радіан кругового руху: повний клубок ≈ 20 обертів. */
+const PER_RAD = 1 / (20 * Math.PI * 2);
+
+interface Pt {
   x: number;
   y: number;
   px: number;
   py: number;
 }
 
-export default function YarnScene({ reducedMotion, setHint, onSettled }: SceneProps) {
+async function loadYarn() {
+  const meta = await loadJson<Meta>("/scenes/yarn/yarn.json");
+  const [tangle, ball, strand] = await Promise.all([
+    loadImage("/scenes/yarn/tangle.webp"),
+    loadImage("/scenes/yarn/ball.webp"),
+    loadImage("/scenes/yarn/strand.webp"),
+  ]);
+  return { meta, tangle, ball, strand };
+}
+
+export default function YarnScene(props: SceneProps) {
+  const assets = useSceneAssets(loadYarn);
+  if (assets.status === "loading") return <div role="status" className="grid h-full place-items-center text-sm text-mist">Готую пряжу…</div>;
+  if (assets.status === "error")
+    return (
+      <div className="grid h-full place-items-center gap-3 px-6 text-center text-mist">
+        <p>Не вдалося завантажити пряжу.</p>
+        <button type="button" onClick={assets.retry} className="scene-btn border border-steel/60">
+          Спробувати ще
+        </button>
+      </div>
+    );
+  return <Yarn {...props} data={assets.data} />;
+}
+
+function Yarn({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProps & { data: Awaited<ReturnType<typeof loadYarn>> }) {
+  const { meta, tangle, ball, strand } = data;
+  const { canvasRef, ctx, size } = useCanvas2D();
   const rootRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [easy, setEasy] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const easyRef = useRef(easy);
-  useEffect(() => {
-    easyRef.current = easy;
-  });
+  const [phase, setPhase] = useState<"free" | "wind" | "done">("free");
+  const phaseRef = useRef<"free" | "wind" | "done">("free");
+  const [pct, setPct] = useState(0);
 
+  // Нитка: ланцюжок точок (Верле). Перша — біля маси, остання — кінчик / точка на клубку.
+  const rope = useRef<Pt[]>([]);
+  if (rope.current.length === 0) rope.current = sampleTail();
   const st = useRef({
-    w: 1,
-    h: 1,
-    dpr: 1,
-    ball: { x: 0, y: 0, r0: 60, jx: 0, jy: 0 },
-    pts: [] as P[],
-    remaining: TOTAL_SEGMENTS,
+    progress: 0,
+    pulled: 0,
+    ballX: 0,
+    ballY: 0,
     spin: 0,
-    held: null as null | { pointer: number; x: number; y: number; speed: number; lastT: number },
-    tension: 0,
-    help: 0,
-    strands: [] as { a: number; b: number; c: number }[],
-    winding: -1,
-    coil: [] as { x: number; y: number }[],
-    done: false,
-    t: 0,
-    lastSound: 0,
-    /** До коли пульсує кінчик після останньої дії (щоб цикл засинав). */
-    awakeUntil: 8,
+    spinV: 0,
+    tug: 0,
+    massDX: 0,
+    massDY: 0,
+    tipDrag: null as null | { id: number; x: number; y: number },
+    wind: null as null | { id: number; a: number },
+    wraps: [] as { tilt: number; start: number; len: number; age: number }[],
+    tailTarget: null as null | { x: number; y: number }[],
+    tailT: 0,
+    settled: false,
   });
 
-  const ballR = () => {
+  const view = useMemo(() => {
+    const W = size.width;
+    const H = size.height;
+    const s = Math.min(W / (WORLD.x1 - WORLD.x0), H / (WORLD.y1 - WORLD.y0));
+    return { s, ox: (W - (WORLD.x1 - WORLD.x0) * s) / 2 - WORLD.x0 * s, oy: (H - (WORLD.y1 - WORLD.y0) * s) / 2 - WORLD.y0 * s };
+  }, [size]);
+  const toWorld = useCallback((x: number, y: number) => ({ x: (x - view.ox) / view.s, y: (y - view.oy) / view.s }), [view]);
+
+  /** Маса зменшується з прогресом; точка виходу нитки рухається разом із нею. */
+  const massTransform = () => {
     const s = st.current;
-    return Math.max(0, s.ball.r0 * Math.cbrt(s.remaining / TOTAL_SEGMENTS));
+    const left = 1 - s.progress;
+    const k = Math.max(0, 0.22 + 0.78 * Math.sqrt(left) - Math.min(0.08, s.pulled / 6000));
+    const pivot = { x: 560, y: 520 };
+    return { k, pivot, dx: s.massDX, dy: s.massDY, rot: s.progress * 0.5 };
   };
-
-  const anchor = () => {
-    const s = st.current;
-    const r = ballR();
-    const first = s.pts[1] ?? s.pts[0];
-    const bx = s.ball.x + s.ball.jx;
-    const by = s.ball.y + s.ball.jy;
-    if (!first) return { x: bx + r, y: by };
-    const a = Math.atan2(first.y - by, first.x - bx);
-    return { x: bx + Math.cos(a) * r * 0.92, y: by + Math.sin(a) * r * 0.92 };
+  const exitPoint = () => {
+    const m = massTransform();
+    const [ex, ey] = meta.tangle.exit;
+    const cos = Math.cos(m.rot);
+    const sin = Math.sin(m.rot);
+    const lx = (ex - m.pivot.x) * m.k;
+    const ly = (ey - m.pivot.y) * m.k;
+    return { x: m.pivot.x + m.dx + lx * cos - ly * sin, y: m.pivot.y + m.dy + lx * sin + ly * cos };
   };
+  const ballR = () => BALL_MIN_R + (BALL_MAX_R - BALL_MIN_R) * Math.cbrt(st.current.progress);
 
-  const init = () => {
+  const step = (dt: number) => {
+    const pts = rope.current;
     const s = st.current;
-    const root = rootRef.current!;
-    s.w = root.clientWidth;
-    s.h = root.clientHeight;
-    const r0 = Math.min(s.w, s.h) * 0.16;
-    s.ball = { x: s.w * 0.36, y: s.h * 0.46, r0, jx: 0, jy: 0 };
-    s.remaining = TOTAL_SEGMENTS - 6;
-    s.pts = [];
-    for (let i = 0; i < 7; i++) {
-      const x = s.ball.x + r0 * 0.9 + i * SEG * 0.9;
-      const y = s.ball.y + r0 * 0.4 + Math.sin(i) * 3;
-      s.pts.push({ x, y, px: x, py: y });
-    }
-    s.strands = Array.from({ length: 46 }, (_, i) => ({ a: hash2(i, 1) * Math.PI, b: hash2(i, 2) * Math.PI * 2, c: hash2(i, 3) }));
-  };
-
-  const draw = () => {
-    const s = st.current;
-    const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx) return;
-    ctx.setTransform(s.dpr, 0, 0, s.dpr, 0, 0);
-    ctx.clearRect(0, 0, s.w, s.h);
-    // Стіл.
-    const g = ctx.createRadialGradient(s.w * 0.5, s.h * 0.45, 20, s.w * 0.5, s.h * 0.5, Math.max(s.w, s.h) * 0.7);
-    g.addColorStop(0, "rgba(86,116,135,0.2)");
-    g.addColorStop(1, "rgba(8,19,28,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, s.w, s.h);
-
-    drawRope(ctx);
-    const r = ballR();
-    if (r > 2) drawBall(ctx, s.ball.x + s.ball.jx, s.ball.y + s.ball.jy, r);
-    if (s.winding >= 0) drawSkeinShine(ctx);
-    // Підсвічений кінчик.
-    const tip = s.pts[s.pts.length - 1];
-    if (tip && !s.done) {
-      const pulse = reducedMotion ? 0.6 : 0.5 + 0.3 * Math.sin(s.t * 3);
-      const glowR = 18 + 14 * s.help;
-      const tg = ctx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, glowR);
-      tg.addColorStop(0, `rgba(216,192,165,${0.55 * pulse + 0.35 * s.help})`);
-      tg.addColorStop(1, "rgba(216,192,165,0)");
-      ctx.fillStyle = tg;
-      ctx.beginPath();
-      ctx.arc(tip.x, tip.y, glowR, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  };
-
-  const drawRope = (ctx: CanvasRenderingContext2D) => {
-    const s = st.current;
-    const pts = s.pts;
-    if (pts.length < 2) return;
-    const a = anchor();
-    const path = () => {
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      for (let i = 1; i < pts.length - 1; i++) {
-        const mx = (pts[i]!.x + pts[i + 1]!.x) / 2;
-        const my = (pts[i]!.y + pts[i + 1]!.y) / 2;
-        ctx.quadraticCurveTo(pts[i]!.x, pts[i]!.y, mx, my);
-      }
-      const last = pts[pts.length - 1]!;
-      ctx.lineTo(last.x, last.y);
-    };
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    // Тінь нитки на столі.
-    ctx.save();
-    ctx.translate(2, 4);
-    ctx.strokeStyle = "rgba(0,0,0,0.35)";
-    ctx.lineWidth = 6;
-    ctx.filter = "blur(2px)";
-    path();
-    ctx.stroke();
-    ctx.restore();
-    // Трубка: темний контур, основний колір, відблиск, скрутка.
-    const taut = Math.min(1, s.tension);
-    ctx.strokeStyle = "#22343f";
-    ctx.lineWidth = 5.5 - taut * 1;
-    path();
-    ctx.stroke();
-    ctx.strokeStyle = taut > 0.5 ? "#b9c7cc" : "#9fb0ba";
-    ctx.lineWidth = 3.8 - taut * 0.8;
-    path();
-    ctx.stroke();
-    ctx.save();
-    ctx.strokeStyle = "rgba(34,52,63,0.45)";
-    ctx.lineWidth = 3.6 - taut;
-    ctx.setLineDash([2, 3]);
-    path();
-    ctx.stroke();
-    ctx.restore();
-    ctx.save();
-    ctx.translate(-0.8, -0.9);
-    ctx.strokeStyle = "rgba(231,235,237,0.55)";
-    ctx.lineWidth = 1;
-    path();
-    ctx.stroke();
-    ctx.restore();
-  };
-
-  /** Клубок: сфера з витками нитки спереду й ззаду; обертається, коли нитка розмотується. */
-  const drawBall = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number) => {
-    const s = st.current;
-    ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.55)";
-    ctx.shadowBlur = 22;
-    ctx.shadowOffsetY = 12;
-    const body = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r);
-    body.addColorStop(0, "#a9bac2");
-    body.addColorStop(0.7, "#6c8291");
-    body.addColorStop(1, "#33495a");
-    ctx.fillStyle = body;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.clip();
-    for (const pass of [0, 1] as const)
-      for (const st2 of s.strands) {
-        // Великий круг на сфері, повернутий на spin.
-        const a = st2.a;
-        const b = st2.b + s.spin * (0.6 + st2.c);
-        ctx.beginPath();
-        let started = false;
-        for (let k = 0; k <= 40; k++) {
-          const t = (k / 40) * Math.PI * 2;
-          const px = Math.cos(t);
-          const py = Math.sin(t) * Math.cos(a);
-          const pz = Math.sin(t) * Math.sin(a);
-          const rx = px * Math.cos(b) - pz * Math.sin(b);
-          const rz = px * Math.sin(b) + pz * Math.cos(b);
-          const front = rz > 0;
-          if ((pass === 1) !== front) {
-            started = false;
-            continue;
-          }
-          const sx = x + rx * r * 0.96;
-          const sy = y + py * r * 0.96;
-          if (!started) {
-            ctx.moveTo(sx, sy);
-            started = true;
-          } else ctx.lineTo(sx, sy);
-        }
-        if (pass === 1) {
-          // Виток спереду: темний край + світла нитка — як трубочка.
-          ctx.strokeStyle = "rgba(20,32,40,0.55)";
-          ctx.lineWidth = 3;
-          ctx.stroke();
-          ctx.strokeStyle = "rgba(196,210,216,0.75)";
-          ctx.lineWidth = 1.8;
-          ctx.stroke();
-        } else {
-          ctx.strokeStyle = "rgba(20,32,40,0.45)";
-          ctx.lineWidth = 1.4;
-          ctx.stroke();
-        }
-      }
-    // Обʼєм зверху.
-    const shade = ctx.createRadialGradient(x - r * 0.3, y - r * 0.35, r * 0.05, x, y, r * 1.05);
-    shade.addColorStop(0, "rgba(255,255,255,0.18)");
-    shade.addColorStop(0.6, "rgba(255,255,255,0)");
-    shade.addColorStop(1, "rgba(8,19,28,0.55)");
-    ctx.fillStyle = shade;
-    ctx.fillRect(x - r, y - r, r * 2, r * 2);
-    ctx.restore();
-  };
-
-  const drawSkeinShine = (ctx: CanvasRenderingContext2D) => {
-    const s = st.current;
-    if (s.winding < 1 || !s.coil.length) return;
-    const c = s.coil[Math.floor(s.coil.length / 2)]!;
-    const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 120);
-    g.addColorStop(0, "rgba(159,176,186,0.12)");
-    g.addColorStop(1, "rgba(159,176,186,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(c.x - 130, c.y - 130, 260, 260);
-  };
-
-  const finish = () => {
-    const s = st.current;
-    if (s.winding >= 0) return;
-    s.winding = 0;
-    s.held = null;
-    // Охайний моток: витки еліпса, що лягають один на одного.
-    const cx = s.w * 0.62;
-    const cy = s.h * 0.5;
-    const rx = Math.min(s.w, s.h) * 0.18;
-    const ry = rx * 0.42;
-    s.coil = s.pts.map((_, i) => {
-      const t = (i / s.pts.length) * Math.PI * 2 * 9;
-      const drift = (i / s.pts.length - 0.5) * ry * 0.9;
-      return { x: cx + Math.cos(t) * rx, y: cy + Math.sin(t) * ry + drift };
-    });
-    setHint("Охайний моток. Можна видихнути.");
-    onSettled();
-  };
-
-  const wake = useFrameLoop(rootRef, (dt) => {
-    const s = st.current;
-    const pts = s.pts;
-    if (pts.length === 0) return false; // ще не ініціалізовано або немає canvas
-    s.t += dt;
-    s.help = Math.max(0, s.help - dt * 0.4);
-    if (s.winding >= 0) {
-      s.winding = Math.min(1, s.winding + dt * (reducedMotion ? 3 : 0.45));
-      const k = Math.min(1, dt * 3);
-      pts.forEach((p, i) => {
-        const c = s.coil[i]!;
-        p.x += (c.x - p.x) * k;
-        p.y += (c.y - p.y) * k;
+    if (phaseRef.current === "done") {
+      // Змотано: хвостик плавно лягає на місце, без фізики натягу.
+      const tgt = s.tailTarget;
+      if (!tgt) return;
+      const k = Math.min(1, dt * 5);
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i]!;
+        const q = tgt[Math.min(i, tgt.length - 1)]!;
+        p.x += (q.x - p.x) * k;
+        p.y += (q.y - p.y) * k;
         p.px = p.x;
         p.py = p.y;
-      });
-      draw();
-      return s.winding < 1 || pts.some((p, i) => Math.hypot(p.x - s.coil[i]!.x, p.y - s.coil[i]!.y) > 0.5);
+      }
+      return;
     }
-    // Verlet із сильним тертям (вигляд згори: нитка лягає, де поклали).
-    for (const p of pts) {
-      const vx = (p.x - p.px) * 0.86;
-      const vy = (p.y - p.py) * 0.86;
+    const damp = 0.86;
+    for (let i = 1; i < pts.length - 1; i++) {
+      const p = pts[i]!;
+      const vx = (p.x - p.px) * damp;
+      const vy = (p.y - p.py) * damp;
       p.px = p.x;
       p.py = p.y;
       p.x += vx;
       p.y += vy;
     }
-    const tip = pts[pts.length - 1];
-    if (s.held && tip) {
-      tip.x = s.held.x;
-      tip.y = s.held.y;
-    }
-    for (let it = 0; it < 14; it++) {
-      const a = anchor();
-      pts[0]!.x = a.x;
-      pts[0]!.y = a.y;
-      for (let i = 0; i < pts.length - 1; i++) {
-        const p = pts[i]!;
-        const q = pts[i + 1]!;
-        const dx = q.x - p.x;
-        const dy = q.y - p.y;
-        const d = Math.hypot(dx, dy) || 0.001;
-        const diff = (d - SEG) / d;
-        const pinP = i === 0;
-        const pinQ = i + 1 === pts.length - 1 && s.held;
-        if (pinP && pinQ) continue;
-        const wp = pinP ? 0 : pinQ ? 1 : 0.5;
-        const wq = pinQ ? 0 : pinP ? 1 : 0.5;
-        p.x += dx * diff * wp;
-        p.y += dy * diff * wp;
-        q.x -= dx * diff * wq;
-        q.y -= dy * diff * wq;
-      }
-    }
-    // Натяг: наскільки нитка довша за свою довжину між клубком і пальцем.
-    let len = 0;
-    for (let i = 0; i < pts.length - 1; i++) len += Math.hypot(pts[i + 1]!.x - pts[i]!.x, pts[i + 1]!.y - pts[i]!.y);
-    const stretch = len / ((pts.length - 1) * SEG);
-    s.tension += ((s.held ? Math.max(0, (stretch - 1) * 6) : 0) - s.tension) * Math.min(1, dt * 8);
-    // Розмотування: повільно — нитка йде легко; різко — підвищений натяг і пауза, без покарання.
-    if (s.held && s.remaining > 0 && stretch > 1.01) {
-      const fast = !easyRef.current && s.held.speed > FAST;
-      const rate = easyRef.current ? 3 : fast ? 0.25 : 1.6;
-      const add = Math.min(s.remaining, Math.max(1, Math.round((stretch - 1) * 30 * rate)));
-      for (let k = 0; k < add; k++) {
-        const a = anchor();
-        pts.splice(1, 0, { x: a.x, y: a.y, px: a.x, py: a.y });
-        s.remaining--;
-      }
-      s.spin += add * 0.06;
-      if (fast) {
-        s.ball.jx += (Math.random() - 0.5) * 3;
-        s.ball.jy += (Math.random() - 0.5) * 3;
-        if (s.t - s.lastSound > 0.25) {
-          s.lastSound = s.t;
-          setHint("Різко — затягується. Повільніше, і піде.");
-          haptic(6);
+    // Кінці. Поки є маса — нитка виходить з неї; коли змотано все, лишається вільний хвостик.
+    const headFree = phaseRef.current === "done";
+    if (!headFree) {
+      const e = exitPoint();
+      pts[0]!.x = pts[0]!.px = e.x;
+      pts[0]!.y = pts[0]!.py = e.y;
+    } else {
+      // Залишок нитки плавно лягає S-подібним хвостиком (як на фото змотаного клубка).
+      const tgt = s.tailTarget;
+      if (tgt) {
+        const k = Math.min(1, dt * 5);
+        for (let i = 0; i < pts.length - 1; i++) {
+          const p = pts[i]!;
+          const q = tgt[Math.min(i, tgt.length - 1)]!;
+          p.x += (q.x - p.x) * k;
+          p.y += (q.y - p.y) * k;
+          p.px = p.x;
+          p.py = p.y;
         }
-      } else if (s.t - s.lastSound > 0.18) {
-        s.lastSound = s.t;
-        sound.play("soft", 0.15);
       }
     }
-    s.ball.jx *= 0.85;
-    s.ball.jy *= 0.85;
-    if (s.remaining <= 0 && !s.held && s.winding < 0) finish();
+    const last = pts[pts.length - 1]!;
+    if (phaseRef.current === "free") {
+      if (s.tipDrag) {
+        last.px = last.x;
+        last.py = last.y;
+        last.x += (s.tipDrag.x - last.x) * Math.min(1, dt * 30);
+        last.y += (s.tipDrag.y - last.y) * Math.min(1, dt * 30);
+      }
+    } else {
+      // Нитка йде на клубок: точка кріплення обертається разом із ним.
+      const r = ballR();
+      last.x = last.px = s.ballX + Math.cos(s.spin * 1.7 + 2.2) * r * 0.92;
+      last.y = last.py = s.ballY + Math.sin(s.spin * 1.7 + 2.2) * r * 0.55;
+    }
+    // Обмеження довжини. Перша точка (маса) й кінець (палець/клубок) закріплені.
+    const pinLast = phaseRef.current !== "free" || Boolean(s.tipDrag);
+    for (let it = 0; it < 14; it++) {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i]!;
+        const b = pts[i + 1]!;
+        const pa = i === 0;
+        const pb = i + 1 === pts.length - 1 && pinLast;
+        if (pa && pb) continue;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const d = Math.hypot(dx, dy) || 1e-3;
+        const diff = (d - SEG) / d;
+        const wa = pa ? 0 : pb ? 1 : 0.5;
+        const wb = pb ? 0 : pa ? 1 : 0.5;
+        a.x += dx * diff * wa;
+        a.y += dy * diff * wa;
+        b.x -= dx * diff * wb;
+        b.y -= dy * diff * wb;
+      }
+    }
+    // Натяг: нитка розтягнута довше, ніж є, — розмотуємо з маси (нові ланки біля неї).
+    const tail = pts[pts.length - 1]!;
+    const prev = pts[pts.length - 2]!;
+    let total = 0;
+    for (let i = 0; i < pts.length - 1; i++) total += Math.hypot(pts[i + 1]!.x - pts[i]!.x, pts[i + 1]!.y - pts[i]!.y);
+    let extra = total - (pts.length - 1) * SEG;
+    while (extra > SEG * 0.5 && pts.length < 260) {
+      const head = pts[0]!;
+      const next = pts[1]!;
+      pts.splice(1, 0, { x: (head.x + next.x) / 2, y: (head.y + next.y) / 2, px: (head.x + next.x) / 2, py: (head.y + next.y) / 2 });
+      s.pulled += SEG;
+      extra -= SEG;
+      s.tug = Math.min(1, s.tug + 0.25);
+      if (Math.random() < 0.25) sound.play("paper", 0.15);
+    }
+    // Змотування: зайва слабина зникає з боку маси (нитку тягне клубок), без «вузлів».
+    if (phaseRef.current === "wind" && pts.length > 8) {
+      const straight = Math.hypot(tail.x - pts[0]!.x, tail.y - pts[0]!.y);
+      const length = (pts.length - 1) * SEG;
+      if (length > straight * 1.05 + SEG * 2) pts.splice(1, 1);
+    }
+
+    // Маса трохи смикається за ниткою.
+    s.tug *= 1 - Math.min(1, dt * 4);
+    const dir = { x: prev.x - pts[0]!.x, y: prev.y - pts[0]!.y };
+    const dl = Math.hypot(dir.x, dir.y) || 1;
+    s.massDX += ((dir.x / dl) * s.tug * 10 - s.massDX) * Math.min(1, dt * 6);
+    s.massDY += ((dir.y / dl) * s.tug * 10 - s.massDY) * Math.min(1, dt * 6);
+  };
+
+  const draw = useCallback(() => {
+    const g = ctx;
+    if (!g) return;
+    const s = st.current;
+    const { s: sc, ox, oy } = view;
+    const dpr = size.dpr;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, g.canvas.width, g.canvas.height);
+    g.setTransform(dpr * sc, 0, 0, dpr * sc, dpr * ox, dpr * oy);
+    // Стіл — той самий графітовий тон, що на фото, з мʼяким світлом.
+    const bg = g.createRadialGradient(700, 650, 80, 700, 700, 1100);
+    bg.addColorStop(0, "rgba(70,70,72,0.55)");
+    bg.addColorStop(1, "rgba(30,31,33,0)");
+    g.fillStyle = bg;
+    g.fillRect(-400, -200, 2400, 2000);
+
+    // Маса.
+    const m = massTransform();
+    if (s.progress < 0.995) {
+      g.save();
+      g.translate(m.pivot.x + m.dx, m.pivot.y + m.dy);
+      g.rotate(m.rot);
+      g.scale(m.k, m.k);
+      g.translate(-m.pivot.x, -m.pivot.y);
+      contactShadow(g, 580, 640, 540, 200, 0.5);
+      g.globalAlpha = Math.min(1, (1 - s.progress) * 8);
+      g.drawImage(tangle, meta.tangle.x, meta.tangle.y);
+      g.restore();
+    }
+
+    // Нитка: тінь, потім текстура.
+    const pts = rope.current;
+    g.save();
+    g.lineCap = "round";
+    g.lineJoin = "round";
+    g.strokeStyle = "rgba(0,0,0,0.38)";
+    g.lineWidth = THICK * 0.9;
+    g.beginPath();
+    g.moveTo(pts[0]!.x + 7, pts[0]!.y + 9);
+    for (let i = 1; i < pts.length; i++) g.lineTo(pts[i]!.x + 7, pts[i]!.y + 9);
+    g.stroke();
+    g.restore();
+    drawRope(g, pts, strand, meta.strand);
+
+    // Клубок.
+    if (phaseRef.current !== "free") {
+      const r = ballR();
+      contactShadow(g, s.ballX + r * 0.25, s.ballY + r * 0.78, r * 1.05, r * 0.35, 0.6);
+      g.save();
+      g.translate(s.ballX, s.ballY);
+      g.beginPath();
+      g.arc(0, 0, r, 0, Math.PI * 2);
+      g.clip();
+      g.rotate(s.spin);
+      const k = (r * 2) / Math.min(meta.ball.w, meta.ball.h);
+      g.drawImage(ball, (-meta.ball.w / 2) * k, (-meta.ball.h / 2) * k, meta.ball.w * k, meta.ball.h * k);
+      g.restore();
+      // Свіжі витки поверх клубка — нитка лягає з тією ж фактурою.
+      for (const w of s.wraps) drawWrap(g, s.ballX, s.ballY, r, w, strand, meta.strand);
+      // Обʼєм: тінь знизу справа, світло зліва вгорі (як на фото).
+      const sh = g.createRadialGradient(s.ballX - r * 0.35, s.ballY - r * 0.4, r * 0.2, s.ballX, s.ballY, r * 1.02);
+      sh.addColorStop(0, "rgba(255,255,255,0.06)");
+      sh.addColorStop(0.65, "rgba(0,0,0,0)");
+      sh.addColorStop(1, "rgba(0,0,0,0.38)");
+      g.fillStyle = sh;
+      g.beginPath();
+      g.arc(s.ballX, s.ballY, r, 0, Math.PI * 2);
+      g.fill();
+    }
+  }, [ctx, view, size.dpr, tangle, ball, strand, meta]);
+
+  const wake = useFrameLoop(rootRef, (dt) => {
+    const s = st.current;
+    step(dt);
+    step(dt); // два кроки — стабільніша нитка
+    s.spin += s.spinV * dt;
+    s.spinV *= 1 - Math.min(1, dt * 5);
+    for (const w of s.wraps) w.age += dt;
+    s.wraps = s.wraps.filter((w) => w.age < 6);
     draw();
-    return Boolean(s.held) || s.tension > 0.01 || pts.some((p) => Math.abs(p.x - p.px) + Math.abs(p.y - p.py) > 0.05) || (!reducedMotion && s.t < s.awakeUntil);
+    // Нитка заспокоїлась і ніхто не тягне — сплячий режим.
+    const moving = rope.current.some((p) => Math.abs(p.x - p.px) + Math.abs(p.y - p.py) > 0.05);
+    return moving || Boolean(s.tipDrag || s.wind) || Math.abs(s.spinV) > 0.01 || s.tug > 0.01 || (phaseRef.current === "done" && st.current.tailT < 1.5 && ((st.current.tailT += 1 / 60), true));
   });
 
   useEffect(() => {
-    const root = rootRef.current;
-    const canvas = canvasRef.current;
-    if (!root || !canvas || !canvas.getContext("2d")) {
-      setFailed(true);
-      return;
-    }
-    const s = st.current;
-    const resize = () => {
-      const w = root.clientWidth;
-      const h = root.clientHeight;
-      const dpr = detectQuality().dpr;
-      if (!s.pts.length) {
-        Object.assign(s, { dpr });
-        init();
-      } else {
-        const dx = (w - s.w) / 2;
-        const dy = (h - s.h) / 2;
-        s.ball.x += dx;
-        s.ball.y += dy;
-        for (const p of s.pts) {
-          p.x += dx;
-          p.y += dy;
-          p.px += dx;
-          p.py += dy;
-        }
-        s.coil = s.coil.map((c) => ({ x: c.x + dx, y: c.y + dy }));
-        Object.assign(s, { w, h, dpr });
-      }
-      canvas.width = Math.round(s.w * s.dpr);
-      canvas.height = Math.round(s.h * s.dpr);
-      wake();
-    };
-    resize();
-    const ro = new ResizeObserver(resize);
-    ro.observe(root);
-    const unbind = bindPointer(root, {
-      down: (p) => {
-        const tip = s.pts[s.pts.length - 1];
-        if (!tip || s.winding >= 0) return false;
-        if (Math.hypot(p.x - tip.x, p.y - tip.y) > 44) {
-          s.help = 1;
-          s.awakeUntil = s.t + 8;
-          setHint("Кінчик світиться біля клубка — візьмись за нього.");
-          wake();
-          return false;
-        }
-        s.held = { pointer: p.id, x: p.x, y: p.y, speed: 0, lastT: p.time };
-        s.awakeUntil = s.t + 8;
-        setHint("Повільно тягни — і клубок піддається.");
-        wake();
-      },
-      move: (p) => {
-        const h = s.held;
-        if (!h || h.pointer !== p.id) return;
-        const dt = Math.max(1, p.time - h.lastT) / 1000;
-        const v = Math.hypot(p.x - h.x, p.y - h.y) / dt;
-        h.speed = h.speed * 0.7 + v * 0.3;
-        h.x = Math.max(8, Math.min(s.w - 8, p.x));
-        h.y = Math.max(8, Math.min(s.h - 8, p.y));
-        h.lastT = p.time;
-        wake();
-      },
-      up: () => {
-        s.held = null;
-        s.awakeUntil = s.t + 8;
-        wake();
-      },
-    });
-    return () => {
-      ro.disconnect();
-      unbind();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- привʼязка один раз
-  }, []);
+    draw();
+    wake();
+  }, [draw, wake]);
 
-  /** Клавіатура: акуратно витягнути трохи нитки. */
-  const pullStep = () => {
+  const startWinding = useCallback(
+    (x: number, y: number) => {
+      const s = st.current;
+      // Повний клубок має вміститися в кадр.
+      s.ballX = Math.max(WORLD.x0 + BALL_MAX_R + 260, Math.min(WORLD.x1 - BALL_MAX_R - 30, x));
+      s.ballY = Math.max(WORLD.y0 + BALL_MAX_R + 30, Math.min(WORLD.y1 - BALL_MAX_R - 150, y));
+      phaseRef.current = "wind";
+      setPhase("wind");
+      setHint("Тепер води пальцем по колу — нитка змотуватиметься.");
+      sound.play("soft", 0.4);
+    },
+    [setHint],
+  );
+
+  const addProgress = useCallback(
+    (rad: number) => {
+      const s = st.current;
+      if (phaseRef.current !== "wind") return;
+      s.progress = Math.min(1, s.progress + Math.abs(rad) * PER_RAD);
+      if (s.progress > 0.999) s.progress = 1;
+      s.spinV += rad * 2.2;
+      s.tug = Math.min(1, s.tug + Math.abs(rad) * 0.6);
+      // Новий виток щочверть оберту.
+      const last = s.wraps[s.wraps.length - 1];
+      if (!last || last.age > 0.35) s.wraps.push({ tilt: Math.random() * Math.PI, start: Math.random() * Math.PI * 2, len: 1.2 + Math.random() * 1.4, age: 0 });
+      setPct(Math.round(s.progress * 100));
+      if (Math.random() < 0.2) sound.play("paper", 0.12);
+      if (s.progress >= 1 && !s.settled) {
+        s.settled = true;
+        // Короткий хвостик: від клубка вниз-ліворуч мʼякою S-кривою.
+        const r = ballR();
+        const n = 16;
+        // Нитка сходить з нижнього лівого боку клубка й лягає на стіл назовні.
+        const ax = s.ballX - r * 0.62;
+        const ay = s.ballY + r * 0.62;
+        const tail: { x: number; y: number }[] = [];
+        for (let i = 0; i < n; i++) {
+          const t = 1 - i / (n - 1); // 0 — біля клубка
+          tail.push({ x: ax - t * 210 + Math.sin(t * Math.PI * 1.5) * 34, y: ay + t * 120 - Math.sin(t * Math.PI) * 46 });
+        }
+        const cur = rope.current;
+        rope.current = cur.slice(cur.length - n);
+        s.tailTarget = tail;
+        phaseRef.current = "done";
+        setPhase("done");
+        onSettled();
+        haptic(12);
+        setHint("Клубок змотано. Можна побути тут скільки треба.");
+      }
+    },
+    [onSettled, setHint],
+  );
+
+  usePointer(rootRef, {
+    down: (p) => {
+      const w = toWorld(p.x, p.y);
+      const s = st.current;
+      onInteract();
+      if (phaseRef.current === "free") {
+        const tip = rope.current[rope.current.length - 1]!;
+        // Кінчик легко вхопити: щедра зона.
+        if (Math.hypot(w.x - tip.x, w.y - tip.y) > 110) return false;
+        s.tipDrag = { id: p.id, x: w.x, y: w.y };
+        sound.play("paper", 0.25);
+        wake();
+        return;
+      }
+      if (phaseRef.current === "wind") {
+        s.wind = { id: p.id, a: Math.atan2(w.y - s.ballY, w.x - s.ballX) };
+        wake();
+      }
+    },
+    move: (p) => {
+      const w = toWorld(p.x, p.y);
+      const s = st.current;
+      if (s.tipDrag && s.tipDrag.id === p.id) {
+        s.tipDrag.x = w.x;
+        s.tipDrag.y = w.y;
+        wake();
+        return;
+      }
+      if (s.wind && s.wind.id === p.id) {
+        const dist = Math.hypot(w.x - s.ballX, w.y - s.ballY);
+        const a = Math.atan2(w.y - s.ballY, w.x - s.ballX);
+        if (dist > ballR() * 0.45) {
+          let d = a - s.wind.a;
+          if (d > Math.PI) d -= Math.PI * 2;
+          if (d < -Math.PI) d += Math.PI * 2;
+          // Різкий ривок не карається, але й не «перестрибує» — обмежуємо крок.
+          addProgress(Math.max(-0.6, Math.min(0.6, d)));
+        }
+        s.wind.a = a;
+        wake();
+      }
+    },
+    up: (p, cancelled) => {
+      const s = st.current;
+      if (s.tipDrag && s.tipDrag.id === p.id) {
+        s.tipDrag = null;
+        const tip = rope.current[rope.current.length - 1]!;
+        // Витягнули достатньо — тут починається новий клубок.
+        if (!cancelled && s.pulled > 140) startWinding(tip.x, tip.y);
+        else if (!cancelled) setHint("Тягни сміливіше — нитка подасться.");
+        wake();
+        return;
+      }
+      if (s.wind && s.wind.id === p.id) s.wind = null;
+    },
+  });
+
+  /** Кнопкова альтернатива. */
+  const pullByButton = () => {
+    onInteract();
     const s = st.current;
-    if (s.winding >= 0) return;
-    const tip = s.pts[s.pts.length - 1]!;
-    const steps = Math.min(s.remaining, 18);
-    for (let k = 0; k < steps; k++) {
-      const a = anchor();
-      s.pts.splice(1, 0, { x: a.x, y: a.y, px: a.x, py: a.y });
-      s.remaining--;
-    }
-    s.spin += steps * 0.06;
-    const ang = (s.pts.length * 0.11) % (Math.PI * 2);
-    tip.x = s.w * 0.62 + Math.cos(ang) * s.w * 0.25;
-    tip.y = s.h * 0.5 + Math.sin(ang) * s.h * 0.3;
-    if (s.remaining <= 0) finish();
+    const tip = rope.current[rope.current.length - 1]!;
+    s.tipDrag = { id: -1, x: tip.x + 140, y: tip.y + 60 };
+    wake();
+    window.setTimeout(() => {
+      s.tipDrag = null;
+      const t = rope.current[rope.current.length - 1]!;
+      startWinding(t.x, t.y);
+      wake();
+    }, 450);
+  };
+  const windByButton = () => {
+    onInteract();
+    for (let i = 0; i < 6; i++) addProgress(Math.PI / 3);
     wake();
   };
 
-  if (failed) return <div className="grid h-full place-items-center px-6 text-center text-mist">Цей пристрій не показує сцену. Спробуй іншу дію.</div>;
-
   return (
-    <div className="flex h-full flex-col">
-      <div ref={rootRef} className="scene-surface relative min-h-0 flex-1">
-        <canvas ref={canvasRef} role="img" aria-label="Заплутаний клубок. Візьмись за світлий кінчик нитки й повільно тягни." className="absolute inset-0 h-full w-full" />
-      </div>
-      <div className="flex flex-wrap justify-center gap-2 px-3 pt-2">
-        <button type="button" role="switch" aria-checked={easy} className={cn("scene-btn border", easy ? "border-frost bg-frost text-abyss hover:bg-white hover:text-abyss" : "border-steel/50")} onClick={() => setEasy((v) => !v)}>
-          Легкий режим
-        </button>
-        <button type="button" className="scene-btn border border-steel/50" onClick={() => {
-          st.current.help = 1;
-          setHint("Кінчик світиться біля клубка — візьмись за нього й тягни повільно.");
-          wake();
-        }}>
-          Підказка
-        </button>
-        <button type="button" className="scene-btn border border-steel/50" onClick={pullStep}>
-          Потягнути трохи
-        </button>
+    <div ref={rootRef} className="scene-surface relative h-full w-full overflow-hidden">
+      <canvas ref={canvasRef} aria-hidden className="absolute inset-0 h-full w-full" />
+      <div className="absolute inset-x-0 bottom-1 z-10 flex flex-wrap items-center justify-center gap-2 px-2">
+        {phase === "free" && (
+          <button type="button" onClick={pullByButton} className="scene-btn border border-steel/50 bg-night/70 text-sm">
+            Потягнути нитку
+          </button>
+        )}
+        {phase === "wind" && (
+          <button type="button" onClick={windByButton} className="scene-btn border border-steel/50 bg-night/70 text-sm">
+            Змотати оберт
+          </button>
+        )}
+        <span className="sr-only" aria-live="polite">
+          {phase === "free" ? "Кінець нитки лежить праворуч унизу." : `Змотано приблизно ${pct}%`}
+        </span>
       </div>
     </div>
   );
+}
+
+function sampleTail(): Pt[] {
+  const out: Pt[] = [];
+  for (let i = 0; i < TAIL.length - 1; i++) {
+    const [x0, y0] = TAIL[i]!;
+    const [x1, y1] = TAIL[i + 1]!;
+    const n = Math.max(1, Math.round(Math.hypot(x1 - x0, y1 - y0) / SEG));
+    for (let k = 0; k < n; k++) {
+      const x = x0 + ((x1 - x0) * k) / n;
+      const y = y0 + ((y1 - y0) * k) / n;
+      out.push({ x, y, px: x, py: y });
+    }
+  }
+  const [lx, ly] = TAIL[TAIL.length - 1]!;
+  out.push({ x: lx, y: ly, px: lx, py: ly });
+  return out;
+}
+
+/** Нитка з реальною фактурою: смуга зі знімка кладеться вздовж кожної ланки. */
+function drawRope(g: CanvasRenderingContext2D, pts: Pt[], strand: HTMLImageElement, m: { w: number; h: number }) {
+  let u = 0;
+  const k = m.h / THICK; // пікселів смуги на світовий px
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i]!;
+    const b = pts[i + 1]!;
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len < 0.01) continue;
+    const ang = Math.atan2(b.y - a.y, b.x - a.x);
+    g.save();
+    g.translate(a.x, a.y);
+    g.rotate(ang);
+    let rest = len + 1.2;
+    let x = -0.6;
+    while (rest > 0) {
+      const su = (u * k) % m.w;
+      const take = Math.min(rest, (m.w - su) / k);
+      g.drawImage(strand, su, 0, Math.max(1, take * k), m.h, x, -THICK / 2, take, THICK);
+      x += take;
+      rest -= take;
+      u += take;
+    }
+    g.restore();
+  }
+}
+
+/** Виток на клубку: дуга-«меридіан» під нахилом, тією ж ниткою. */
+function drawWrap(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, w: { tilt: number; start: number; len: number; age: number }, strand: HTMLImageElement, m: { w: number; h: number }) {
+  const alpha = Math.max(0, 1 - w.age / 6);
+  if (alpha <= 0) return;
+  const steps = 18;
+  const pts: Pt[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = w.start + (w.len * i) / steps;
+    // Велике коло на сфері, повернуте на tilt, в ортографічній проєкції.
+    const x = Math.cos(t) * r * 0.97;
+    const yz = Math.sin(t) * r * 0.97;
+    const y = yz * Math.cos(w.tilt);
+    const z = yz * Math.sin(w.tilt);
+    if (z < -r * 0.15) continue; // задня частина — не видно
+    pts.push({ x: cx + x, y: cy + y, px: 0, py: 0 });
+  }
+  if (pts.length < 2) return;
+  g.save();
+  g.globalAlpha = alpha * 0.9;
+  g.save();
+  g.scale(1, 1);
+  drawRopeThin(g, pts, strand, m, Math.max(6, r * 0.09));
+  g.restore();
+  g.restore();
+}
+
+function drawRopeThin(g: CanvasRenderingContext2D, pts: Pt[], strand: HTMLImageElement, m: { w: number; h: number }, th: number) {
+  let u = 0;
+  const k = m.h / th;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i]!;
+    const b = pts[i + 1]!;
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const ang = Math.atan2(b.y - a.y, b.x - a.x);
+    g.save();
+    g.translate(a.x, a.y);
+    g.rotate(ang);
+    const su = (u * k) % (m.w - len * k - 1 > 0 ? m.w - len * k - 1 : 1);
+    g.drawImage(strand, su, 0, Math.max(1, len * k), m.h, 0, -th / 2, len + 0.8, th);
+    g.restore();
+    u += len;
+  }
 }
