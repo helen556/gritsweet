@@ -142,6 +142,20 @@ export function SceneShell({
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
+            onClick={() => setIntroOpen((o) => !o)}
+            aria-expanded={introOpen}
+            aria-label="Що тут робити?"
+            className="scene-btn w-11 justify-center px-0"
+          >
+            <span
+              aria-hidden
+              className="grid size-5 place-items-center rounded-full border border-current text-[0.7rem] font-semibold"
+            >
+              ?
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={toggleSound}
             aria-pressed={soundOn}
             aria-label={soundOn ? "Вимкнути звук" : "Увімкнути звук"}
@@ -163,65 +177,42 @@ export function SceneShell({
 
       {/* Вступ лежить поверх сцени: коли згортається, розмір сцени не змінюється посеред жесту. */}
       <div className="relative z-10 min-h-0 flex-1">
-        {/* Вступ: спершу помітний, далі — стислий рядок, який можна розгорнути. */}
-        <div
-          className="safe-px pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-center gap-1 pb-6 text-center [&_button]:pointer-events-auto"
-          style={{
-            background: introOpen
-              ? "linear-gradient(180deg, rgb(28 30 32 / 0.92) 0%, rgb(28 30 32 / 0.75) 60%, transparent 100%)"
-              : undefined,
-          }}
-        >
-          <AnimatePresence initial={false} mode="wait">
-            {introOpen ? (
-              <motion.p
-                key="intro"
-                initial={
-                  reducedMotion
-                    ? { opacity: 0 }
-                    : { opacity: 0, y: 8, filter: "blur(6px)" }
-                }
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={
-                  reducedMotion
-                    ? { opacity: 0 }
-                    : { opacity: 0, y: -6, filter: "blur(4px)" }
-                }
-                transition={{
-                  duration: reducedMotion ? 0.2 : 0.6,
-                  delay: reducedMotion ? 0 : 0.35,
-                }}
-                className="max-w-2xl text-balance text-[1.02rem] leading-snug text-frost/90 sm:text-lg"
-              >
+        {/* Вступ (і звідки тема) — поверх сцени, лише доки людина не почала дію; потім нічого не перекриває предметів. */}
+        <AnimatePresence>
+          {introOpen && (
+            <motion.div
+              key="intro"
+              className="safe-px pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-center gap-1.5 pb-8 pt-1 text-center [&_button]:pointer-events-auto"
+              style={{
+                background:
+                  "linear-gradient(180deg, rgb(28 30 32 / 0.94) 0%, rgb(28 30 32 / 0.8) 62%, transparent 100%)",
+              }}
+              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}
+              transition={{
+                duration: reducedMotion ? 0.2 : 0.55,
+                delay: reducedMotion ? 0 : 0.3,
+              }}
+            >
+              <p className="max-w-2xl text-balance text-[1.02rem] leading-snug text-frost/90 sm:text-lg">
                 {meta.intro}
-              </motion.p>
-            ) : (
-              <motion.button
-                key="intro-min"
-                type="button"
-                onClick={() => setIntroOpen(true)}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="min-h-8 text-xs text-mist underline-offset-4 hover:text-frost hover:underline"
-              >
-                Що тут робити?
-              </motion.button>
-            )}
-          </AnimatePresence>
-          {topicNote && (
-            <p className="flex flex-wrap items-center justify-center gap-x-2 text-xs text-mist">
-              <span>{topicNote}</span>
-              <button
-                type="button"
-                onClick={() => onExit("change")}
-                className="min-h-8 text-frost/85 underline underline-offset-4 hover:text-frost"
-              >
-                Змінити тему
-              </button>
-            </p>
+              </p>
+              {topicNote && (
+                <p className="flex flex-wrap items-center justify-center gap-x-2 text-xs text-mist">
+                  <span>{topicNote}</span>
+                  <button
+                    type="button"
+                    onClick={() => onExit("change")}
+                    className="min-h-8 text-frost/85 underline underline-offset-4 hover:text-frost"
+                  >
+                    Змінити тему
+                  </button>
+                </p>
+              )}
+            </motion.div>
           )}
-        </div>
+        </AnimatePresence>
         <Scene
           key={runId}
           input={input}

@@ -1,413 +1,577 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
-import { createHeightfield, dent, hash2, relax, shade, type Heightfield, type Material } from "@/lib/scene/heightfield";
+import { loadImage, loadJson, useSceneAssets } from "@/lib/scene/assets";
+import { drawSoftShadow } from "@/lib/scene/bend";
+import { useCanvas2D } from "@/lib/scene/canvas";
+import { createHeightfield, dent, relax, type Heightfield } from "@/lib/scene/heightfield";
+import { createHeightGL, type HeightGL } from "@/lib/scene/heightgl";
 import { useFrameLoop } from "@/lib/scene/loop";
-import { bindPointer } from "@/lib/scene/pointer";
-import { detectQuality } from "@/lib/scene/quality";
+import { usePointer } from "@/lib/scene/pointer";
 import { haptic, sound } from "@/lib/scene/sound";
+import { contactShadow, makeSprite, opaqueAt, type Sprite } from "@/lib/scene/sprite";
 import type { SceneProps } from "../types";
 
-const SAND: Material = { base: [184, 182, 172], grain: 0.16, specular: 0.02, shininess: 12, relief: 60 };
-const TALUS = 0.045;
-
-interface Stone {
-  x: number;
-  y: number;
-  r: number;
-  ry: number;
-  rot: number;
-  tone: number;
+interface Meta {
+  size: [number, number];
+  grid: number;
+  heightScale: number;
+  light: [number, number, number];
+  inner: [number, number, number, number];
+  free: [number, number, number, number];
+  stones: { x: number; y: number; w: number; h: number; cx: number; cy: number }[];
 }
-interface Drop {
+
+type Tool = "stones" | "level";
+
+interface Pebble {
+  sprite: Sprite;
   x: number;
   y: number;
   vx: number;
   vy: number;
-  life: number;
-}
-interface Ring {
-  x: number;
-  y: number;
-  t: number;
+  rot: number;
+  lift: number;
+  /** Де лежить: у піску, на вільному дереві. */
+  onWood: boolean;
+  /** Ще не виймали з піску (сидить у своїй ямці на фото). */
+  original: boolean;
+  homeX: number;
+  homeY: number;
+  dropTo: { x: number; y: number } | null;
+  z: number;
 }
 
-export default function SandScene({ reducedMotion, setHint }: SceneProps) {
+const TRAY = { x0: 120, y0: 95, x1: 1420, y1: 880 }; // видима частина фото з лотком
+
+async function loadSand() {
+  const meta = await loadJson<Meta>("/scenes/sand/sand.json");
+  const [tray, height, mask, ...pebbles] = await Promise.all([
+    loadImage("/scenes/sand/tray.webp"),
+    loadImage("/scenes/sand/height.png"),
+    loadImage("/scenes/sand/mask.png"),
+    ...meta.stones.map((_, i) => loadImage(`/scenes/sand/pebble-${String(i).padStart(2, "0")}.webp`)),
+  ]);
+  // Висоти з PNG → світові пікселі.
+  const gw = height.naturalWidth;
+  const gh = height.naturalHeight;
+  const c = document.createElement("canvas");
+  c.width = gw;
+  c.height = gh;
+  const g = c.getContext("2d", { willReadFrequently: true })!;
+  g.drawImage(height, 0, 0);
+  const px = g.getImageData(0, 0, gw, gh).data;
+  const hf = createHeightfield(gw, gh);
+  for (let i = 0; i < gw * gh; i++) hf.data[i] = ((px[i * 4]! - 127.5) / 127.5) * meta.heightScale;
+  g.clearRect(0, 0, gw, gh);
+  g.drawImage(mask, 0, 0);
+  const md = g.getImageData(0, 0, gw, gh).data;
+  const sandMask = new Float32Array(gw * gh);
+  for (let i = 0; i < gw * gh; i++) sandMask[i] = md[i * 4]! / 255;
+  return { meta, tray, mask, hf, sandMask, sprites: pebbles.map(makeSprite) };
+}
+
+export default function SandScene(props: SceneProps) {
+  const assets = useSceneAssets(loadSand);
+  if (assets.status === "loading") return <div role="status" className="grid h-full place-items-center text-sm text-mist">Готую пісок…</div>;
+  if (assets.status === "error")
+    return (
+      <div className="grid h-full place-items-center gap-3 px-6 text-center text-mist">
+        <p>Не вдалося завантажити лоток.</p>
+        <button type="button" onClick={assets.retry} className="scene-btn border border-steel/60">
+          Спробувати ще
+        </button>
+      </div>
+    );
+  return <Sand {...props} data={assets.data} />;
+}
+
+/** Чаша з мʼякими стінками (косинус) і валиком: обʼєм виймається й лягає довкола. */
+function bowl(hf: Heightfield, gx: number, gy: number, rx: number, ry: number, depth: number) {
+  const x0 = Math.max(1, Math.floor(gx - rx * 1.5));
+  const x1 = Math.min(hf.w - 2, Math.ceil(gx + rx * 1.5));
+  const y0 = Math.max(1, Math.floor(gy - ry * 1.5));
+  const y1 = Math.min(hf.h - 2, Math.ceil(gy + ry * 1.5));
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      const d = Math.hypot((x - gx) / rx, (y - gy) / ry);
+      const i = y * hf.w + x;
+      if (d < 1) hf.data[i]! -= depth * 0.5 * (1 + Math.cos(Math.PI * d));
+      else if (d < 1.45) hf.data[i]! += depth * 0.3 * Math.sin((Math.PI * (d - 1)) / 0.45);
+    }
+}
+
+function Sand({ reducedMotion, onSettled, setHint, onInteract, data }: SceneProps & { data: Awaited<ReturnType<typeof loadSand>> }) {
+  const { meta, tray, mask, sprites } = data;
+  const { canvasRef, ctx, size } = useCanvas2D();
   const rootRef = useRef<HTMLDivElement>(null);
-  const sandRef = useRef<HTMLCanvasElement>(null);
-  const waterRef = useRef<HTMLCanvasElement>(null);
-  const [failed, setFailed] = useState(false);
-  const [flow, setFlow] = useState(true);
-  const flowRef = useRef(flow);
-  useEffect(() => {
-    flowRef.current = flow;
-  });
+  const glCanvas = useRef<HTMLCanvasElement | null>(null);
+  const gl = useRef<HeightGL | null>(null);
+  const [tool, setTool] = useState<Tool>("stones");
+  const toolRef = useRef<Tool>("stones");
+  const [glFailed, setGlFailed] = useState(false);
+  const [counts, setCounts] = useState({ inSand: meta.stones.length, onWood: 0 });
+  // Кожен запуск — власна копія висот (Заново = чистий стан).
+  const hf = useMemo<Heightfield>(() => ({ w: data.hf.w, h: data.hf.h, data: data.hf.data.slice(), gloss: new Float32Array(data.hf.data.length) }), [data.hf]);
+  const G = meta.grid;
+  const dirty = useRef({ y0: 0, y1: hf.h - 1, any: true });
+  const settling = useRef<{ x0: number; y0: number; x1: number; y1: number; until: number }[]>([]);
+  const settledOnce = useRef(false);
 
-  const st = useRef({
-    hf: null as Heightfield | null,
-    wet: new Float32Array(0),
-    off: null as HTMLCanvasElement | null,
-    img: null as ImageData | null,
-    w: 1,
-    h: 1,
-    dpr: 1,
-    cell: 1,
-    stones: [] as Stone[],
-    drops: [] as Drop[],
-    rings: [] as Ring[],
-    gesture: null as null | { pointer: number; kind: "draw" | "stone"; stone?: Stone; last: { x: number; y: number }; moved: number; start: { x: number; y: number } },
-    slump: { x0: 0, y0: 0, x1: 0, y1: 0, t: 0 },
-    sandDirty: true,
-    frame: 0,
-    source: { x: 0, y: 0 },
-    spawnAcc: 0,
-    maxDrops: 240,
-    wetAt: 0,
-  });
-
-  const init = () => {
-    const s = st.current;
-    const root = rootRef.current!;
-    s.w = root.clientWidth;
-    s.h = root.clientHeight;
-    s.dpr = detectQuality().dpr;
-    const low = detectQuality().tier === "low";
-    const gw = low ? 120 : 170;
-    const gh = Math.max(40, Math.round((gw * s.h) / s.w));
-    s.cell = s.w / gw;
-    s.maxDrops = low ? 140 : 240;
-    const hf = createHeightfield(gw, gh);
-    for (let y = 0; y < gh; y++)
-      for (let x = 0; x < gw; x++) {
-        // Пологий схил донизу + вітрові брижі.
-        hf.data[y * gw + x] = 1.4 - (y / gh) * 0.5 + 0.0035 * Math.sin(x * 0.32 + Math.sin(y * 0.12) * 2.5) + (hash2(x, y) - 0.5) * 0.003;
-      }
-    s.hf = hf;
-    s.wet = new Float32Array(gw * gh);
-    s.off = document.createElement("canvas");
-    s.off.width = gw;
-    s.off.height = gh;
-    s.img = s.off.getContext("2d")!.createImageData(gw, gh);
-    s.stones = Array.from({ length: 5 }, (_, i) => ({
-      x: s.w * (0.18 + 0.64 * hash2(i, 11)),
-      y: s.h * (0.3 + 0.55 * hash2(i, 12)),
-      r: 14 + hash2(i, 13) * 14,
-      ry: 0.72 + hash2(i, 14) * 0.2,
-      rot: hash2(i, 15) * Math.PI,
-      tone: hash2(i, 16),
+  const pebbles = useRef<Pebble[]>([]);
+  if (pebbles.current.length === 0) {
+    pebbles.current = meta.stones.map((m, i) => ({
+      sprite: sprites[i]!,
+      x: m.x + m.w / 2,
+      y: m.y + m.h / 2,
+      vx: 0,
+      vy: 0,
+      rot: 0,
+      lift: 0,
+      onWood: false,
+      original: true,
+      homeX: m.x + m.w / 2,
+      homeY: m.y + m.h / 2,
+      dropTo: null,
+      z: i,
     }));
-    s.source = { x: s.w * 0.3, y: -6 };
-    s.sandDirty = true;
-  };
+  }
+  const drag = useRef<{ kind: "pebble"; i: number; id: number; ox: number; oy: number; tx: number; ty: number } | { kind: "sand"; id: number; lx: number; ly: number } | null>(null);
 
-  const gridOf = (x: number, y: number) => ({ gx: x / st.current.cell, gy: y / st.current.cell });
+  // Вид: на вузькому екрані лоток повертається на 90°, щоб камінці не були дрібними.
+  const view = useMemo(() => {
+    const W = size.width;
+    const H = size.height;
+    const tw = TRAY.x1 - TRAY.x0;
+    const th = TRAY.y1 - TRAY.y0;
+    const rotate = W / Math.max(1, H) < 0.95;
+    const s = rotate ? Math.min(W / th, H / tw) : Math.min(W / tw, H / th);
+    // світ → екран: x' = a*x + c*y + e; y' = b*x + d*y + f
+    const cx = (TRAY.x0 + TRAY.x1) / 2;
+    const cy = (TRAY.y0 + TRAY.y1) / 2;
+    const m = rotate ? { a: 0, b: s, c: -s, d: 0 } : { a: s, b: 0, c: 0, d: s };
+    const e = W / 2 - (m.a * cx + m.c * cy);
+    const f = H / 2 - (m.b * cx + m.d * cy);
+    return { ...m, e, f, s, rotate };
+  }, [size]);
+  const toWorld = useCallback(
+    (x: number, y: number) => {
+      const { a, b, c, d, e, f } = view;
+      const det = a * d - b * c;
+      const dx = x - e;
+      const dy = y - f;
+      return { x: (d * dx - c * dy) / det, y: (-b * dx + a * dy) / det };
+    },
+    [view],
+  );
 
-  const heightAt = (x: number, y: number) => {
-    const s = st.current;
-    const hf = s.hf!;
-    const gx = Math.max(0, Math.min(hf.w - 1, Math.round(x / s.cell)));
-    const gy = Math.max(0, Math.min(hf.h - 1, Math.round(y / s.cell)));
-    return hf.data[gy * hf.w + gx]!;
-  };
-
-  const markSlump = (gx: number, gy: number, r: number) => {
-    const sl = st.current.slump;
-    if (sl.t <= 0) {
-      Object.assign(sl, { x0: gx - r, y0: gy - r, x1: gx + r, y1: gy + r });
-    } else {
-      sl.x0 = Math.min(sl.x0, gx - r);
-      sl.y0 = Math.min(sl.y0, gy - r);
-      sl.x1 = Math.max(sl.x1, gx + r);
-      sl.y1 = Math.max(sl.y1, gy + r);
-    }
-    sl.t = 1.6; // секунди осипання після жесту
-  };
-
-  const plow = (x: number, y: number, r: number, amount: number) => {
-    const s = st.current;
-    const { gx, gy } = gridOf(x, y);
-    dent(s.hf!, gx, gy, r / s.cell, amount);
-    markSlump(gx, gy, (r / s.cell) * 3);
-    s.sandDirty = true;
-  };
-
-  const drawSand = () => {
-    const s = st.current;
-    const ctx = sandRef.current?.getContext("2d");
-    if (!ctx || !s.hf || !s.img || !s.off) return;
-    shade(s.hf, s.img.data, SAND, undefined, s.wet);
-    s.off.getContext("2d")!.putImageData(s.img, 0, 0);
-    ctx.setTransform(s.dpr, 0, 0, s.dpr, 0, 0);
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(s.off, 0, 0, s.w, s.h);
-    // Камінці: тінь, тіло, відблиск.
-    for (const k of s.stones) {
-      ctx.save();
-      ctx.translate(k.x, k.y);
-      ctx.rotate(k.rot);
-      ctx.fillStyle = "rgba(20,25,28,0.45)";
-      ctx.filter = "blur(4px)";
-      ctx.beginPath();
-      ctx.ellipse(4, 6, k.r * 1.05, k.r * k.ry * 1.05, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.filter = "none";
-      // Матовий камінь: мʼяке світло без дзеркального блиску + крапчаста фактура.
-      const g = ctx.createRadialGradient(-k.r * 0.3, -k.r * 0.35, k.r * 0.2, 0, 0, k.r * 1.15);
-      const base = 92 + k.tone * 36;
-      g.addColorStop(0, `rgb(${base + 34},${base + 38},${base + 40})`);
-      g.addColorStop(0.7, `rgb(${base},${base + 4},${base + 8})`);
-      g.addColorStop(1, `rgb(${base - 34},${base - 30},${base - 26})`);
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, k.r, k.r * k.ry, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.save();
-      ctx.clip();
-      for (let i = 0; i < 26; i++) {
-        ctx.fillStyle = i % 2 ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.12)";
-        ctx.fillRect((hash2(i, k.tone * 99) - 0.5) * k.r * 2, (hash2(k.tone * 77, i) - 0.5) * k.r * 2, 1.4, 1.4);
-      }
-      ctx.restore();
-      ctx.restore();
-    }
-  };
-
-  const drawWater = () => {
-    const s = st.current;
-    const ctx = waterRef.current?.getContext("2d");
-    if (!ctx) return;
-    ctx.setTransform(s.dpr, 0, 0, s.dpr, 0, 0);
-    ctx.clearRect(0, 0, s.w, s.h);
-    for (const d of s.drops) {
-      const g = ctx.createRadialGradient(d.x - 1, d.y - 1, 0, d.x, d.y, 10);
-      g.addColorStop(0, "rgba(196,224,230,0.75)");
-      g.addColorStop(0.4, "rgba(120,170,182,0.45)");
-      g.addColorStop(1, "rgba(110,154,156,0)");
-      ctx.fillStyle = g;
-      ctx.fillRect(d.x - 10, d.y - 10, 20, 20);
-    }
-    // Кола від дотику.
-    for (const r of s.rings) {
-      const rad = 6 + r.t * 70;
-      ctx.strokeStyle = `rgba(226,238,242,${0.7 * (1 - r.t)})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.ellipse(r.x, r.y, rad, rad * 0.8, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      if (r.t > 0.15) {
-        ctx.beginPath();
-        ctx.ellipse(r.x, r.y, rad * 0.6, rad * 0.48, 0, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    }
-  };
-
-  const wake = useFrameLoop(rootRef, (dt) => {
-    const s = st.current;
-    const hf = s.hf;
-    if (!hf) return false;
-    s.frame++;
-    // Осипання після жесту.
-    if (s.slump.t > 0) {
-      s.slump.t -= dt;
-      for (let k = 0; k < 2; k++) if (relax(hf, s.slump.x0, s.slump.y0, s.slump.x1, s.slump.y1, TALUS, 0.18)) s.sandDirty = true;
-    }
-    // Струмок.
-    if (flowRef.current && s.drops.length < s.maxDrops) {
-      s.spawnAcc += dt * 60;
-      while (s.spawnAcc > 1) {
-        s.spawnAcc -= 1;
-        s.drops.push({ x: s.source.x + (Math.random() - 0.5) * 10, y: s.source.y, vx: (Math.random() - 0.5) * 10, vy: 40, life: 0 });
-      }
-    }
-    const e = s.cell * 1.5;
-    for (const d of s.drops) {
-      // Вода тече вниз за рельєфом (градієнт висоти) + легкий ухил кадру донизу.
-      const gx = (heightAt(d.x - e, d.y) - heightAt(d.x + e, d.y)) / (2 * e);
-      const gy = (heightAt(d.x, d.y - e) - heightAt(d.x, d.y + e)) / (2 * e);
-      // Сила схилу: перепади висот на піксель малі, тому масштаб великий; борозни ведуть воду.
-      d.vx += gx * 300000 * dt;
-      d.vy += (gy * 300000 + 30) * dt;
-      const damp = Math.pow(0.08, dt);
-      d.vx *= damp;
-      d.vy *= damp;
-      d.x += d.vx * dt;
-      d.y += d.vy * dt;
-      d.life += dt;
-      // Огинає камінці.
-      for (const k of s.stones) {
-        const dx = d.x - k.x;
-        const dy = d.y - k.y;
-        const dist = Math.hypot(dx, dy);
-        const rr = k.r + 3;
-        if (dist < rr) {
-          const nx = dx / (dist || 1);
-          const ny = dy / (dist || 1);
-          d.x = k.x + nx * rr;
-          d.y = k.y + ny * rr;
-          const vn = d.vx * nx + d.vy * ny;
-          if (vn < 0) {
-            d.vx -= vn * nx;
-            d.vy -= vn * ny;
-          }
-        }
-      }
-      // Мокрий слід.
-      const cx = Math.floor(d.x / s.cell);
-      const cy = Math.floor(d.y / s.cell);
-      if (cx >= 0 && cy >= 0 && cx < hf.w && cy < hf.h) s.wet[cy * hf.w + cx] = Math.min(1, s.wet[cy * hf.w + cx]! + 0.05);
-    }
-    s.drops = s.drops.filter((d) => d.y < s.h + 10 && d.x > -10 && d.x < s.w + 10 && d.life < 18);
-    // Мокре повільно висихає.
-    if (s.frame % 6 === 0) {
-      for (let i = 0; i < s.wet.length; i++) s.wet[i] = s.wet[i]! * 0.985;
-      s.sandDirty = true;
-    }
-    for (const r of s.rings) r.t += dt * (reducedMotion ? 2 : 0.7);
-    s.rings = s.rings.filter((r) => r.t < 1);
-    if (s.sandDirty && (s.gesture || s.slump.t > 0 || s.frame % 3 === 0)) {
-      drawSand();
-      s.sandDirty = false;
-    }
-    drawWater();
-    return s.drops.length > 0 || s.rings.length > 0 || s.slump.t > 0 || Boolean(s.gesture) || flowRef.current;
-  });
-
+  // WebGL: пісок із попіксельним освітленням. Тло (дерево) — те саме фото, без рельєфу (маска).
   useEffect(() => {
-    const root = rootRef.current;
-    const a = sandRef.current;
-    const b = waterRef.current;
-    if (!root || !a || !b || !a.getContext("2d")) {
-      setFailed(true);
+    const c = document.createElement("canvas");
+    glCanvas.current = c;
+    const r = createHeightGL(c, { gw: hf.w, gh: hf.h, albedo: tray, mask, light: meta.light, relief: 1 / G, specular: 0.04, shininess: 30, solid: false });
+    if (!r) {
+      setGlFailed(true);
       return;
     }
-    const s = st.current;
-    const resize = () => {
-      if (!s.hf) init();
-      else {
-        // Поворот/ресайз: розтягуємо поле на новий розмір, нічого не скидаючи.
-        const sx = root.clientWidth / s.w;
-        const sy = root.clientHeight / s.h;
-        for (const k of s.stones) {
-          k.x *= sx;
-          k.y *= sy;
-        }
-        s.w = root.clientWidth;
-        s.h = root.clientHeight;
-        s.cell = s.w / s.hf.w;
-        s.source = { x: s.w * 0.3, y: -6 };
-        s.sandDirty = true;
-      }
-      for (const c of [a, b]) {
-        c.width = Math.round(s.w * s.dpr);
-        c.height = Math.round(s.h * s.dpr);
-      }
-      drawSand();
-      wake();
-    };
-    resize();
-    const ro = new ResizeObserver(resize);
-    ro.observe(root);
-    const unbind = bindPointer(root, {
-      down: (p) => {
-        const stone = s.stones.find((k) => Math.hypot(p.x - k.x, (p.y - k.y) / k.ry) < k.r + 8);
-        s.gesture = { pointer: p.id, kind: stone ? "stone" : "draw", stone, last: p, moved: 0, start: p };
-        if (stone) {
-          s.stones = [...s.stones.filter((k) => k !== stone), stone];
-          sound.play("thud", 0.25);
-        }
-        wake();
-      },
-      move: (p) => {
-        const g = s.gesture;
-        if (!g || g.pointer !== p.id) return;
-        const dx = p.x - g.last.x;
-        const dy = p.y - g.last.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist < 2) return;
-        g.moved = Math.max(g.moved, Math.hypot(p.x - g.start.x, p.y - g.start.y));
-        // Рівномірні кроки вздовж руху — борозна без пропусків.
-        const steps = Math.ceil(dist / 4);
-        for (let k = 1; k <= steps; k++) {
-          const x = g.last.x + (dx * k) / steps;
-          const y = g.last.y + (dy * k) / steps;
-          if (g.kind === "stone" && g.stone) {
-            g.stone.x = x;
-            g.stone.y = y;
-            plow(x, y, g.stone.r * 0.8, 0.012);
-          } else plow(x, y, 12, 0.03);
-        }
-        if (Math.random() < 0.15) sound.play("soft", 0.08);
-        g.last = p;
-        wake();
-      },
-      up: (p) => {
-        const g = s.gesture;
-        if (g && g.kind === "draw" && g.moved < 6) {
-          // Дотик без руху — кола.
-          s.rings.push({ x: p.x, y: p.y, t: 0 });
-          for (const d of s.drops) {
-            const dx = d.x - p.x;
-            const dy = d.y - p.y;
-            const dd = Math.hypot(dx, dy);
-            if (dd < 80) {
-              d.vx += (dx / (dd || 1)) * 60;
-              d.vy += (dy / (dd || 1)) * 60;
-            }
-          }
-          sound.play("water", 0.4);
-          haptic(5);
-        }
-        s.gesture = null;
-        wake();
-      },
-    });
-    setHint("Веди пальцем по піску. Камінці можна пересувати. Вода знайде дорогу сама.");
+    gl.current = r;
+    r.upload(hf.data);
+    dirty.current.any = true;
+    const onLost = () => setGlFailed(true);
+    c.addEventListener("webglcontextlost", onLost);
     return () => {
-      ro.disconnect();
-      unbind();
+      c.removeEventListener("webglcontextlost", onLost);
+      r.dispose();
+      gl.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- привʼязка один раз
-  }, []);
+  }, [hf, tray, mask, meta.light, G]);
 
-  /** Клавіатура: провести борозну / кинути камінець у воду. */
-  const furrow = () => {
-    const s = st.current;
-    const y0 = s.h * (0.3 + Math.random() * 0.4);
-    for (let x = s.w * 0.1; x < s.w * 0.9; x += 4) plow(x, y0 + Math.sin(x / 40) * 20, 12, 0.03);
-    sound.play("soft", 0.2);
+  // Розмір GL-полотна — під фактичний розмір на екрані (чітко, але без зайвих пікселів).
+  useEffect(() => {
+    const r = gl.current;
+    if (!r || !size.width) return;
+    const k = Math.min(1, view.s * size.dpr);
+    r.resize(Math.round(meta.size[0] * k), Math.round(meta.size[1] * k));
+    dirty.current.any = true;
+  }, [view.s, size, meta.size]);
+
+  /** Запасний рендер без WebGL: тінь рельєфу поверх фото (м'яке світло). */
+  const fallbackShade = useRef<HTMLCanvasElement | null>(null);
+  const renderFallback = useCallback(() => {
+    let c = fallbackShade.current;
+    if (!c) {
+      c = document.createElement("canvas");
+      c.width = hf.w;
+      c.height = hf.h;
+      fallbackShade.current = c;
+    }
+    const g = c.getContext("2d")!;
+    const img = g.createImageData(hf.w, hf.h);
+    const L = meta.light;
+    for (let y = 1; y < hf.h - 1; y++)
+      for (let x = 1; x < hf.w - 1; x++) {
+        const i = y * hf.w + x;
+        const hx = (hf.data[i + 1]! - hf.data[i - 1]!) / (2 * G);
+        const hy = (hf.data[i + hf.w]! - hf.data[i - hf.w]!) / (2 * G);
+        const sh = 1 - ((L[0] * hx + L[1] * hy) / L[2]) * data.sandMask[i]!;
+        const v = Math.max(0, Math.min(255, sh * 128));
+        img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v;
+        img.data[i * 4 + 3] = 255;
+      }
+    g.putImageData(img, 0, 0);
+  }, [hf, G, meta.light, data.sandMask]);
+
+  const draw = useCallback(() => {
+    const g = ctx;
+    if (!g) return;
+    const { a, b, c, d, e, f } = view;
+    const dpr = size.dpr;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, g.canvas.width, g.canvas.height);
+    g.setTransform(dpr * a, dpr * b, dpr * c, dpr * d, dpr * e, dpr * f);
+    // Лоток + пісок.
+    if (dirty.current.any) {
+      if (gl.current && !gl.current.lost()) {
+        gl.current.uploadRows(hf.data, dirty.current.y0, dirty.current.y1);
+        gl.current.render();
+      } else renderFallback();
+      dirty.current = { y0: hf.h, y1: -1, any: false };
+    }
+    if (gl.current && !gl.current.lost() && glCanvas.current) g.drawImage(glCanvas.current, 0, 0, meta.size[0], meta.size[1]);
+    else {
+      g.drawImage(tray, 0, 0);
+      if (fallbackShade.current) {
+        g.save();
+        g.globalCompositeOperation = "soft-light";
+        g.drawImage(fallbackShade.current, 0, 0, meta.size[0], meta.size[1]);
+        g.restore();
+      }
+    }
+    // Камінці: ті, що лежать, — за порядком; піднятий — останнім.
+    const list = [...pebbles.current].sort((p, q) => p.z + p.lift * 100 - (q.z + q.lift * 100));
+    const Lx = -meta.light[0];
+    const Ly = -meta.light[1];
+    for (const p of list) {
+      const w = p.sprite.w;
+      const h = p.sprite.h;
+      if (p.lift > 1) drawSoftShadow(g, p.x + Lx * p.lift * 0.9, p.y + Ly * p.lift * 0.9 + 4, w * 0.9, h * 0.8, p.rot, 10 + p.lift * 0.5, Math.max(0.2, 0.5 - p.lift * 0.005), Math.min(w, h) / 2);
+      else contactShadow(g, p.x + Lx * 7, p.y + Ly * 7 + 3, w * 0.55, h * 0.5, p.onWood ? 0.6 : 0.5);
+      const sc = 1 + p.lift * 0.003;
+      g.save();
+      g.translate(p.x, p.y);
+      g.rotate(p.rot);
+      g.scale(sc, sc);
+      g.drawImage(p.sprite.img, -w / 2, -h / 2);
+      g.restore();
+    }
+  }, [ctx, view, size.dpr, hf, renderFallback, tray, meta.size, meta.light]);
+
+  const markDirty = (gy0: number, gy1: number) => {
+    const dd = dirty.current;
+    dd.any = true;
+    dd.y0 = Math.min(dd.y0, gy0);
+    dd.y1 = Math.max(dd.y1, gy1);
+  };
+
+  const wake = useFrameLoop(rootRef, (dt, now) => {
+    let busy = false;
+    const d = drag.current;
+    for (const [i, p] of pebbles.current.entries()) {
+      if (d && d.kind === "pebble" && d.i === i) {
+        const tx = d.tx - d.ox;
+        const ty = d.ty - d.oy;
+        const k = reducedMotion ? 140 : 110;
+        const c = reducedMotion ? 24 : 17;
+        p.vx += ((tx - p.x) * k - p.vx * c) * dt;
+        p.vy += ((ty - p.y) * k - p.vy * c) * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.rot += ((reducedMotion ? 0 : Math.max(-0.3, Math.min(0.3, p.vx * 0.0008))) - p.rot) * Math.min(1, dt * 6);
+        p.lift += (34 - p.lift) * Math.min(1, dt * 10);
+        busy = true;
+      } else if (p.dropTo) {
+        p.vx += ((p.dropTo.x - p.x) * 120 - p.vx * 16) * dt;
+        p.vy += ((p.dropTo.y - p.y) * 120 - p.vy * 16) * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.lift += (0 - p.lift) * Math.min(1, dt * 12);
+        p.rot *= 1 - Math.min(1, dt * 3);
+        busy = true;
+        if (Math.hypot(p.dropTo.x - p.x, p.dropTo.y - p.y) < 0.6 && p.lift < 0.6) {
+          p.dropTo = null;
+          p.lift = 0;
+          sound.play(p.onWood ? "thud" : "clay", 0.5);
+          haptic(8);
+          if (!p.onWood) pressInto(p);
+        }
+      }
+    }
+    // Осипання стінок ямок (кут природного укосу), поступово.
+    const act = settling.current.filter((r) => r.until > now);
+    settling.current = act;
+    for (const r of act) {
+      for (let k = 0; k < 2; k++) if (relax(hf, r.x0, r.y0, r.x1, r.y1, G * 0.45, 0.18)) markDirty(r.y0, r.y1);
+      busy = true;
+    }
+    draw();
+    return busy;
+  });
+
+  useEffect(() => {
+    draw();
+    wake();
+  }, [draw, wake]);
+
+  /** Ямка там, де лежав камінець: виймаємо пісок і трохи насипаємо валик; далі стінки осипаються. */
+  const liftFromSand = (p: Pebble) => {
+    const gx = p.x / G;
+    const gy = p.y / G;
+    const r = (Math.min(p.sprite.w, p.sprite.h) * 0.48) / G;
+    const sx = p.sprite.w / p.sprite.h;
+    // Ямка-чаша за формою камінця (еліпс), пісок — у мʼякий валик довкола.
+    bowl(hf, gx, gy, (p.sprite.w * 0.44) / G, (p.sprite.h * 0.44) / G, Math.min(p.sprite.w, p.sprite.h) * 0.085);
+    settling.current.push({ x0: gx - r * 2.6, y0: gy - r * 2.6, x1: gx + r * 2.6, y1: gy + r * 2.6, until: performance.now() + (reducedMotion ? 150 : 900) });
+    markDirty(gy - r * 3, gy + r * 3);
+  };
+  /** Покладений на пісок — легко вдавлюється. */
+  function pressInto(p: Pebble) {
+    const r = (Math.min(p.sprite.w, p.sprite.h) * 0.4) / G;
+    dent(hf, p.x / G, p.y / G, r, 2.5);
+    markDirty(p.y / G - r * 3, p.y / G + r * 3);
+  }
+
+  const inFree = (x: number, y: number) => x > meta.free[0] && x < meta.free[2] && y > meta.free[1] && y < meta.free[3];
+  const inSand = (x: number, y: number) => {
+    const gx = Math.round(x / G);
+    const gy = Math.round(y / G);
+    if (gx < 0 || gy < 0 || gx >= hf.w || gy >= hf.h) return false;
+    return data.sandMask[gy * hf.w + gx]! > 0.5;
+  };
+
+  /** Делікатне вирівнювання в рядок на вільному дереві, без жорсткого «прилипання». */
+  const alignOnWood = (p: Pebble, x: number, y: number) => {
+    const others = pebbles.current.filter((q) => q !== p && q.onWood && !q.dropTo);
+    let nx = x;
+    let ny = y;
+    if (others.length) {
+      const meanX = others.reduce((s, q) => s + q.x, 0) / others.length;
+      if (Math.abs(nx - meanX) < 45) nx += (meanX - nx) * 0.6;
+    }
+    // Не накладатися: відсунути вздовж рядка.
+    for (let it = 0; it < 6; it++) {
+      const hit = others.find((q) => Math.abs(q.x - nx) < (q.sprite.w + p.sprite.w) * 0.42 && Math.abs(q.y - ny) < (q.sprite.h + p.sprite.h) * 0.5);
+      if (!hit) break;
+      ny = hit.y + Math.sign(ny - hit.y || 1) * ((hit.sprite.h + p.sprite.h) * 0.52);
+    }
+    return { x: Math.max(meta.free[0] + p.sprite.w / 2, Math.min(meta.free[2] - p.sprite.w / 2, nx)), y: Math.max(meta.free[1] + p.sprite.h / 2, Math.min(meta.free[3] - p.sprite.h / 2, ny)) };
+  };
+
+  const updateCounts = useCallback(() => {
+    const onWood = pebbles.current.filter((p) => p.onWood).length;
+    const inSandN = pebbles.current.length - onWood;
+    setCounts({ inSand: inSandN, onWood });
+    if (inSandN === 0 && toolRef.current === "stones") setHint("Камінці на своїх місцях. Тепер можна розрівняти пісок.");
+  }, [setHint]);
+
+  /** Наскільки пісок нерівний (середній модуль лапласіана). */
+  const roughness = () => {
+    let sum = 0;
+    let n = 0;
+    for (let y = 2; y < hf.h - 2; y += 2)
+      for (let x = 2; x < hf.w - 2; x += 2) {
+        const i = y * hf.w + x;
+        if (data.sandMask[i]! < 0.9) continue;
+        sum += Math.abs(hf.data[i - 1]! + hf.data[i + 1]! + hf.data[i - hf.w]! + hf.data[i + hf.w]! - 4 * hf.data[i]!);
+        n++;
+      }
+    return n ? sum / n : 0;
+  };
+  const startRough = useRef<number | null>(null);
+
+  /** Розрівнювання: висоти тягнуться до локального середнього й до рівної площини. */
+  const level = (wx: number, wy: number) => {
+    const gx = wx / G;
+    const gy = wy / G;
+    const R = 18;
+    const x0 = Math.max(2, Math.floor(gx - R));
+    const x1 = Math.min(hf.w - 3, Math.ceil(gx + R));
+    const y0 = Math.max(2, Math.floor(gy - R));
+    const y1 = Math.min(hf.h - 3, Math.ceil(gy + R));
+    const src = hf.data.slice();
+    for (let y = y0; y <= y1; y++)
+      for (let x = x0; x <= x1; x++) {
+        const i = y * hf.w + x;
+        const m = data.sandMask[i]!;
+        if (m < 0.05) continue;
+        const dd = Math.hypot(x - gx, y - gy) / R;
+        if (dd >= 1) continue;
+        let acc = 0;
+        let cnt = 0;
+        for (let oy = -4; oy <= 4; oy += 2)
+          for (let ox = -4; ox <= 4; ox += 2) {
+            acc += src[i + oy * hf.w + ox]!;
+            cnt++;
+          }
+        const w = (1 - dd * dd) * 0.75 * m;
+        hf.data[i] = src[i]! + (acc / cnt - src[i]!) * w;
+        hf.data[i] *= 1 - 0.12 * w; // поступово до рівної площини
+      }
+    markDirty(y0, y1);
+  };
+
+  usePointer(rootRef, {
+    down: (p) => {
+      if (drag.current) return false;
+      const w = toWorld(p.x, p.y);
+      onInteract();
+      if (toolRef.current === "stones") {
+        const order = [...pebbles.current.entries()].sort((a, b) => b[1].z - a[1].z);
+        for (const [i, pb] of order) {
+          if (pb.dropTo) continue;
+          const lx = w.x - pb.x + pb.sprite.w / 2;
+          const ly = w.y - pb.y + pb.sprite.h / 2;
+          if (!opaqueAt(pb.sprite, lx, ly, 60) && Math.hypot(w.x - pb.x, w.y - pb.y) > Math.min(pb.sprite.w, pb.sprite.h) * 0.55) continue;
+          const lift = p.type === "touch" ? 26 / view.s : 0;
+          drag.current = { kind: "pebble", i, id: p.id, ox: w.x - pb.x, oy: w.y - pb.y + lift, tx: w.x, ty: w.y };
+          pb.z = 100 + i;
+          pb.vx = pb.vy = 0;
+          if (!pb.onWood) liftFromSand(pb);
+          pb.original = false;
+          sound.play("clay", 0.3);
+          wake();
+          return;
+        }
+      }
+      if (!inSand(w.x, w.y)) return false;
+      drag.current = { kind: "sand", id: p.id, lx: w.x, ly: w.y };
+      startRough.current ??= roughness();
+      wake();
+    },
+    move: (p) => {
+      const d = drag.current;
+      if (!d || d.id !== p.id) return;
+      const w = toWorld(p.x, p.y);
+      if (d.kind === "pebble") {
+        d.tx = w.x;
+        d.ty = w.y;
+      } else {
+        // Крокуємо вздовж руху: рівна борозна або рівномірне розрівнювання.
+        const dist = Math.hypot(w.x - d.lx, w.y - d.ly);
+        const steps = Math.max(1, Math.ceil(dist / (G * 1.5)));
+        for (let k = 1; k <= steps; k++) {
+          const x = d.lx + ((w.x - d.lx) * k) / steps;
+          const y = d.ly + ((w.y - d.ly) * k) / steps;
+          if (!inSand(x, y)) continue;
+          if (toolRef.current === "level") level(x, y);
+          else {
+            dent(hf, x / G, y / G, 3.2, 1.6);
+            markDirty(y / G - 8, y / G + 8);
+          }
+        }
+        if (toolRef.current === "level" && Math.random() < 0.08) sound.play("paper", 0.15);
+        d.lx = w.x;
+        d.ly = w.y;
+      }
+      wake();
+    },
+    up: (p, cancelled) => {
+      const d = drag.current;
+      if (!d || d.id !== p.id) return;
+      drag.current = null;
+      if (d.kind === "sand") {
+        if (toolRef.current === "level" && startRough.current !== null && !settledOnce.current) {
+          const r = roughness();
+          if (r < startRough.current * 0.45 && pebbles.current.every((q) => q.onWood)) {
+            settledOnce.current = true;
+            onSettled();
+            setHint("Рівно. Можна продовжувати скільки хочеш.");
+          }
+        }
+        wake();
+        return;
+      }
+      const pb = pebbles.current[d.i]!;
+      const x = pb.x;
+      const y = pb.y;
+      if (!cancelled && inFree(x, y)) {
+        pb.onWood = true;
+        pb.dropTo = alignOnWood(pb, x, y);
+      } else if (!cancelled && inSand(x, y)) {
+        pb.onWood = false;
+        pb.dropTo = { x, y };
+      } else {
+        // Поза лотком чи перерваний жест — назад, де лежав.
+        pb.dropTo = { x: pb.homeX, y: pb.homeY };
+        if (!pb.onWood) pb.onWood = inFree(pb.homeX, pb.homeY);
+      }
+      pb.homeX = pb.dropTo.x;
+      pb.homeY = pb.dropTo.y;
+      pb.z = pb.onWood ? 50 + pebbles.current.filter((q) => q.onWood).length : d.i;
+      updateCounts();
+      wake();
+    },
+  });
+
+  const setToolBoth = (t: Tool) => {
+    setTool(t);
+    toolRef.current = t;
+    setHint(t === "level" ? "Веди пальцем по піску — він вирівнюється під рукою." : "Перенеси камінці на вільну частину дошки.");
+  };
+
+  /** Кнопкова альтернатива: наступний камінець — на вільне дерево. */
+  const moveNext = () => {
+    const pb = pebbles.current.find((q) => !q.onWood && !q.dropTo);
+    if (!pb) return;
+    onInteract();
+    liftFromSand(pb);
+    pb.original = false;
+    pb.onWood = true;
+    const n = pebbles.current.filter((q) => q.onWood).length;
+    const fx = (meta.free[0] + meta.free[2]) / 2;
+    pb.dropTo = alignOnWood(pb, fx, meta.free[1] + 60 + (n - 1) * 46);
+    pb.homeX = pb.dropTo.x;
+    pb.homeY = pb.dropTo.y;
+    pb.z = 50 + n;
+    pb.lift = 30;
+    updateCounts();
     wake();
   };
-  const ripple = () => {
-    const s = st.current;
-    s.rings.push({ x: s.w * (0.3 + Math.random() * 0.4), y: s.h * (0.4 + Math.random() * 0.3), t: 0 });
-    sound.play("water", 0.4);
+  const levelAll = () => {
+    onInteract();
+    for (let y = 8; y < hf.h; y += 18) for (let x = 8; x < hf.w; x += 18) if (inSand(x * G, y * G)) level(x * G, y * G);
     wake();
   };
-
-  if (failed) return <div className="grid h-full place-items-center px-6 text-center text-mist">Цей пристрій не показує сцену. Спробуй іншу дію.</div>;
 
   return (
-    <div className="flex h-full flex-col">
-      <div ref={rootRef} className="scene-surface relative min-h-0 flex-1 overflow-hidden">
-        <canvas ref={sandRef} role="img" aria-label="Пісок із камінцями й струмком. Веди пальцем, пересувай камінці." className="absolute inset-0 h-full w-full" />
-        <canvas ref={waterRef} aria-hidden className="pointer-events-none absolute inset-0 h-full w-full [filter:blur(1.5px)]" />
-      </div>
-      <div className="flex flex-wrap justify-center gap-2 px-3 pt-2">
-        <button type="button" role="switch" aria-checked={flow} className={cn("scene-btn border", flow ? "border-frost bg-frost text-abyss hover:bg-white hover:text-abyss" : "border-steel/50")} onClick={() => {
-          setFlow((v) => !v);
-          wake();
-        }}>
-          Струмок
-        </button>
-        <button type="button" className="scene-btn border border-steel/50" onClick={furrow}>
-          Провести борозну
-        </button>
-        <button type="button" className="scene-btn border border-steel/50" onClick={ripple}>
-          Кола на воді
-        </button>
+    <div ref={rootRef} className="scene-surface relative h-full w-full overflow-hidden">
+      <canvas ref={canvasRef} aria-hidden className="absolute inset-0 h-full w-full" />
+      {glFailed && <p className="absolute inset-x-0 top-2 text-center text-xs text-mist">Спрощене освітлення піску (WebGL недоступний).</p>}
+      <div className="absolute inset-x-0 bottom-1 z-10 flex flex-wrap items-center justify-center gap-2 px-2">
+        <div role="radiogroup" aria-label="Що робити" className="flex overflow-hidden rounded-[var(--radius-hair)] border border-steel/50 bg-night/70">
+          {(
+            [
+              ["stones", "Камінці"],
+              ["level", "Розрівняти"],
+            ] as const
+          ).map(([t, l]) => (
+            <button key={t} type="button" role="radio" aria-checked={tool === t} onClick={() => setToolBoth(t)} className={cn("min-h-11 px-4 text-sm", tool === t ? "bg-frost text-abyss" : "text-frost/85 hover:bg-night")}>
+              {l}
+            </button>
+          ))}
+        </div>
+        {tool === "stones" ? (
+          <button type="button" onClick={moveNext} disabled={counts.inSand === 0} className="scene-btn border border-steel/50 bg-night/70 text-sm disabled:opacity-40">
+            Перекласти камінець
+          </button>
+        ) : (
+          <button type="button" onClick={levelAll} className="scene-btn border border-steel/50 bg-night/70 text-sm">
+            Пригладити все
+          </button>
+        )}
+        <span className="sr-only" aria-live="polite">
+          У піску: {counts.inSand}, на дереві: {counts.onWood}
+        </span>
       </div>
     </div>
   );

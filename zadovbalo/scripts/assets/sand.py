@@ -37,7 +37,20 @@ def stone_mask(img, rect, i):
     hull = cv2.convexHull(max(cnts, key=cv2.contourArea))
     out = np.zeros_like(fg)
     cv2.fillPoly(out, [hull], 255)
-    return cv2.erode(out, np.ones((3, 3), np.uint8))
+    out = cv2.erode(out, np.ones((5, 5), np.uint8))
+    # Прибрати світлий обідок піску по краю (колір близький до піску поруч).
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB).astype(np.float32)
+    ring = cv2.dilate(out, np.ones((25, 25), np.uint8)) - cv2.dilate(out, np.ones((9, 9), np.uint8))
+    sand_col = lab[ring > 0].mean(0)
+    edge = (out > 0) & (cv2.erode(out, np.ones((11, 11), np.uint8)) == 0)
+    close = np.linalg.norm(lab - sand_col, axis=2) < 30
+    out[edge & close] = 0
+    out = cv2.morphologyEx(out, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)))
+    cnts, _ = cv2.findContours(out, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    hull = cv2.convexHull(max(cnts, key=cv2.contourArea))
+    final = np.zeros_like(out)
+    cv2.fillPoly(final, [hull], 255)
+    return cv2.bitwise_and(final, cv2.dilate(out, np.ones((3, 3), np.uint8)))
 
 
 def integrate(g, l):
@@ -77,7 +90,8 @@ def run():
     sand = cv2.morphologyEx(sand, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
 
     # Прибрати камінці разом із контактною тінню й дорисувати пісок.
-    holes = cv2.dilate(all_st, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (29, 29)))
+    # маски після підрізання менші за камінь — для дорисовки піску беремо з запасом
+    holes = cv2.dilate(all_st, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (45, 45)))
     visible = cv2.bitwise_and(sand, cv2.bitwise_not(holes))
     tray = synthesize_hidden(img, visible, sand, seed=11)
 
