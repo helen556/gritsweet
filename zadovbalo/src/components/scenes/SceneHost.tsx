@@ -15,34 +15,17 @@ function Loading() {
 
 /** Кожна сцена — окремий чанк; важкі ефекти й матеріали не потрапляють у перший екран. */
 const SCENE_COMPONENTS: Record<SceneId, React.ComponentType<SceneProps>> = {
-  debt: dynamic(() => import("./debt/DebtScene"), {
-    ssr: false,
-    loading: Loading,
-  }),
-  backpack: dynamic(() => import("./backpack/BackpackScene"), {
-    ssr: false,
-    loading: Loading,
-  }),
-  yarn: dynamic(() => import("./yarn/YarnScene"), {
-    ssr: false,
-    loading: Loading,
-  }),
-  sand: dynamic(() => import("./sand/SandScene"), {
-    ssr: false,
-    loading: Loading,
-  }),
-  clay: dynamic(() => import("./clay/ClayScene"), {
-    ssr: false,
-    loading: Loading,
-  }),
-  war_map: dynamic(() => import("./war/WarMapScene"), {
-    ssr: false,
-    loading: Loading,
-  }),
-  unsaid: dynamic(() => import("./unsaid/UnsaidScene"), {
-    ssr: false,
-    loading: Loading,
-  }),
+  debt: dynamic(() => import("./debt/DebtScene"), { ssr: false, loading: Loading }),
+  backpack: dynamic(() => import("./backpack/BackpackScene"), { ssr: false, loading: Loading }),
+  yarn: dynamic(() => import("./yarn/YarnScene"), { ssr: false, loading: Loading }),
+  sand: dynamic(() => import("./sand/SandScene"), { ssr: false, loading: Loading }),
+  dishes: dynamic(() => import("./dishes/DishesScene"), { ssr: false, loading: Loading }),
+  bubble: dynamic(() => import("./bubble/BubbleScene"), { ssr: false, loading: Loading }),
+  candle: dynamic(() => import("./candle/CandleScene"), { ssr: false, loading: Loading }),
+  stay: dynamic(() => import("./stay/StayScene"), { ssr: false, loading: Loading }),
+  can: dynamic(() => import("./can/CanScene"), { ssr: false, loading: Loading }),
+  war_map: dynamic(() => import("./war/WarMapScene"), { ssr: false, loading: Loading }),
+  unsaid: dynamic(() => import("./unsaid/UnsaidScene"), { ssr: false, loading: Loading }),
 };
 
 export function SceneHost({
@@ -51,12 +34,14 @@ export function SceneHost({
   topicNote,
   onExit,
   onEditInput,
+  onSwitch,
 }: {
   id: SceneId;
   input: SceneInput;
   topicNote?: string | null;
   onExit: (kind: SceneExit) => void;
   onEditInput?: () => void;
+  onSwitch?: (id: SceneId) => void;
 }) {
   return (
     <SceneShell
@@ -66,6 +51,7 @@ export function SceneHost({
       topicNote={topicNote}
       onExit={onExit}
       onEditInput={onEditInput}
+      onSwitch={onSwitch}
     />
   );
 }

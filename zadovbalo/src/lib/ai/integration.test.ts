@@ -54,6 +54,18 @@ describe("analyzeText", () => {
     expect(r.status === "ok" && r.analysis.sceneIds).toEqual(["backpack"]);
   });
 
+  it("clay (removed scene) migrates to bubble; scenes outside the categories are dropped", async () => {
+    const r = await analyzeText("бісить усе", deps(fixed(ok({ categories: ["anger"], primaryCategory: "anger", sceneIds: ["clay", "war_map", "debt"] }))));
+    expect(r).toMatchObject({ status: "ok", analysis: { categories: ["anger"], sceneIds: ["bubble"] } });
+  });
+
+  it("new states are valid categories with their own scenes", async () => {
+    const r = await analyzeText("втомилась, хочу паузу", deps(fixed(ok({ categories: ["pause"], primaryCategory: "pause", sceneIds: [] }))));
+    expect(r).toMatchObject({ status: "ok", analysis: { categories: ["pause"], sceneIds: ["can", "bubble", "candle"] } });
+    const l = await analyzeText("сумно", deps(fixed(ok({ categories: ["lonely"], primaryCategory: "lonely", sceneIds: ["stay"] }))));
+    expect(l).toMatchObject({ status: "ok", analysis: { sceneIds: ["stay"] } });
+  });
+
   it("migrates legacy names from the model (hurtful_words → unsaid_words, stickers → unsaid)", async () => {
     const r = await analyzeText("я так і не сказала йому", deps(fixed(ok({ categories: ["hurtful_words"], primaryCategory: "hurtful_words", sceneIds: ["stickers"] }))));
     expect(r).toMatchObject({ status: "ok", analysis: { categories: ["unsaid_words"], primaryCategory: "unsaid_words", sceneIds: ["unsaid"] } });

@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { sound } from "@/lib/scene/sound";
-import type { SceneMeta } from "@/lib/scenes/registry";
+import type { SceneId, SceneMeta } from "@/lib/scenes/registry";
 import type { SceneInput, SceneProps } from "./types";
 
 export type SceneExit = "change" | "write" | "enough";
@@ -21,14 +21,16 @@ export function SceneShell({
   topicNote,
   onExit,
   onEditInput,
+  onSwitch,
 }: {
   meta: SceneMeta;
   Scene: React.ComponentType<SceneProps>;
   input: SceneInput;
-  /** «Тему визначено …» — з кнопкою змінити. */
+  /** «Сцену підібрано …» — з кнопкою обрати іншу. */
   topicNote?: string | null;
   onExit: (kind: SceneExit) => void;
   onEditInput?: () => void;
+  onSwitch?: (id: SceneId) => void;
 }) {
   const reducedMotion = Boolean(useReducedMotion());
   const [runId, setRunId] = useState(0);
@@ -61,10 +63,22 @@ export function SceneShell({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  useEffect(() => {
+    const off = sound.onChange(setSoundOn);
+    return () => {
+      off();
+    };
+  }, []);
+
   const toggleSound = () => {
     if (sound.enabled) sound.disable();
     else sound.enable();
     setSoundOn(sound.enabled);
+  };
+
+  // Людина вже обирала «Звук: увімкнено» раніше — вмикаємо з першим дотиком (жест розблоковує аудіо, автозапуску немає).
+  const unlockOnGesture = () => {
+    if (!sound.enabled && sound.preferred) sound.enable(false);
   };
 
   const restart = () => {
@@ -83,6 +97,8 @@ export function SceneShell({
       className="scene-backdrop fixed inset-0 z-40 flex flex-col overflow-hidden text-frost"
       role="region"
       aria-label={meta.title}
+      onPointerDownCapture={unlockOnGesture}
+      onKeyDownCapture={unlockOnGesture}
       initial={
         reducedMotion
           ? { opacity: 0 }
@@ -127,10 +143,10 @@ export function SceneShell({
           type="button"
           onClick={() => onExit("change")}
           className="scene-btn min-w-11 shrink-0 justify-center"
-          aria-label="Змінити сцену"
+          aria-label="Обрати іншу сцену"
         >
           <span aria-hidden>←</span>
-          <span className="hidden sm:inline">Змінити сцену</span>
+          <span className="hidden sm:inline">Інша сцена</span>
         </button>
         <h1
           ref={headingRef}
@@ -158,19 +174,22 @@ export function SceneShell({
             type="button"
             onClick={toggleSound}
             aria-pressed={soundOn}
-            aria-label={soundOn ? "Вимкнути звук" : "Увімкнути звук"}
-            className="scene-btn w-11 justify-center px-0"
+            aria-label={soundOn ? "Звук: увімкнено" : "Звук: вимкнено"}
+            title={soundOn ? "Звук: увімкнено" : "Звук: вимкнено"}
+            className="scene-btn min-w-11 justify-center px-2"
           >
             <SoundIcon on={soundOn} />
+            <span className="hidden text-xs lg:inline">{soundOn ? "Звук: увімк." : "Звук: вимк."}</span>
           </button>
           <button
             type="button"
             onClick={restart}
             className="scene-btn min-w-11 justify-center"
-            aria-label="Почати заново"
+            aria-label={meta.restart}
+            title={meta.restart}
           >
             <span aria-hidden>↺</span>
-            <span className="hidden sm:inline">Заново</span>
+            <span className="hidden sm:inline">{meta.restart}</span>
           </button>
         </div>
       </header>
@@ -206,7 +225,7 @@ export function SceneShell({
                     onClick={() => onExit("change")}
                     className="min-h-8 text-frost/85 underline underline-offset-4 hover:text-frost"
                   >
-                    Змінити тему
+                    Обрати іншу сцену
                   </button>
                 </p>
               )}
@@ -222,6 +241,7 @@ export function SceneShell({
           onInteract={onInteract}
           onFinish={openOutro}
           onEditInput={onEditInput}
+          onSwitch={onSwitch}
         />
       </div>
 

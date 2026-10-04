@@ -426,7 +426,7 @@ function Sand({
         ) {
           p.dropTo = null;
           p.lift = 0;
-          sound.play(p.onWood ? "thud" : "clay", 0.5);
+          sound.play(p.onWood ? "thud" : "grit", 0.5);
           haptic(8);
           if (!p.onWood) pressInto(p);
         }
@@ -627,7 +627,7 @@ function Sand({
           pb.vx = pb.vy = 0;
           if (!pb.onWood) liftFromSand(pb);
           pb.original = false;
-          sound.play("clay", 0.3);
+          sound.play("grit", 0.3);
           wake();
           return;
         }

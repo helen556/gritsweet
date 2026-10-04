@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { StormHero } from "@/components/hero/StormHero";
-import { HeroFirst } from "@/components/hero/HeroCopy";
+import { Compose } from "@/components/hero/Compose";
 import { SiteFooter, SiteHeader } from "@/components/ui/SiteChrome";
 import type { SceneExit } from "@/components/scenes/SceneShell";
 import { extractAmounts, pickAmount } from "@/lib/ai/amount";
@@ -15,7 +15,6 @@ import { splitPhrases } from "@/lib/text";
 import { flowReducer, initialFlow } from "./state";
 
 // Усе після першого екрана — окремими чанками: перший екран не чекає на їхній JS.
-const RantInput = dynamic(() => import("@/components/input/RantInput").then((m) => m.RantInput));
 const VoiceInput = dynamic(() => import("@/components/input/VoiceInput").then((m) => m.VoiceInput));
 const Analyzing = dynamic(() => import("@/components/ai/Analyzing").then((m) => m.Analyzing));
 const SceneHost = dynamic(() => import("@/components/scenes/SceneHost").then((m) => m.SceneHost));
@@ -68,8 +67,10 @@ export function Experience() {
       switch (res.status) {
         case "stale":
           return; // відповідь запізнилась: людина вже скасувала, змінила текст чи почала заново
-        case "ok":
-          return dispatch({ type: "analyzed", analysis: res.analysis, warMood: localRoute(text).warMood });
+        case "ok": {
+          const local = localRoute(text);
+          return dispatch({ type: "analyzed", analysis: res.analysis, warMood: local.warMood, requested: local.requested });
+        }
         case "support":
           return dispatch({ type: "support" });
         case "manual":
@@ -103,7 +104,7 @@ export function Experience() {
 
   const onTranscript = useCallback((text: string) => dispatch({ type: "transcribed", text }), []);
   const inScene = stage === "scene" && state.scene;
-  const topicNote = state.source === "ai" ? "Тему визначено автоматично." : state.source === "local" ? "Тему підібрано за словами в тексті." : null;
+  const topicNote = state.source === "ai" ? "Сцену підібрав ШІ." : state.source === "local" ? "Сцену підібрано за словами в тексті, без ШІ." : null;
 
   return (
     <>
@@ -120,29 +121,21 @@ export function Experience() {
       >
         <main className="safe-px flex flex-1 flex-col items-center justify-center pb-10 pt-24">
           <AnimatePresence mode="wait">
-            {stage === "hero" && (
-              <HeroFirst
-                key="hero"
-                onWrite={() => {
+            {(stage === "hero" || stage === "write") && (
+              <Compose
+                key="compose"
+                first={stage === "hero"}
+                value={state.text}
+                onChange={(text) => {
                   leaveHero();
-                  dispatch({ type: "write" });
+                  dispatch({ type: "edit", text });
                 }}
+                onSubmit={() => void analyze(state.text)}
+                onLocal={() => routeLocally(state.text, null)}
                 onDictate={() => {
                   leaveHero();
                   dispatch({ type: "dictate" });
                 }}
-                onManual={openManual}
-              />
-            )}
-
-            {stage === "write" && (
-              <RantInput
-                key="write"
-                value={state.text}
-                onChange={(text) => dispatch({ type: "edit", text })}
-                onSubmit={() => void analyze(state.text)}
-                onLocal={() => routeLocally(state.text, null)}
-                onDictate={() => dispatch({ type: "dictate" })}
                 onManual={openManual}
               />
             )}
@@ -210,7 +203,7 @@ export function Experience() {
               />
             )}
 
-            {stage === "support" && <SafetyFlow key="support" onQuiet={() => dispatch({ type: "choose_scene", scene: "sand" })} onTopics={openManual} onExit={reset} />}
+            {stage === "support" && <SafetyFlow key="support" onQuiet={() => dispatch({ type: "choose_scene", scene: "candle" })} onTopics={openManual} onExit={reset} />}
           </AnimatePresence>
         </main>
         <SiteFooter />
@@ -225,6 +218,7 @@ export function Experience() {
             topicNote={topicNote}
             onExit={onSceneExit}
             onEditInput={state.scene === "debt" ? () => dispatch({ type: "edit_setup" }) : undefined}
+            onSwitch={(scene) => dispatch({ type: "choose_scene", scene })}
           />
         )}
       </AnimatePresence>

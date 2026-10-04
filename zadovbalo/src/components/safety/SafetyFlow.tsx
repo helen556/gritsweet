@@ -44,10 +44,10 @@ export function SafetyFlow({ onQuiet, onTopics, onExit }: { onQuiet: () => void;
 
       <div className="flex flex-wrap items-center justify-center gap-3">
         <Button variant="ghost" size="lg" onClick={onQuiet}>
-          Тиха дія: пісок і вода
+          Тиха дія: запалити свічку
         </Button>
         <Button variant="quiet" onClick={onTopics}>
-          Це не про те — обрати тему
+          Це не про те — обрати сцену
         </Button>
         <Button variant="quiet" onClick={onExit}>
           Вийти

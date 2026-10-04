@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
 import { confirmPhrase } from "@/lib/ai/phrases";
 import type { ClientReason } from "@/lib/ai/client";
 import type { WarMood } from "@/lib/ai/route";
-import { CATEGORY_SCENES, SCENE_CATEGORY, SCENE_IDS, SCENES, WAR_QUIET_SCENES, type SceneId } from "@/lib/scenes/registry";
+import { CATEGORY_SCENES, CHOICE_CATEGORIES, SCENE_CATEGORY, SCENE_IDS, SCENES, WAR_QUIET_SCENES, type SceneId } from "@/lib/scenes/registry";
 import { CATEGORY_COPY, type Category } from "@/lib/topics";
 import type { TopicSource } from "./state";
 import { StageHeading, StagePanel } from "./StagePanel";
@@ -34,8 +34,8 @@ function SceneCard({ id, onChoose, note }: { id: SceneId; onChoose: (id: SceneId
 }
 
 const SOURCE_NOTE: Record<TopicSource, string | null> = {
-  ai: "Теми визначено автоматично.",
-  local: "Теми підібрано за словами в тексті.",
+  ai: "Сцени підібрав ШІ.",
+  local: "Сцени підібрано за словами в тексті, без ШІ.",
   manual: null,
 };
 
@@ -52,17 +52,22 @@ export function Choose({
   onOther: () => void;
 }) {
   const r = useReveal();
-  const general = options.length === 1 && options[0] === "general";
-  const scenes = general ? CATEGORY_SCENES.general : [...new Set(options.map((c) => CATEGORY_SCENES[c][0]!))];
+  const single = options.length === 1 && CHOICE_CATEGORIES.includes(options[0]!) ? options[0]! : null;
+  const scenes = single ? CATEGORY_SCENES[single] : [...new Set(options.map((c) => CATEGORY_SCENES[c][0]!))];
   return (
     <StagePanel label="З чого почнемо" className="gap-6">
-      {!general && (
+      {single === "pause" && (
+        <motion.p {...r.rise(0)} className="text-lede max-w-2xl text-balance text-frost/90">
+          Схоже, треба перепочити. Обери щось просте.
+        </motion.p>
+      )}
+      {!single && (
         <motion.p {...r.rise(0)} className="text-lede max-w-2xl text-balance text-frost/90">
           {confirmPhrase(options, options[0] ?? null)}
         </motion.p>
       )}
       <motion.div {...r.word(0.15, 1)}>
-        <StageHeading size="title">З чого почнемо?</StageHeading>
+        <StageHeading size="title">{single ? "Що зараз хочеться?" : "З чого почнемо?"}</StageHeading>
       </motion.div>
       <motion.ul variants={listStagger} initial="hidden" animate="show" className="grid w-full max-w-2xl gap-3 sm:grid-cols-2" aria-label="Дії">
         {scenes.map((id) => (
@@ -72,7 +77,7 @@ export function Choose({
       <div className="flex flex-col items-center gap-1">
         {SOURCE_NOTE[source] && <p className="text-xs text-mist">{SOURCE_NOTE[source]}</p>}
         <Button variant="quiet" onClick={onOther}>
-          Змінити тему
+          Обрати іншу сцену
         </Button>
       </div>
     </StagePanel>
@@ -106,12 +111,12 @@ export function Clarify({ categories, onCategory, onOther }: { categories: Categ
 }
 
 const REASON_COPY: Partial<Record<ClientReason, string>> = {
-  not_configured: "Автоматичне визначення теми зараз вимкнене.",
+  not_configured: "Підбір через ШІ зараз вимкнений. Обери сцену самостійно.",
   offline: "Схоже, немає інтернету. Сцени працюють і без нього.",
-  rate_limited: "Забагато запитів за короткий час. Обери сцену — так навіть швидше.",
-  quota: "Ліміт автоматичних визначень на сьогодні вичерпано.",
-  budget: "Ліміт автоматичних визначень на сьогодні вичерпано.",
-  timeout: "Автоматичне визначення не встигло відповісти.",
+  rate_limited: "Не вдалося підібрати: забагато запитів. Обери сцену самостійно.",
+  quota: "Не вдалося підібрати: ліміт на сьогодні вичерпано. Обери сцену самостійно.",
+  budget: "Не вдалося підібрати: ліміт на сьогодні вичерпано. Обери сцену самостійно.",
+  timeout: "Не вдалося підібрати вчасно. Обери сцену самостійно.",
 };
 
 /** Ручний вибір сцени (і «Змінити сцену»). Підказки за словами в тексті — підписані як такі. */
@@ -127,7 +132,7 @@ export function Manual({
   onSupport: () => void;
 }) {
   const r = useReveal();
-  const note = reason ? (REASON_COPY[reason] ?? "Тему не вдалося визначити автоматично.") : null;
+  const note = reason ? (REASON_COPY[reason] ?? "Не вдалося підібрати. Обери сцену самостійно.") : null;
   const hinted = new Set(suggestions);
   const ids = [...SCENE_IDS].sort((a, b) => Number(hinted.has(SCENE_CATEGORY[b])) - Number(hinted.has(SCENE_CATEGORY[a])));
   return (
@@ -152,7 +157,7 @@ export function Manual({
 export function WarChoice({ mood, onScene }: { mood: WarMood; onScene: (id: SceneId) => void }) {
   const r = useReveal();
   const quietFirst = mood === "fear" || mood === "grief";
-  const quiet = mood === "grief" ? (["unsaid", "sand"] as const) : WAR_QUIET_SCENES;
+  const quiet = mood === "grief" ? (["unsaid", "candle"] as const) : WAR_QUIET_SCENES;
   return (
     <StagePanel label="Що зараз потрібно" className="gap-6">
       <motion.div {...r.word(0, 1)}>
@@ -163,7 +168,7 @@ export function WarChoice({ mood, onScene }: { mood: WarMood; onScene: (id: Scen
           ? "Схоже, це про втрату. Тут можна сказати недоговорене або просто побути з тишею."
           : mood === "fear"
             ? "Схоже, це більше про страх. Можна спершу зробити щось спокійне руками."
-            : "Якщо війна зараз більше про страх чи втрату, тихіша дія може бути доречнішою."}
+            : "Якщо війна зараз більше про страх чи втрату, краще щось тихіше."}
       </motion.p>
       <motion.ul variants={listStagger} initial="hidden" animate="show" className="grid w-full max-w-2xl gap-3 sm:grid-cols-2">
         {quietFirst ? (
@@ -192,7 +197,7 @@ export function Finish({ onOther, onWriteMore, onEnough }: { onOther: () => void
     <StagePanel label="Завершення" className="gap-7">
       <motion.div {...r.word(0, 1.6)}>
         <StageHeading size="giant" className="italic">
-          Видихни.
+          Видихай.
         </StageHeading>
       </motion.div>
       <motion.p {...r.rise(0.6)} className="text-lede max-w-xl text-balance text-frost/80">

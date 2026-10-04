@@ -9,7 +9,16 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]  # zadovbalo/
 PKG = ROOT.parent / "Vydyhny_Claude_Package" / "assets"
 OUT = ROOT / "public" / "scenes"
-EXTRA = ROOT / "assets-src"  # додаткові ліцензовані матеріали (напр. долари), якщо додані
+EXTRA = ROOT / "assets-src"  # додаткові ліцензовані матеріали, якщо додані
+REF2 = ROOT.parent / "docs" / "vydyhny-updates-2026-10-04" / "references"  # пакет змін 04.10.2026
+
+
+def load_ref(name: str) -> np.ndarray:
+    p = REF2 / name
+    im = cv2.imread(str(p), cv2.IMREAD_COLOR)
+    if im is None:
+        raise SystemExit(f"Немає референсу: {p}")
+    return im
 
 
 def load(rel: str) -> np.ndarray:
@@ -136,3 +145,56 @@ def trim_dark_rim(alpha: np.ndarray, rgb: np.ndarray, visible: np.ndarray, width
     # згладити зубці: розмити й знову підтягнути контраст
     a = cv2.GaussianBlur(a, (0, 0), 2.2).astype(np.float32)
     return np.clip((a - 128) * 2.2 + 128, 0, 255).astype(np.uint8)
+
+
+def fill_region(im: np.ndarray, hole: np.ndarray, source: np.ndarray, seed=7, P=96, low_sigma=28, gain=1.5) -> np.ndarray:
+    """Заповнити діру поверхнею навколо: світло — нормалізованою згорткою лише по чистих пікселях (source),
+    дрібна фактура — латками P×P з тієї ж поверхні (з випадковим віддзеркаленням)."""
+    rng = np.random.default_rng(seed)
+    img = im.astype(np.float32)
+    vis = (source > 127).astype(np.float32)
+
+    def nblur(x, s):
+        num = cv2.GaussianBlur(x * vis[..., None], (0, 0), s)
+        den = cv2.GaussianBlur(vis, (0, 0), s)[..., None]
+        return num / np.maximum(den, 1e-3), den[..., 0]
+
+    low_fine, _ = nblur(img, 6)
+    low, den = nblur(img, low_sigma)
+    # далеко від чистої стіни (центр великої діри) — світло доінпейнтити з країв
+    far = ((den < 0.2) | (hole > 0) & (den < 0.35)).astype(np.uint8) * 255
+    q = cv2.resize(np.clip(low, 0, 255).astype(np.uint8), None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)
+    qm = cv2.resize(far, (q.shape[1], q.shape[0]), interpolation=cv2.INTER_NEAREST)
+    q = cv2.inpaint(q, qm, 12, cv2.INPAINT_TELEA)
+    up = cv2.GaussianBlur(cv2.resize(q, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_CUBIC).astype(np.float32), (0, 0), 10)
+    tf = cv2.GaussianBlur(far, (0, 0), 12).astype(np.float32)[..., None] / 255
+    low = low * (1 - tf) + up * tf
+    # у дірі світло лише з великого масштабу; біля краю — плавно з дрібнішого
+    detail = (img - low_fine) * vis[..., None]
+    inner = cv2.erode(source, np.ones((P + 1, P + 1), np.uint8))
+    ys, xs = np.nonzero(inner > 127)
+    ok = (ys >= P // 2) & (ys < img.shape[0] - P // 2) & (xs >= P // 2) & (xs < img.shape[1] - P // 2)
+    ys, xs = ys[ok], xs[ok]
+    fill = np.zeros_like(img)
+    acc = np.zeros(img.shape[:2], np.float32)
+    win = np.outer(np.hanning(P), np.hanning(P)).astype(np.float32) + 1e-3
+    hy, hx = np.nonzero(hole > 0)
+    for ty in range(hy.min() - P // 2, hy.max() + 1, P // 3):
+        for tx in range(hx.min() - P // 2, hx.max() + 1, P // 3):
+            i = rng.integers(len(ys))
+            sy, sx = ys[i] - P // 2, xs[i] - P // 2
+            ty0, tx0 = max(ty, 0), max(tx, 0)
+            ty1, tx1 = min(ty + P, img.shape[0]), min(tx + P, img.shape[1])
+            if ty1 <= ty0 or tx1 <= tx0:
+                continue
+            py0, px0 = ty0 - ty, tx0 - tx
+            ww = win[py0 : py0 + ty1 - ty0, px0 : px0 + tx1 - tx0]
+            patch = detail[sy : sy + P, sx : sx + P]
+            if rng.random() < 0.5:
+                patch = patch[:, ::-1]
+            fill[ty0:ty1, tx0:tx1] += patch[py0 : py0 + ty1 - ty0, px0 : px0 + tx1 - tx0] * ww[..., None]
+            acc[ty0:ty1, tx0:tx1] += ww
+    tex = fill / np.maximum(acc, 1e-3)[..., None] * gain
+    synth = np.clip(low + tex, 0, 255)
+    t = cv2.GaussianBlur(hole, (0, 0), 3).astype(np.float32)[..., None] / 255
+    return (img * (1 - t) + synth * t).astype(np.uint8)

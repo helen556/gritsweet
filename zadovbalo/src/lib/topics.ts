@@ -7,6 +7,9 @@ export const CATEGORIES = [
   "unsaid_words",
   "control",
   "war_anger",
+  "quiet",
+  "lonely",
+  "pause",
   "general",
   "needs_support",
 ] as const;
@@ -15,6 +18,7 @@ export type Category = (typeof CATEGORIES)[number];
 export const EMOTIONS = ["anger", "anxiety", "fear", "sadness", "exhaustion", "overwhelm", "shame", "numbness"] as const;
 export type Emotion = (typeof EMOTIONS)[number];
 
+/** Валюти, які розпізнаються в тексті. Сама вправа з грошима — лише в гривнях. */
 export const CURRENCIES = ["UAH", "USD", "EUR", "PLN", "GBP"] as const;
 export type Currency = (typeof CURRENCIES)[number];
 
@@ -32,10 +36,13 @@ export const CATEGORY_COPY: Record<Category, { label: string; hint: string; phra
   financial_debt: { label: "Гроші й борги", hint: "Сума, що висить над головою", phrase: "гроші", plural: true },
   overload: { label: "Все на мені", hint: "Забагато справ і відповідальності", phrase: "те, що все на тобі", plural: false },
   rumination: { label: "Думки по колу", hint: "Одне й те саме крутиться в голові", phrase: "думки, що крутяться по колу", plural: true },
-  anger: { label: "Злість", hint: "Хочеться мʼяти, тиснути, давати форму", phrase: "злість", plural: false },
+  anger: { label: "Просто бісить", hint: "Хочеться щось розбити чи полопати", phrase: "злість", plural: false },
   unsaid_words: { label: "Те, що не встигла сказати", hint: "Слова, які так і не відправила", phrase: "невисловлені слова", plural: true },
   control: { label: "Все вислизає", hint: "Хочеться хоч трохи керувати чимось", phrase: "відчуття, що все вислизає з рук", plural: false },
   war_anger: { label: "Злість через війну", hint: "Лють, якій нема куди подітися", phrase: "злість через війну", plural: false },
+  quiet: { label: "Хочу тиші", hint: "Спокійно посидіти", phrase: "бажання тиші", plural: false },
+  lonely: { label: "Сумно й самотньо", hint: "Хочеться, щоб хтось був поруч", phrase: "смуток і самотність", plural: false },
+  pause: { label: "Хочу паузу", hint: "Втома, треба перепочити", phrase: "втома", plural: false },
   general: { label: "Просто накипіло", hint: "Без конкретної причини", phrase: "загальна втома від усього", plural: false },
   needs_support: { label: "Дуже важко", hint: "Зараз потрібна підтримка", phrase: "щось дуже важке", plural: false },
 };
@@ -49,5 +56,8 @@ export const MANUAL_CATEGORIES: readonly Category[] = [
   "unsaid_words",
   "control",
   "war_anger",
+  "quiet",
+  "lonely",
+  "pause",
   "general",
 ];

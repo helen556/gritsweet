@@ -1,7 +1,7 @@
 import type { ClientReason } from "@/lib/ai/client";
 import type { LocalRoute, WarMood } from "@/lib/ai/route";
 import type { Analysis } from "@/lib/ai/service";
-import { CATEGORY_SCENES, type SceneId } from "@/lib/scenes/registry";
+import { CATEGORY_SCENES, CHOICE_CATEGORIES, SCENE_CATEGORY, type SceneId } from "@/lib/scenes/registry";
 import type { Category, Currency } from "@/lib/topics";
 
 export type Stage =
@@ -33,6 +33,8 @@ export interface FlowState {
   /** Теми для «З чого почнемо?» / уточнення. */
   options: Category[];
   warMood: WarMood;
+  /** Дії, які людина назвала прямо («полопати плівку»): мають перевагу над типовою сценою теми. */
+  requested: SceneId[];
   scene: SceneId | null;
   sceneInput: { amount?: number; currency?: Currency | null; labels?: string[] };
 }
@@ -43,7 +45,7 @@ export type FlowAction =
   | { type: "edit"; text: string }
   | { type: "transcribed"; text: string }
   | { type: "analyze" }
-  | { type: "analyzed"; analysis: Analysis; warMood: WarMood }
+  | { type: "analyzed"; analysis: Analysis; warMood: WarMood; requested?: SceneId[] }
   | { type: "local"; route: LocalRoute; reason: ClientReason | null; amount: number | null; currency: Currency | null }
   | { type: "manual"; reason: ClientReason | null; keywordSuggestions?: Category[] }
   | { type: "support" }
@@ -65,6 +67,7 @@ export const initialFlow: FlowState = {
   category: null,
   options: [],
   warMood: null,
+  requested: [],
   scene: null,
   sceneInput: {},
 };
@@ -78,11 +81,19 @@ export function focusCategories(categories: readonly Category[]): Category[] {
   return [...new Set(specific.length ? specific : list)];
 }
 
-/** Перехід у сцену: з налаштуванням, якщо бракує даних (сума/валюта, підписи каменів). */
+/** Сцена теми: та, яку людина назвала прямо, інакше — основна. */
+export function sceneFor(category: Category, requested: readonly SceneId[]): SceneId {
+  return requested.find((id) => SCENE_CATEGORY[id] === category && CATEGORY_SCENES[category].includes(id)) ?? CATEGORY_SCENES[category][0]!;
+}
+
+/**
+ * Перехід у сцену: з налаштуванням, якщо бракує даних (підписи каменів; сума в гривнях).
+ * Вправа з грошима — лише в гривнях: іншу валюту не перейменовуємо й не конвертуємо, а просимо суму в гривнях.
+ */
 function enterScene(state: FlowState, scene: SceneId): FlowState {
   const { amount, currency } = state.extracted;
   if (scene === "debt") {
-    if (amount && currency) return { ...state, scene, stage: "scene", sceneInput: { amount, currency } };
+    if (amount && currency === "UAH") return { ...state, scene, stage: "scene", sceneInput: { amount, currency } };
     return { ...state, scene, stage: "setup", sceneInput: {} };
   }
   if (scene === "backpack") return { ...state, scene, stage: "setup", sceneInput: {} };
@@ -110,9 +121,12 @@ export function resolveTopics(
     const ordered = primary ? [primary, ...cats.filter((c) => c !== primary)] : cats;
     return { ...base, stage: "choose", options: ordered, category: null };
   }
-  if (chosen === "general") return { ...base, stage: "choose", options: ["general"], category: "general" };
+  // «Хочу паузу» чи «просто накипіло» — один короткий вибір між кількома тихими діями (якщо дію не названо прямо).
+  if (CHOICE_CATEGORIES.includes(chosen) && !state.requested.some((id) => SCENE_CATEGORY[id] === chosen || CATEGORY_SCENES[chosen].includes(id)))
+    return { ...base, stage: "choose", options: [chosen], category: chosen };
   if (input.needsClarification && input.source === "ai") return { ...base, stage: "clarify", options: cats, category: null };
-  return enterScene({ ...base, category: chosen }, CATEGORY_SCENES[chosen][0]!);
+  const requestedHere = state.requested.find((id) => CATEGORY_SCENES[chosen].includes(id));
+  return enterScene({ ...base, category: chosen }, requestedHere ?? sceneFor(chosen, state.requested));
 }
 
 export function flowReducer(state: FlowState, action: FlowAction): FlowState {
@@ -129,11 +143,12 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
       return { ...state, stage: "analyzing" };
     case "analyzed": {
       const a = action.analysis;
-      const next = { ...state, manualReason: null, extracted: { amount: a.amount, currency: a.currency } };
+      // Прямо названа дія береться з тексту (правила на пристрої), а не з вибору моделі.
+      const next = { ...state, manualReason: null, requested: action.requested ?? [], extracted: { amount: a.amount, currency: a.currency } };
       return resolveTopics(next, { categories: a.categories, primary: a.primaryCategory, needsClarification: a.needsClarification, warMood: action.warMood, source: "ai" });
     }
     case "local": {
-      const next = { ...state, manualReason: action.reason, keywordSuggestions: action.route.categories, extracted: { amount: action.amount, currency: action.currency } };
+      const next = { ...state, manualReason: action.reason, keywordSuggestions: action.route.categories, requested: action.route.requested, extracted: { amount: action.amount, currency: action.currency } };
       if (action.route.clarity === "unclear") {
         // Війна без явної емоції: людина сама обере між злістю й тихішою дією.
         if (action.route.war) return { ...next, stage: "war_choice", source: "local", warMood: null, category: null };
@@ -161,7 +176,7 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
     case "change_scene":
       return { ...state, scene: null, stage: "manual", manualReason: null };
     case "edit_setup":
-      // Змінити суму/валюту, не повертаючись до вибору теми.
+      // Змінити суму, не повертаючись до вибору теми.
       return { ...state, stage: "setup", extracted: { amount: state.sceneInput.amount ?? state.extracted.amount, currency: state.sceneInput.currency ?? state.extracted.currency } };
     case "finish_scene":
       return { ...state, stage: "finish" };

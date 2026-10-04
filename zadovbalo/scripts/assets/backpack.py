@@ -2,7 +2,7 @@
 import cv2
 import numpy as np
 
-from common import OUT, trim_dark_rim, crop_rgba, edge_shade, load, poly_mask, rgba, save_webp, smooth_mask, synthesize_hidden, write_json
+from common import OUT, trim_dark_rim, crop_rgba, edge_shade, fill_region, load, poly_mask, rgba, save_webp, smooth_mask, synthesize_hidden, write_json
 
 # Контури каменів на backpack_full_stones.png (1254×1254), розмічені вручну.
 STONES = {
@@ -28,6 +28,11 @@ SUPPORTS = {"A": {"B": 46, "C": 30}, "B": {"E": 38, "D": 24}, "C": {"D": 58}, "D
 FLAP = [(330,700),(360,712),(385,722),(420,733),(460,745),(500,757),(535,765),(570,775),(600,782),(640,790),(670,793),(710,800),(760,805),(810,800),(840,790),(880,770),(930,740),(965,712),(992,690),(1010,720),(1030,800),(1010,930),(940,1010),(700,1050),(420,1030),(330,960),(300,840)]
 LEFT_RIM = [(310,250),(372,262),(378,300),(366,360),(358,430),(352,520),(350,610),(352,700),(300,720),(290,500)]
 RIGHT_RIM = [(905,250),(930,300),(950,360),(965,430),(976,520),(986,600),(994,680),(1060,690),(1060,300)]
+
+
+SLIDER = [(333, 685), (360, 683), (366, 700), (360, 728), (345, 732), (332, 715)]
+PULL = [(338, 715), (352, 722), (332, 760), (324, 800), (322, 840), (306, 860), (284, 852), (288, 815), (298, 772), (318, 736)]
+ZIPPER = [(348, 700), (350, 550), (369, 450), (406, 362), (469, 287), (550, 231), (662, 210), (775, 227), (850, 269), (906, 325), (944, 400), (965, 487), (979, 575), (987, 662)]
 
 
 def run():
@@ -69,6 +74,29 @@ def run():
             "cx": round(m["m10"] / m["m00"], 1), "cy": round(m["m01"] / m["m00"], 1),
             "visibleShare": round(float((vis_c > 127).sum()) / float((amodal > 127).sum()), 3),
         }
+
+    # Бігунок блискавки й тканинний язичок — окремими спрайтами (бігунок рухається по траєкторії блискавки).
+    slider_m = poly_mask(full.shape, SLIDER)
+    pull_m = poly_mask(full.shape, PULL)
+    for name, m in (("zip-slider", slider_m), ("zip-pull", pull_m)):
+        spr, box = crop_rgba(rgba(full, smooth_mask(m, 0.8)))
+        save_webp(out / f"{name}.webp", spr, 92)
+        meta[name.replace("-", "_")] = {"x": box[0], "y": box[1], "w": box[2], "h": box[3]}
+    gone = cv2.dilate(np.maximum(slider_m, pull_m), np.ones((7, 7), np.uint8))
+    area = np.zeros_like(gone)
+    area[640:900, 230:470] = 255
+    src_m = np.where((cv2.dilate(gone, np.ones((11, 11), np.uint8)) == 0) & (area > 0), 255, 0).astype(np.uint8)
+    full = fill_region(full, gone, src_m, seed=3, P=20, low_sigma=8, gain=1.1)
+    empty = fill_region(empty, gone, src_m, seed=5, P=20, low_sigma=8, gain=1.1)
+    # Фактура зовнішньої тканини для застебнутої передньої стінки: з передньої кишені, без світлотіні, безшовна 2×2.
+    patch = full[995:1075, 500:780].astype(np.float32)  # рівна тканина під кишенею, без швів
+    low = cv2.GaussianBlur(patch, (0, 0), 18)
+    flat = patch / np.maximum(low, 1) * low.reshape(-1, 3).mean(axis=0)
+    flat = np.clip(flat, 0, 255).astype(np.uint8)
+    tile = np.vstack([np.hstack([flat, flat[:, ::-1]]), np.hstack([flat[::-1], flat[::-1, ::-1]])])
+    save_webp(out / "fabric.webp", tile, 86)
+    # Траєкторія блискавки: край задньої стінки (зліва знизу — через верх — праворуч униз).
+    meta["zipper"] = ZIPPER
 
     # Клапан: беремо з фото з камінням (він вигнутий під вагою), альфа мʼяка.
     flap_alpha = smooth_mask(front_fabric, 1.4)

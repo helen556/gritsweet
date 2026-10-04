@@ -1,0 +1,34 @@
+[
+  {
+    "file": "references/01_dishes_and_bottle.png",
+    "dimensions": [
+      1681,
+      936
+    ],
+    "sha256": "4fd8e96eac8403eff7d43a8eaf090aefb28a988beffed1435527c8dbd744c8f7"
+  },
+  {
+    "file": "references/02_candle.png",
+    "dimensions": [
+      1881,
+      836
+    ],
+    "sha256": "d20c7f080e98961cbc5c9985fe6a9734051b8fa1e105fd01f7a25320dba8049a"
+  },
+  {
+    "file": "references/03_bubble_wrap.png",
+    "dimensions": [
+      1536,
+      1024
+    ],
+    "sha256": "b6ebf483acf6e6f53b019b7d2e269de6a8969e88cdd56e59095118dfeec07a51"
+  },
+  {
+    "file": "references/04_beverage_can.png",
+    "dimensions": [
+      1536,
+      1024
+    ],
+    "sha256": "135f79d5a472b5dda538c8e981d32d10bdb6b4287f2e3eba453f00d5b8f460f9"
+  }
+]

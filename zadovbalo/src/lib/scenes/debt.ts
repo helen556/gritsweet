@@ -1,32 +1,28 @@
 import type { Currency } from "@/lib/topics";
 
+/** Купюра вправи — справжня 1000 грн (фото з наданих матеріалів). Сума вправи — лише в гривнях. */
+export const BILL = 1000;
 /** Скільки купюр у пачці. */
 export const PACK_SIZE = 100;
 /** Більше — «по купюрі» стає безкінечним, лишаємо лише пачки. */
 export const MAX_BILL_MOVES = 300;
-/** Більше пачок — пачка стає умовною (масштаб підписано явно). */
-const MAX_PACK_MOVES = 24;
-const SYMBOLIC_TARGET = 12;
+/** Скільки перенесень пачками ще зручно; більше — переносимо стос із кількох справжніх пачок (і так і пишемо). */
+const MAX_PACK_MOVES = 30;
 
-export type NoteKind = "uah-500" | "uah-1000" | "usd-100" | "neutral";
+export type NoteKind = "uah-1000";
 
 export interface DebtPlan {
-  /** Яка купюра: справжнє фото (гривня) або чесна нейтральна. */
   note: NoteKind;
-  /** Номінал купюри (у валюті суми). */
+  /** Номінал купюри, ₴. */
   bill: number;
-  /** Скільки списує одна пачка. */
+  /** Скільки пачок по 100 купюр переноситься за раз (1, 10, 100…) — без прихованого масштабу. */
+  packs: number;
+  /** Скільки списує один перенос «пачкою» (packs × 100 × купюра). */
   pack: number;
-  /** Пачка умовна: її вартість не дорівнює 100 купюрам — це явно підписуємо. */
-  symbolicPack: boolean;
   /** Чи має сенс «по купюрі» (не безкінечно). */
   billMode: boolean;
   /** Чи має сенс «пачкою». */
   packMode: boolean;
-}
-
-function decimalsFor(amount: number) {
-  return Number.isInteger(amount) ? 0 : 2;
 }
 
 /** «Кругле» число 1/2/5 × 10ⁿ. */
@@ -41,34 +37,14 @@ export function niceStep(raw: number): number {
 }
 
 /**
- * Як перекладати суму. Гривня — справжні 500/1000 грн. Інші валюти й «без валюти» — нейтральна символічна купюра
- * з чесним номіналом (не видаємо гривню чи макет за долари). Великі суми — пачками; якщо й пачок забагато,
- * пачка стає умовною й це явно підписано.
+ * Як переносити суму (у гривнях). Завжди справжня 1000 грн; останній перенос — лише залишок.
+ * Великі суми — пачками по 100 купюр; дуже великі — стосом із 10, 100… пачок, і це підписано.
  */
-export function planDebt(total: number, currency: Currency | null | undefined, hasUsdNote = false): DebtPlan {
-  let note: NoteKind;
-  let bill: number;
-  if (currency === "UAH") {
-    note = total >= 5000 ? "uah-1000" : "uah-500";
-    bill = note === "uah-1000" ? 1000 : 500;
-  } else if (currency === "USD" && hasUsdNote) {
-    note = "usd-100";
-    bill = 100;
-  } else if (currency) {
-    note = "neutral";
-    bill = total >= 2000 ? 100 : total >= 200 ? 20 : niceStep(total / 10);
-  } else {
-    note = "neutral";
-    bill = niceStep(total / SYMBOLIC_TARGET);
-  }
-  const bills = Math.ceil(total / bill);
-  let pack = bill * PACK_SIZE;
-  let symbolicPack = false;
-  if (total / pack > MAX_PACK_MOVES) {
-    pack = niceStep(total / SYMBOLIC_TARGET);
-    symbolicPack = true;
-  }
-  return { note, bill, pack, symbolicPack, billMode: bills <= MAX_BILL_MOVES, packMode: bills > 12 };
+export function planDebt(total: number): DebtPlan {
+  const bills = Math.ceil(total / BILL);
+  let packs = 1;
+  while (total / (BILL * PACK_SIZE * packs) > MAX_PACK_MOVES) packs *= 10;
+  return { note: "uah-1000", bill: BILL, packs, pack: BILL * PACK_SIZE * packs, billMode: bills <= MAX_BILL_MOVES, packMode: bills > 12 };
 }
 
 /** Відняти один перенос. Останній крок — точно до нуля, ніколи не нижче. Копійки без похибок float. */
@@ -80,6 +56,10 @@ export function applyTransfer(remaining: number, step: number): number {
 /** Скільки насправді списав перенос (останній — лише залишок). */
 export function transferred(remaining: number, step: number): number {
   return Math.min(remaining, step);
+}
+
+function decimalsFor(amount: number) {
+  return Number.isInteger(amount) ? 0 : 2;
 }
 
 export function formatAmount(value: number, currency: Currency | null | undefined, original: number): string {

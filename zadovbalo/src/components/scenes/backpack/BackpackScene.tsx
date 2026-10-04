@@ -7,7 +7,7 @@ import { useCanvas2D } from "@/lib/scene/canvas";
 import { useLazyRef } from "@/lib/scene/lazyRef";
 import { useFrameLoop } from "@/lib/scene/loop";
 import { usePointer } from "@/lib/scene/pointer";
-import { haptic, sound } from "@/lib/scene/sound";
+import { haptic, sound, type LoopHandle } from "@/lib/scene/sound";
 import {
   contactShadow,
   featherImage,
@@ -27,7 +27,33 @@ interface Meta {
   >;
   flap: { x: number; y: number; w: number; h: number };
   flapEdge: [number, number][];
+  zipper: [number, number][];
+  zip_slider: { x: number; y: number; w: number; h: number };
+  zip_pull: { x: number; y: number; w: number; h: number };
 }
+
+/** Рівномірна ламана: N точок за довжиною дуги. */
+function resample(pts: [number, number][], n: number): [number, number][] {
+  const d = [0];
+  for (let i = 1; i < pts.length; i++) d.push(d[i - 1]! + Math.hypot(pts[i]![0] - pts[i - 1]![0], pts[i]![1] - pts[i - 1]![1]));
+  const total = d[d.length - 1]!;
+  const out: [number, number][] = [];
+  let j = 1;
+  for (let k = 0; k < n; k++) {
+    const t = (total * k) / (n - 1);
+    while (j < pts.length - 1 && d[j]! < t) j++;
+    const a = pts[j - 1]!;
+    const b = pts[j]!;
+    const u = (t - d[j - 1]!) / Math.max(1e-6, d[j]! - d[j - 1]!);
+    out.push([a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]);
+  }
+  return out;
+}
+
+const ZN = 120;
+/** Ширина зони, де краї тканини ще сходяться за бігунком (частка довжини). */
+const ZIP_W = 0.15;
+const ZIP_SOUNDS = ["zip-loop", "zip-end"] as const;
 
 const TAGS = [
   "Відкласти",
@@ -70,15 +96,23 @@ interface Stone {
 
 async function loadBackpack() {
   const meta = await loadJson<Meta>("/scenes/backpack/backpack.json");
-  const [base, flap, ...stones] = await Promise.all([
+  const [base, flap, slider, pull, fabric, ...stones] = await Promise.all([
     loadImage("/scenes/backpack/base.webp"),
     loadImage("/scenes/backpack/flap.webp"),
+    loadImage("/scenes/backpack/zip-slider.webp"),
+    loadImage("/scenes/backpack/zip-pull.webp"),
+    loadImage("/scenes/backpack/fabric.webp"),
     ...meta.order.map((k) => loadImage(`/scenes/backpack/stone-${k}.webp`)),
   ]);
   return {
     meta,
     base: featherImage(base, 0.1),
     flap,
+    slider,
+    pull,
+    fabric,
+    zipB: resample(meta.zipper, ZN),
+    zipF: resample(meta.flapEdge, ZN),
     sprites: Object.fromEntries(
       meta.order.map((k, i) => [k, makeSprite(stones[i]!)]),
     ) as Record<string, Sprite>,
@@ -120,7 +154,7 @@ function Backpack({
   onInteract,
   data,
 }: SceneProps & { data: Awaited<ReturnType<typeof loadBackpack>> }) {
-  const { meta, base, flap, sprites } = data;
+  const { meta, base, flap, sprites, slider, pull, fabric, zipB, zipF } = data;
   const { canvasRef, ctx, size } = useCanvas2D();
   const rootRef = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<{
@@ -183,6 +217,28 @@ function Backpack({
     moved: number;
   } | null>(null);
   const bagLoad = useRef(1);
+  /** Блискавка: 0 — відкрито, 1 — застебнуто. Частковий стан зберігається. */
+  const zip = useLazyRef(() => ({
+    t: 0,
+    shown: 0,
+    grab: null as null | { id: number },
+    auto: null as null | { to: number },
+    swing: 0,
+    swingV: 0,
+    /** Згладжена швидкість бігунка — для рівної гучності «з-з-з». */
+    speed: 0,
+    lastT: 0,
+    ended: false,
+    covered: null as Path2D | null,
+    pattern: null as CanvasPattern | null,
+  }));
+  const zipLoop = useRef<LoopHandle | null>(null);
+  const [zipT, setZipT] = useState(0);
+  useEffect(() => {
+    sound.preload(ZIP_SOUNDS);
+    zipLoop.current = sound.loop("zip-loop", 0);
+    return () => zipLoop.current?.stop(0.05);
+  }, []);
 
   // Вид: рюкзак у центрі, довкола — підлога, куди можна класти камені.
   const view = useMemo(() => {
@@ -323,6 +379,8 @@ function Backpack({
     g.drawImage(flap, meta.flap.x, meta.flap.y);
     g.restore();
 
+    drawZipper(g);
+
     const outside = list
       .filter((st) => !st.inBag && st.above)
       .sort((a, b) =>
@@ -354,9 +412,134 @@ function Backpack({
         );
       drawStone(g, st);
     }
-    // Підписи — шар сайту, не частина фото.
-    for (const st of list) if (st.label || st.tag) drawLabel(g, st, s);
+    // Підписи — шар сайту, не частина фото. Камені під застебнутою тканиною — без підписів.
+    for (const st of list) if ((st.label || st.tag) && !(st.inBag && !st.above && covers(st.x, st.y + st.shownSettle))) drawLabel(g, st, s);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, size.dpr, base, flap, meta.flap, canvasRef, stones]);
+
+  /** Чи закрита точка (світові координати) застебнутою тканиною. */
+  const covers = (wx: number, wy: number) => {
+    const cov = zip.current.covered;
+    const g = canvasRef.current?.getContext("2d");
+    if (!cov || !g) return false;
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    const r = g.isPointInPath(cov, wx, wy);
+    g.restore();
+    return r;
+  };
+
+  /** Частка закриття для точки i траєкторії: позаду бігунка — краї зійшлися, біля нього — сходяться. */
+  const closureAt = (i: number, t: number) => {
+    const sPos = i / (ZN - 1);
+    if (sPos <= t - ZIP_W) return 1;
+    if (sPos >= t) return 0;
+    const u = (t - sPos) / ZIP_W;
+    return u * u * (3 - 2 * u);
+  };
+
+  function teeth(g: CanvasRenderingContext2D, pts: [number, number][], from: number, to: number, both: boolean) {
+    let acc = 0;
+    let n = 0;
+    for (let i = Math.max(1, from); i <= to && i < pts.length; i++) {
+      const [x0, y0] = pts[i - 1]!;
+      const [x1, y1] = pts[i]!;
+      const seg = Math.hypot(x1 - x0, y1 - y0);
+      acc += seg;
+      while (acc >= 7) {
+        acc -= 7;
+        const u = 1 - acc / Math.max(1e-6, seg);
+        const x = x0 + (x1 - x0) * u;
+        const y = y0 + (y1 - y0) * u;
+        const ang = Math.atan2(y1 - y0, x1 - x0);
+        const side = both ? (n % 2 ? 1 : -1) : 1;
+        g.save();
+        g.translate(x, y);
+        g.rotate(ang);
+        g.fillStyle = "#23221e";
+        g.fillRect(-2.6, side * 2.6 - 5, 5.2, 10);
+        g.fillStyle = "rgba(190,185,170,0.6)";
+        g.fillRect(-2.6, side * 2.6 - 5, 5.2, 1.8);
+        g.restore();
+        n++;
+      }
+    }
+  }
+
+  function drawZipper(g: CanvasRenderingContext2D) {
+    const z = zip.current;
+    const t = z.shown;
+    if (t > 0.002) {
+      const c = zipB.map((_, i) => closureAt(i, t));
+      const P = zipF.map(([fx, fy], i) => [fx + (zipB[i]![0] - fx) * c[i]!, fy + (zipB[i]![1] - fy) * c[i]!] as [number, number]);
+      const path = new Path2D();
+      P.forEach(([x, y], i) => (i ? path.lineTo(x, y) : path.moveTo(x, y)));
+      for (let i = ZN - 1; i >= 0; i--) path.lineTo(zipF[i]![0], zipF[i]![1] + 18 * c[i]!);
+      path.closePath();
+      z.covered = path;
+      z.pattern ??= g.createPattern(fabric, "repeat");
+      g.save();
+      g.clip(path);
+      g.fillStyle = z.pattern ?? "#4a4a3a";
+      g.fillRect(250, 150, 820, 760);
+      // світло: опукла передня стінка — світліше зліва-згори, до країв і низу темніше (як на фото)
+      const lg = g.createRadialGradient(560, 380, 40, 640, 500, 520);
+      lg.addColorStop(0, "rgba(255,255,235,0.10)");
+      lg.addColorStop(0.55, "rgba(0,0,0,0.06)");
+      lg.addColorStop(1, "rgba(0,0,0,0.42)");
+      g.fillStyle = lg;
+      g.fillRect(250, 150, 820, 760);
+      // горбики від каменів, що лишились усередині
+      for (const st of stones.current) {
+        if (!st.inBag || st.above) continue;
+        const sy = st.y + st.shownSettle;
+        const r = Math.max(st.sprite.w, st.sprite.h) * 0.42;
+        const hl = g.createRadialGradient(st.x - r * 0.3, sy - r * 0.35, 0, st.x, sy, r);
+        hl.addColorStop(0, "rgba(255,255,235,0.10)");
+        hl.addColorStop(0.7, "rgba(0,0,0,0)");
+        hl.addColorStop(1, "rgba(0,0,0,0.16)");
+        g.fillStyle = hl;
+        g.beginPath();
+        g.ellipse(st.x, sy, r, r * 0.8, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+      // шов уздовж блискавки: тонка тінь під зубцями (лише вздовж краю тканини)
+      g.strokeStyle = "rgba(0,0,0,0.35)";
+      g.lineWidth = 10;
+      g.beginPath();
+      P.forEach(([x, y], i) => (i ? g.lineTo(x, y + 7) : g.moveTo(x, y + 7)));
+      g.stroke();
+      g.restore();
+      // зубці: застебнута частина — два ряди вперемішку; край, що підходить, — один ряд
+      const zipped = Math.max(0, Math.floor((t - ZIP_W) * (ZN - 1)));
+      teeth(g, zipB, 1, zipped, true);
+      teeth(g, P, zipped, Math.ceil(t * (ZN - 1)), false);
+    } else z.covered = null;
+
+    // бігунок і язичок — на траєкторії
+    const fi = Math.min(ZN - 2, Math.max(0, t * (ZN - 1)));
+    const i0 = Math.floor(fi);
+    const u = fi - i0;
+    const a = zipB[i0]!;
+    const b = zipB[i0 + 1]!;
+    const px = a[0] + (b[0] - a[0]) * u;
+    const py = a[1] + (b[1] - a[1]) * u;
+    const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    const ang0 = Math.atan2(zipB[1]![1] - zipB[0]![1], zipB[1]![0] - zipB[0]![0]);
+    const sl = meta.zip_slider;
+    const pl = meta.zip_pull;
+    // язичок висить донизу й гойдається від руху
+    g.save();
+    g.translate(px, py + 16);
+    g.rotate(z.swing);
+    g.drawImage(pull, -(344 - pl.x), -(718 - pl.y - 16) - 16);
+    g.restore();
+    g.save();
+    g.translate(px, py);
+    g.rotate(ang - ang0);
+    g.drawImage(slider, -(347 - sl.x), -(703 - sl.y));
+    g.restore();
+  }
 
   function drawStone(g: CanvasRenderingContext2D, st: Stone) {
     const sc = st.scale * (1 + st.lift * 0.0016);
@@ -482,6 +665,38 @@ function Backpack({
         busy = true;
       }
     }
+    // блискавка: показаний стан догоняє жест; звук — лише поки бігунок рухається
+    {
+      const z = zip.current;
+      if (z.auto) {
+        const dir = Math.sign(z.auto.to - z.t);
+        z.t = Math.max(0, Math.min(1, z.t + dir * dt * 0.45));
+        if ((dir > 0 && z.t >= z.auto.to) || (dir < 0 && z.t <= z.auto.to)) z.auto = null;
+      }
+      const prev = z.shown;
+      z.shown += (z.t - z.shown) * Math.min(1, dt * 18);
+      if (Math.abs(z.t - z.shown) < 0.0005) z.shown = z.t;
+      const raw = Math.abs(z.shown - prev) / Math.max(dt, 1e-3);
+      z.speed += (raw - z.speed) * Math.min(1, dt * 14);
+      const speed = raw < 1e-4 && z.speed < 0.02 ? 0 : z.speed;
+      zipLoop.current?.gain(Math.min(0.5, speed * 1.6), 0.03);
+      zipLoop.current?.rate(0.75 + Math.min(1, speed * 1.5) * 0.6);
+      // язичок гойдається від прискорення бігунка
+      z.swingV += (-z.swing * 40 - z.swingV * 4 + (z.shown - prev) * (reducedMotion ? 0 : 900)) * dt;
+      z.swing += z.swingV * dt;
+      if (speed > 0.001 || Math.abs(z.swingV) > 0.01 || z.auto) busy = true;
+      if (z.shown >= 0.995 && !z.ended) {
+        z.ended = true;
+        sound.sample("zip-end", { gain: 0.6 });
+        haptic(10);
+        setHint("Не все потрібно нести зараз.");
+        onSettled();
+      } else if (z.shown < 0.97) z.ended = false;
+      if (Math.round(z.shown * 100) !== Math.round(z.lastT * 100)) {
+        z.lastT = z.shown;
+        setZipT(z.shown);
+      }
+    }
     draw();
     return busy;
   });
@@ -501,15 +716,14 @@ function Backpack({
       const out = stones.current.filter((s) => !s.inBag).length;
       syncUi();
       if (out === stones.current.length) {
-        onSettled();
-        setHint("Рюкзак порожній. Можна побути тут скільки треба.");
+        setHint("Тепер можна закрити рюкзак.");
       } else if (out === 1)
         setHint(
           "Решта осіла. Можна торкнутися вийнятого каменя — і вирішити, що з ним.",
         );
-      else setHint("Не обовʼязково виймати все.");
+      else setHint("Не обовʼязково виймати все. Рюкзак можна закрити будь-коли.");
     },
-    [recomputeSettle, onSettled, setHint, stones, syncUi],
+    [recomputeSettle, setHint, stones, syncUi],
   );
 
   {
@@ -529,14 +743,30 @@ function Backpack({
         if (!opaqueAt(st.sprite, lx, ly)) continue;
         // У рюкзаку: місце, закрите клапаном, не вхопити (видно лише відкриту частину).
         if (st.inBag && !st.above && wy > flapEdgeY(wx) + 4) continue;
+        // Крізь застебнуту тканину камінь не витягти.
+        if (st.inBag && !st.above && covers(wx, wy)) continue;
         return st;
       }
       return null;
     };
     usePointer(rootRef, {
       down: (p) => {
-        if (drag.current) return false;
+        if (drag.current || zip.current.grab) return false;
         const w = toWorld(p.x, p.y);
+        // бігунок блискавки: щедра зона навколо нього й язичка
+        {
+          const z = zip.current;
+          const fi = z.shown * (ZN - 1);
+          const q = zipB[Math.round(fi)]!;
+          if (Math.hypot(w.x - q[0], w.y - q[1]) < 70 || Math.hypot(w.x - q[0], w.y - (q[1] + 70)) < 55) {
+            onInteract();
+            setMenu(null);
+            z.grab = { id: p.id };
+            z.auto = null;
+            wake();
+            return;
+          }
+        }
         const st = pick(w.x, w.y);
         if (!st) return false;
         onInteract();
@@ -560,10 +790,28 @@ function Backpack({
           drag.current.oy = w.y - st.y + lift;
         }
         st.vx = st.vy = 0;
-        sound.play("clay", 0.4);
+        sound.play("grit", 0.4);
         wake();
       },
       move: (p) => {
+        const z = zip.current;
+        if (z.grab?.id === p.id) {
+          // палець веде бігунок уздовж траєкторії (найближча точка поруч із поточною — без стрибків через отвір)
+          const w = toWorld(p.x, p.y);
+          const cur = Math.round(z.t * (ZN - 1));
+          let best = cur;
+          let bd = Infinity;
+          for (let i = Math.max(0, cur - 14); i <= Math.min(ZN - 1, cur + 14); i++) {
+            const d2 = (zipB[i]![0] - w.x) ** 2 + (zipB[i]![1] - w.y) ** 2;
+            if (d2 < bd) {
+              bd = d2;
+              best = i;
+            }
+          }
+          z.t = best / (ZN - 1);
+          wake();
+          return;
+        }
         const d = drag.current;
         if (!d || d.id !== p.id) return;
         const w = toWorld(p.x, p.y);
@@ -573,6 +821,12 @@ function Backpack({
         wake();
       },
       up: (p, cancelled) => {
+        if (zip.current.grab?.id === p.id) {
+          // відпустив посередині — стан лишається, можна продовжити
+          zip.current.grab = null;
+          wake();
+          return;
+        }
         const d = drag.current;
         if (!d || d.id !== p.id) return;
         drag.current = null;
@@ -737,8 +991,21 @@ function Backpack({
             </div>
           </details>
         ) : null}
+        <button
+          type="button"
+          onClick={() => {
+            onInteract();
+            const z = zip.current;
+            z.grab = null;
+            z.auto = { to: zipT > 0.98 ? 0 : 1 };
+            wake();
+          }}
+          className="scene-btn border border-steel/50 text-sm"
+        >
+          {zipT > 0.98 ? "Розстебнути" : "Закрити рюкзак"}
+        </button>
         <span className="sr-only" aria-live="polite">
-          Вийнято каменів: {outCount} з {meta.order.length}
+          Вийнято каменів: {outCount} з {meta.order.length}. {zipT > 0.98 ? "Рюкзак застебнуто." : zipT > 0.02 ? `Застебнуто приблизно на ${Math.round(zipT * 100)}%.` : ""}
         </span>
       </div>
     </div>

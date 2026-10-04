@@ -79,12 +79,12 @@ export default function DebtScene({
   onEditInput,
 }: SceneProps) {
   const total = input.amount ?? 0;
-  const currency = input.currency ?? null;
+  // Вправа лише в гривнях: сума вже підтверджена в гривнях на кроці налаштування.
+  const currency = "UAH" as const;
   const assets = useSceneAssets(async () => {
     const manifest = await loadMoneyManifest();
-    const plan = planDebt(total, currency, Boolean(manifest.notes["usd-100"]));
-    const label = formatAmount(plan.bill, currency, plan.bill);
-    const note = await loadNote(plan.note, label, manifest);
+    const plan = planDebt(total);
+    const note = await loadNote(plan.note, manifest);
     return { plan, note };
   });
 
@@ -279,7 +279,7 @@ function Debt({
       haptic(kind === "pack" ? 14 : 8);
       if (next <= 0) {
         onSettled();
-        setHint("Нуль. Можна побути тут скільки треба.");
+        setHint("Нуль. Хоча б в уяві. Можна побути тут скільки треба.");
       } else setHint("Ще. У своєму темпі.");
       return true;
     },
@@ -329,7 +329,7 @@ function Debt({
         g.textAlign = "center";
         g.textBaseline = "middle";
         g.fillText(
-          plan.symbolicPack ? "умовна" : `${PACK_SIZE} шт`,
+          plan.packs > 1 ? `${plan.packs}×${PACK_SIZE}` : `${PACK_SIZE} шт`,
           0,
           0,
           h * 0.9,
@@ -338,7 +338,7 @@ function Debt({
       }
       g.restore();
     },
-    [note, noteW, noteH, plan.symbolicPack],
+    [note, noteW, noteH, plan.packs],
   );
 
   const draw = useCallback(() => {
@@ -658,14 +658,12 @@ function Debt({
 
   const stepNote = useMemo(() => {
     if (mode === "pack") {
-      return plan.symbolicPack
-        ? `Умовна пачка = ${label(plan.pack)}. Масштаб символічний — так сума досяжна.`
-        : `Пачка = ${PACK_SIZE} × ${label(plan.bill)} = ${label(plan.pack)}${note.neutral ? " (символічні купюри)" : ""}`;
+      return plan.packs > 1
+        ? `Стос: ${plan.packs} пачок по ${PACK_SIZE} купюр = ${label(plan.pack)}`
+        : `Пачка = ${PACK_SIZE} × ${label(plan.bill)} = ${label(plan.pack)}`;
     }
-    return note.neutral
-      ? `Символічна купюра = ${label(plan.bill)}`
-      : `Купюра = ${label(plan.bill)}`;
-  }, [mode, plan, label, note.neutral]);
+    return `Купюра = ${label(plan.bill)}`;
+  }, [mode, plan, label]);
 
   return (
     <div
@@ -731,7 +729,7 @@ function Debt({
           ))}
         </div>
         <p className="flex flex-wrap items-center justify-center gap-x-2 text-center text-xs text-mist">
-          <span>Символічна вправа — реальний борг не змінюється</span>
+          <span>Це уява. Реальний борг не змінюється.</span>
           {onEditInput && (
             <button
               type="button"

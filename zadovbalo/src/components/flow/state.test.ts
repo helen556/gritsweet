@@ -18,9 +18,14 @@ const local = (text: string, s: FlowState = initialFlow) =>
   flowReducer(s, { type: "local", route: localRoute(text), reason: "not_configured", amount: null, currency: null });
 
 describe("flowReducer — однозначна тема веде одразу в сцену", () => {
-  it("AI: борг із сумою й валютою → одразу гроші, без анкети", () => {
+  it("AI: борг у гривнях → одразу гроші, без анкети", () => {
+    const s = flowReducer(initialFlow, { type: "analyzed", analysis: analysis({ currency: "UAH" }), warMood: null });
+    expect(s).toMatchObject({ stage: "scene", scene: "debt", source: "ai", sceneInput: { amount: 200000, currency: "UAH" } });
+  });
+
+  it("борг у доларах → просимо суму в гривнях (без мовчазної конвертації)", () => {
     const s = flowReducer(initialFlow, { type: "analyzed", analysis: analysis(), warMood: null });
-    expect(s).toMatchObject({ stage: "scene", scene: "debt", source: "ai", sceneInput: { amount: 200000, currency: "USD" } });
+    expect(s).toMatchObject({ stage: "setup", scene: "debt", extracted: { amount: 200000, currency: "USD" } });
   });
 
   it("борг без суми/валюти → короткий крок суми", () => {
@@ -61,10 +66,24 @@ describe("flowReducer — однозначна тема веде одразу в
     s = flowReducer(s, { type: "setup_done", input: { labels: ["робота"] } });
     s = flowReducer(s, { type: "change_scene" });
     expect(s).toMatchObject({ stage: "manual", scene: null });
-    s = flowReducer(s, { type: "choose_scene", scene: "clay" });
+    s = flowReducer(s, { type: "choose_scene", scene: "bubble" });
     expect(s.stage).toBe("scene");
     s = flowReducer(flowReducer(s, { type: "edit", text: "особисте" }), { type: "reset" });
     expect(s).toEqual(initialFlow);
+  });
+
+  it("нові шляхи: бісить → посуд, плівка напряму, самотність → «Побудь тут», пауза → короткий вибір", () => {
+    expect(local("просто бісить усе")).toMatchObject({ stage: "scene", scene: "dishes" });
+    expect(local("хочу полопати плівку")).toMatchObject({ stage: "scene", scene: "bubble" });
+    expect(local("мені сумно й самотньо")).toMatchObject({ stage: "scene", scene: "stay" });
+    expect(local("хочу тиші")).toMatchObject({ stage: "scene", scene: "candle" });
+    expect(local("втомився, хочу паузу")).toMatchObject({ stage: "choose", options: ["pause"] });
+  });
+
+  it("страх через війну не веде в руйнування", () => {
+    const s = local("мені страшно через обстріли");
+    expect(s.stage).toBe("war_choice");
+    expect(s.scene).toBeNull();
   });
 
   it("needs_support → підтримка", () => {

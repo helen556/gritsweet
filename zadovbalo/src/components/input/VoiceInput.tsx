@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { useReveal } from "@/components/ui/motion";
 import { StageHeading, StagePanel } from "@/components/flow/StagePanel";
-import { MicIcon } from "@/components/hero/HeroCopy";
+import { MicIcon } from "@/components/hero/Compose";
 import type { SpeechErrorCode } from "@/lib/speech";
 import { useVoiceRecorder } from "./useVoiceRecorder";
 import { Waveform } from "./Waveform";
