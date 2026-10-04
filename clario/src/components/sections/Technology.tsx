@@ -1,5 +1,5 @@
-import slitLamp from "@/assets/02_slit_lamp_closeup.webp";
-import eyeMacro from "@/assets/03_eye_exam_macro.webp";
+import slitLamp from "@/assets/02_slit_lamp_closeup.png";
+import eyeMacro from "@/assets/03_eye_exam_macro.png";
 import type { Dictionary } from "@/content/dictionaries";
 import { ParallaxImage } from "@/components/ParallaxImage";
 import { Reveal } from "@/components/motion";
@@ -15,7 +15,7 @@ export function Technology({ t }: { t: Dictionary["technology"] }) {
         </Reveal>
 
         <Reveal delay={0.1} className="mt-14 lg:mt-20">
-          <ParallaxImage src={eyeMacro} alt={t.macroAlt} sizes="(min-width: 1320px) 1240px, 100vw" className="aspect-[4/3] rounded-[1.75rem] sm:aspect-[16/9] lg:aspect-[21/9]" imageClassName="object-[55%_45%]" strength={10} />
+          <ParallaxImage src={eyeMacro} alt={t.macroAlt} sizes="(min-width: 1320px) 1240px, 100vw" className="aspect-[4/3] rounded-[1.75rem] sm:aspect-[16/9] lg:aspect-[21/9]" imageClassName="object-[55%_45%]" strength={5} />
         </Reveal>
 
         <div className="mt-16 grid gap-12 lg:mt-24 lg:grid-cols-12 lg:gap-16">

@@ -48,7 +48,7 @@ export function Doctors({ t }: { t: Dictionary["doctors"] }) {
                   <div className="relative aspect-[4/5] overflow-hidden rounded-[1.75rem] bg-graphite-800 shadow-[var(--shadow-soft)] transition-shadow duration-700 group-hover:shadow-[var(--shadow-lift)]" data-cursor="media">
                     <div className="absolute inset-0 transition-transform duration-[1400ms] ease-[var(--ease-out-expo)] group-hover:scale-[1.035]">
                       {photo ? (
-                        <Image src={photo} alt={`${d.name} — ${d.role}`} fill sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" placeholder="blur" className="object-cover" />
+                        <Image src={photo} alt={`${d.name} — ${d.role}`} fill sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" placeholder="blur" quality={92} className="object-cover" />
                       ) : (
                         <Monogram name={d.name} index={i} />
                       )}

@@ -5,7 +5,8 @@ const nextConfig: NextConfig = {
   turbopack: { root: __dirname },
   images: {
     formats: ["image/avif", "image/webp"],
-    qualities: [75, 85],
+    // Single high quality level: imagery is the clinic's main visual asset
+    qualities: [92],
   },
   async headers() {
     return [

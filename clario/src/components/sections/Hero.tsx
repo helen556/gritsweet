@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import poster from "@/assets/hero-poster.webp";
+import poster from "@/assets/hero-poster.png";
 import type { Dictionary } from "@/content/dictionaries";
 import { BookButton } from "@/components/booking/BookingProvider";
 import { btn } from "@/components/ui";
@@ -51,9 +51,8 @@ export function Hero({ t, cta, scrollLabel }: Props) {
     <section ref={section} id="top" aria-labelledby="hero-title" className="on-dark relative isolate flex min-h-[100svh] flex-col overflow-hidden bg-graphite-900 text-white">
       {/* Media */}
       <motion.div className="absolute inset-0 -z-10" style={reduce ? undefined : { y: mediaY }} aria-hidden="true">
-        {/* Slight overscan keeps the source's lower-right corner mark and soft edge bars out of frame */}
-        <div className="absolute inset-0 origin-[50%_30%] scale-[1.08] lg:origin-[12%_10%] lg:scale-[1.18]">
-          <Image src={poster} alt="" fill priority fetchPriority="high" sizes="100vw" quality={75} placeholder="blur" className="object-cover" />
+        <div className="absolute inset-0">
+          <Image src={poster} alt="" fill priority fetchPriority="high" sizes="100vw" quality={92} placeholder="blur" className="object-cover" />
           {playVideo && (
             <video
               ref={video}
@@ -66,8 +65,11 @@ export function Hero({ t, cta, scrollLabel }: Props) {
               poster={poster.src}
               onPlaying={() => setReady(true)}
             >
-              <source src="/media/hero.webm" type="video/webm" />
-              <source src="/media/hero.mp4" type="video/mp4" />
+              {/* 1080p for larger / high-density screens, 720p for small screens */}
+              <source src="/media/hero-1080.webm" type="video/webm" media="(min-width: 768px), (min-resolution: 2.5dppx)" />
+              <source src="/media/hero-1080.mp4" type="video/mp4" media="(min-width: 768px), (min-resolution: 2.5dppx)" />
+              <source src="/media/hero-720.webm" type="video/webm" />
+              <source src="/media/hero-720.mp4" type="video/mp4" />
             </video>
           )}
         </div>

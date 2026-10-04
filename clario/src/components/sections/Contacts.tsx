@@ -1,4 +1,4 @@
-import clinic from "@/assets/04_clear_clinic.webp";
+import clinic from "@/assets/04_clear_clinic.png";
 import type { Dictionary } from "@/content/dictionaries";
 import { ParallaxImage } from "@/components/ParallaxImage";
 import { Reveal } from "@/components/motion";

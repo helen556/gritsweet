@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import blurred from "@/assets/01_blurred_clinic.webp";
+import blurred from "@/assets/01_blurred_clinic.png";
 import { getDictionary, locales } from "@/content/dictionaries";
 import { EyeMark } from "@/components/Icon";
 import { btn } from "@/components/ui";
@@ -10,7 +10,7 @@ import { btn } from "@/components/ui";
 export default function NotFound() {
   return (
     <main id="main" className="on-dark relative isolate grid min-h-[100svh] place-items-center overflow-hidden bg-graphite-900 px-4 text-center text-white">
-      <Image src={blurred} alt="" fill sizes="100vw" placeholder="blur" className="-z-20 object-cover opacity-60" />
+      <Image src={blurred} alt="" fill sizes="100vw" placeholder="blur" quality={92} className="-z-20 object-cover opacity-60" />
       <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,rgb(21_24_26/0.55),rgb(21_24_26/0.9))]" />
       {locales.map((lang) => {
         const t = getDictionary(lang).notFound;
