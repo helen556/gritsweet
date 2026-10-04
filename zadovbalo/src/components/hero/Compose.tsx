@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "motion/react";
-import { useEffect, useId, useState } from "react";
+import { startTransition, useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { StagePanel } from "@/components/flow/StagePanel";
 import { MAX_TEXT_LENGTH, MIN_TEXT_LENGTH } from "@/lib/ai/schema";
@@ -38,11 +38,18 @@ export function Compose({
 }) {
   const id = useId();
   const [quiet] = useState(() => exhaled);
+  // Поле оновлюється одразу; решта сторінки — як невідкладний перехід (друк без затримок).
+  // Ззовні текст змінюється лише між екранами (голос, «Написати ще») — тоді компонент монтується заново.
+  const [draft, setDraft] = useState(value);
+  const edit = (v: string) => {
+    setDraft(v);
+    startTransition(() => onChange(v));
+  };
   const [howOpen, setHowOpen] = useState(false);
   useEffect(() => {
     exhaled = true;
   }, []);
-  const length = value.trim().length;
+  const length = draft.trim().length;
   const canSubmit = length >= MIN_TEXT_LENGTH && length <= MAX_TEXT_LENGTH;
   const exit = { opacity: 0, filter: "blur(10px)", transition: { duration: 0.5 } };
 
@@ -81,8 +88,8 @@ export function Compose({
         <div className="rounded-[var(--radius-hair)] border border-steel/55 bg-abyss/60 backdrop-blur-md transition-colors focus-within:border-frost/70">
           <textarea
             id={id}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
+            value={draft}
+            onChange={(e) => edit(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && canSubmit) {
                 e.preventDefault();

@@ -92,10 +92,59 @@ export default function DishesScene(props: SceneProps) {
   return <Dishes {...props} {...assets.data} />;
 }
 
+interface ShardArt {
+  /** Обличчя шматка з фактурою й світлим краєм. */
+  face: HTMLCanvasElement;
+  /** Тіло (товщина): кераміка — кремова, скло — зелене. */
+  body: HTMLCanvasElement;
+  /** Чорний силует — для тіні й затемнення при нахилі. */
+  dark: HTMLCanvasElement;
+  /** Зсув центроїда в канвасі. */
+  ox: number;
+  oy: number;
+}
+
+/** Шматок малюється один раз при розбитті; далі щокадру — лише кілька drawImage. */
+function bakeShard(kind: Kind, shape: ShardShape, tex: CanvasImageSource): ShardArt {
+  const xs = shape.poly.map((p) => p[0]);
+  const ys = shape.poly.map((p) => p[1]);
+  const pad = 3;
+  const x0 = Math.floor(Math.min(...xs)) - pad;
+  const y0 = Math.floor(Math.min(...ys)) - pad;
+  const w = Math.max(2, Math.ceil(Math.max(...xs)) + pad - x0);
+  const h = Math.max(2, Math.ceil(Math.max(...ys)) + pad - y0);
+  const mk = () => {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const g = c.getContext("2d")!;
+    g.translate(-x0, -y0);
+    g.beginPath();
+    shape.poly.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+    g.closePath();
+    return { c, g };
+  };
+  const face = mk();
+  face.g.save();
+  face.g.clip();
+  face.g.drawImage(tex, -shape.c[0], -shape.c[1]);
+  face.g.restore();
+  face.g.lineWidth = kind === "plate" ? 1.1 : 1.3;
+  face.g.strokeStyle = kind === "plate" ? "rgba(235,226,206,0.55)" : "rgba(235,255,205,0.55)";
+  face.g.stroke();
+  const body = mk();
+  body.g.fillStyle = kind === "plate" ? "rgb(196,182,158)" : "rgba(64,74,22,0.85)";
+  body.g.fill();
+  const dark = mk();
+  dark.g.fillStyle = "#000";
+  dark.g.fill();
+  return { face: face.c, body: body.c, dark: dark.c, ox: x0, oy: y0 };
+}
+
 interface Shard {
   kind: Kind;
   shape: ShardShape;
-  tex: CanvasImageSource;
+  art: ShardArt;
   x: number;
   y: number;
   z: number;
@@ -327,7 +376,7 @@ function Dishes({
         s.shards.push({
           kind: h.kind,
           shape: sh,
-          tex,
+          art: bakeShard(h.kind, sh, tex),
           x: wx,
           y: wy,
           z: ZW - 0.012,
@@ -606,55 +655,31 @@ function Dishes({
     const elev = Math.atan2(H, sh.z);
     const cph = Math.cos(sh.ph);
     const thick = sh.kind === "plate" ? 6 : 3.5;
-    const poly = sh.shape.poly;
-    const path = () => {
-      g.beginPath();
-      g.moveTo(poly[0]![0], poly[0]![1]);
-      for (let i = 1; i < poly.length; i++) g.lineTo(poly[i]![0], poly[i]![1]);
-      g.closePath();
-    };
+    const a = sh.art;
     g.save();
     g.globalAlpha = alpha * (sh.kind === "bottle" ? 0.92 : 1);
     g.translate(p.sx, p.sy);
     if (sh.rest || sh.y <= -H + 0.002) {
-      // лежить на підлозі: обличчя вкорочене перспективою
+      // лежить на підлозі: обличчя вкорочене перспективою; під ним контактна тінь
       g.scale(1, Math.sin(elev) * 1.15);
-      // контактна тінь
       g.save();
       g.rotate(sh.th);
       g.scale(k, k);
-      g.translate(2, 5);
-      path();
-      g.fillStyle = "rgba(0,0,0,0.38)";
-      g.fill();
+      g.globalAlpha = alpha * 0.38;
+      g.drawImage(a.dark, a.ox + 2, a.oy + 5);
       g.restore();
     }
     g.rotate(sh.th);
     g.scale(k * (Math.abs(cph) < 0.12 ? 0.12 * Math.sign(cph || 1) : cph), k);
-    // товщина: зсунутий край (тіло кераміки / зелене скло)
-    g.save();
-    g.translate(thick * Math.sin(sh.ph) * 1.4, thick * 0.9);
-    path();
-    g.fillStyle = sh.kind === "plate" ? "rgb(196,182,158)" : "rgba(64,74,22,0.85)";
-    g.fill();
-    g.restore();
-    path();
-    g.save();
-    g.clip();
-    g.translate(-sh.shape.c[0], -sh.shape.c[1]);
-    g.drawImage(sh.tex, 0, 0);
-    g.restore();
-    // світло на гранях: глазур / гострі грані скла
+    // товщина: зсунутий край тіла
+    g.drawImage(a.body, a.ox + thick * Math.sin(sh.ph) * 1.4, a.oy + thick * 0.9);
+    g.drawImage(a.face, a.ox, a.oy);
+    // нахилений шматок ловить менше світла
     const lit = 0.25 * (1 - Math.abs(cph));
     if (lit > 0.02) {
-      path();
-      g.fillStyle = `rgba(0,0,0,${lit})`;
-      g.fill();
+      g.globalAlpha = alpha * lit;
+      g.drawImage(a.dark, a.ox, a.oy);
     }
-    path();
-    g.lineWidth = (sh.kind === "plate" ? 1.1 : 1.3) / Math.max(0.3, k);
-    g.strokeStyle = sh.kind === "plate" ? "rgba(235,226,206,0.55)" : "rgba(235,255,205,0.55)";
-    g.stroke();
     g.restore();
   }
 

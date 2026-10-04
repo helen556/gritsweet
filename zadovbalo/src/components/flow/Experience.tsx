@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { memo, startTransition, useCallback, useEffect, useReducer, useRef } from "react";
 import { StormHero } from "@/components/hero/StormHero";
 import { Compose } from "@/components/hero/Compose";
 import { SiteFooter, SiteHeader } from "@/components/ui/SiteChrome";
@@ -27,10 +27,17 @@ const Finish = dynamic(() => import("./Choices").then((m) => m.Finish));
 const DebtSetup = dynamic(() => import("./Setup").then((m) => m.DebtSetup));
 const LabelsSetup = dynamic(() => import("./Setup").then((m) => m.LabelsSetup));
 
+// Фон і рамка сторінки не залежать від тексту — не перемальовуються на кожну літеру.
+const Storm = memo(StormHero);
+const Header = memo(SiteHeader);
+const Footer = memo(SiteFooter);
+
 const BACKPACK_EXAMPLES = ["Робота", "Дім", "Рахунки", "Діти", "Навчання", "Здоровʼя", "Чужі очікування"];
 
 export function Experience() {
-  const [state, dispatch] = useReducer(flowReducer, initialFlow);
+  const [state, rawDispatch] = useReducer(flowReducer, initialFlow);
+  // Зміна екрана — перехід: спершу відгук на дотик (кадр), потім важчий новий екран (менший INP).
+  const dispatch = useCallback((a: Parameters<typeof rawDispatch>[0]) => startTransition(() => rawDispatch(a)), []);
   const analyzer = useRef(createAnalyzer());
   const reduced = useReducedMotion();
   const { stage } = state;
@@ -57,7 +64,7 @@ export function Experience() {
   const routeLocally = useCallback((text: string, reason: ClientReason | null) => {
     const picked = pickAmount(extractAmounts(text));
     dispatch({ type: "local", route: localRoute(text), reason, amount: picked?.amount ?? null, currency: picked?.currency ?? null });
-  }, []);
+  }, [dispatch]);
 
   const analyze = useCallback(
     async (text: string) => {
@@ -80,7 +87,7 @@ export function Experience() {
           return dispatch({ type: "write" });
       }
     },
-    [routeLocally],
+    [routeLocally, dispatch],
   );
 
   const reset = () => {
@@ -102,14 +109,14 @@ export function Experience() {
     if (kind === "write") dispatch({ type: "write" });
   };
 
-  const onTranscript = useCallback((text: string) => dispatch({ type: "transcribed", text }), []);
+  const onTranscript = useCallback((text: string) => dispatch({ type: "transcribed", text }), [dispatch]);
   const inScene = stage === "scene" && state.scene;
   const topicNote = state.source === "ai" ? "Сцену підібрав ШІ." : state.source === "local" ? "Сцену підібрано за словами в тексті, без ШІ." : null;
 
   return (
     <>
-      <StormHero scene={stage === "hero" ? "storm" : "calm"} still={stage === "support" || Boolean(inScene)} />
-      <SiteHeader />
+      <Storm scene={stage === "hero" ? "storm" : "calm"} still={stage === "support" || Boolean(inScene)} />
+      <Header />
 
       <motion.div
         className="relative z-10 flex min-h-dvh flex-col"
@@ -206,7 +213,7 @@ export function Experience() {
             {stage === "support" && <SafetyFlow key="support" onQuiet={() => dispatch({ type: "choose_scene", scene: "candle" })} onTopics={openManual} onExit={reset} />}
           </AnimatePresence>
         </main>
-        <SiteFooter />
+        <Footer />
       </motion.div>
 
       <AnimatePresence>

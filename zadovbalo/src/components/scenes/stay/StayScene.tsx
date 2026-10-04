@@ -145,6 +145,26 @@ function Stay({ candle, plate, wallSrc, setHint, onInteract, reducedMotion }: Sc
   const wipe = useLazyRef(() => new Map<number, { x: number; y: number }>());
   const steam = useLazyRef(() => [] as { x: number; y: number; age: number; life: number; seed: number }[]);
   const rain = useRef<LoopHandle | null>(null);
+  /** Нерухома кімната, вже освітлена: повне світло свічки й майже темрява — змішуються за мерехтінням. */
+  const layers = useLazyRef(() => ({ key: "", lit: null as HTMLCanvasElement | null, dim: null as HTMLCanvasElement | null, glass: null as HTMLCanvasElement | null, glassAge: 1 }));
+  /** Краплі — заздалегідь намальовані спрайти (а не градієнт на кожну краплю щокадру). */
+  const dropSprites = useLazyRef(() =>
+    [0, 1].map((moving) => {
+      const c = document.createElement("canvas");
+      c.width = 24;
+      c.height = 32;
+      const g = c.getContext("2d")!;
+      const gr = g.createRadialGradient(9, 12, 0, 12, 16, 12);
+      gr.addColorStop(0, "rgba(230,235,245,0.6)");
+      gr.addColorStop(0.5, "rgba(120,130,150,0.2)");
+      gr.addColorStop(1, "rgba(10,12,18,0.38)");
+      g.fillStyle = gr;
+      g.beginPath();
+      g.ellipse(12, 16, 11, moving ? 14 : 11, 0, 0, Math.PI * 2);
+      g.fill();
+      return c;
+    }),
+  );
 
   useEffect(() => {
     rain.current = sound.loop("rain", 0.22);
@@ -203,20 +223,13 @@ function Stay({ candle, plate, wallSrc, setHint, onInteract, reducedMotion }: Sc
       tg.globalCompositeOperation = "source-over";
       g.drawImage(gl.tmp, GLASS.x, GLASS.y);
       // краплі: темніший низ, світлий відблиск угорі
+      const [still, run] = dropSprites.current;
       for (const d of gl.drops) {
-        const x = GLASS.x + d.x;
-        const y = GLASS.y + d.y;
-        const gr = g.createRadialGradient(x - d.r * 0.3, y - d.r * 0.4, 0, x, y, d.r * 1.2);
-        gr.addColorStop(0, "rgba(230,235,245,0.55)");
-        gr.addColorStop(0.5, "rgba(120,130,150,0.18)");
-        gr.addColorStop(1, "rgba(10,12,18,0.35)");
-        g.fillStyle = gr;
-        g.beginPath();
-        g.ellipse(x, y, d.r, d.r * (d.moving ? 1.3 : 1), 0, 0, Math.PI * 2);
-        g.fill();
+        const k = d.r / 11;
+        g.drawImage(d.moving ? run! : still!, GLASS.x + d.x - 12 * k, GLASS.y + d.y - 16 * k, 24 * k, 32 * k);
       }
     },
-    [glass],
+    [glass, dropSprites],
   );
 
   /** Чашка: керамічний циліндр із фактурою тієї ж кераміки, що й тарілка; ручка обертається разом. */
@@ -240,10 +253,11 @@ function Stay({ candle, plate, wallSrc, setHint, onInteract, reducedMotion }: Sc
       const drawHandle = () => {
         const hx = cx + Math.sin(handleAng) * (r + 16);
         const hw = 6 + 20 * Math.abs(Math.sin(handleAng));
-        const shade = 0.35 + 0.65 * Math.max(0, Math.cos(handleAng - lightAng)) * light;
+        // та сама кераміка й те саме тепле світло, що й на тілі чашки
+        const shade = 0.22 + 0.58 * Math.max(0, Math.cos(handleAng - lightAng)) * light;
         g.save();
         g.lineWidth = 11;
-        g.strokeStyle = `rgb(${Math.round(205 * shade + 20)},${Math.round(192 * shade + 16)},${Math.round(166 * shade + 12)})`;
+        g.strokeStyle = `rgb(${Math.round(196 * shade + 14)},${Math.round(170 * shade + 10)},${Math.round(130 * shade + 8)})`;
         g.beginPath();
         g.ellipse(hx, top + h * 0.45, hw, h * 0.26, 0, 0, Math.PI * 2);
         g.stroke();
@@ -251,7 +265,7 @@ function Stay({ candle, plate, wallSrc, setHint, onInteract, reducedMotion }: Sc
       };
       if (hz < 0) drawHandle();
       // тіло: вертикальні смужки з фактурою й ламбертівським світлом
-      const N = 36;
+      const N = 28;
       const texW = plate.naturalWidth * 0.6;
       for (let i = 0; i < N; i++) {
         const a0 = -Math.PI / 2 + (Math.PI * i) / N;
@@ -267,6 +281,15 @@ function Stay({ candle, plate, wallSrc, setHint, onInteract, reducedMotion }: Sc
         g.fillStyle = `rgba(16,10,8,${Math.max(0, dark) * 0.9})`;
         g.fillRect(x0, top, x1 - x0 + 0.5, h);
       }
+      // тепле світло свічки на кераміці
+      g.save();
+      g.beginPath();
+      g.rect(cx - r, top, r * 2, h);
+      g.clip();
+      g.globalCompositeOperation = "multiply";
+      g.fillStyle = `rgb(255,${Math.round(205 + 25 * (1 - light))},${Math.round(160 + 60 * (1 - light))})`;
+      g.fillRect(cx - r, top, r * 2, h);
+      g.restore();
       // донце (заокруглення знизу)
       g.save();
       g.beginPath();
@@ -303,6 +326,41 @@ function Stay({ candle, plate, wallSrc, setHint, onInteract, reducedMotion }: Sc
     [cup, plate, flame],
   );
 
+  /** Кімната (стіна, рама, підвіконня, стіл) під світлом свічки сили k — один раз на розмір екрана. */
+  const buildRoom = (k: number, scale: number) => {
+    const c = document.createElement("canvas");
+    c.width = Math.round(W * scale);
+    c.height = Math.round(H * scale);
+    const g = c.getContext("2d")!;
+    g.scale(scale, scale);
+    g.drawImage(wallSrc, 0, 0, 630, 300, -20, 0, W + 40, 540);
+    g.fillStyle = "rgba(12,9,8,0.35)";
+    g.fillRect(0, 0, W, 540);
+    g.fillStyle = "#1c130f";
+    g.fillRect(GLASS.x - 16, GLASS.y - 16, GLASS.w + 32, GLASS.h + 32);
+    g.fillStyle = "#2a1c15";
+    g.fillRect(GLASS.x - 30, GLASS.y + GLASS.h + 14, GLASS.w + 60, 18);
+    g.drawImage(wallSrc, 0, 700, 630, 136, -20, 530, W + 40, H - 530);
+    const tableShade = g.createLinearGradient(0, 530, 0, H);
+    tableShade.addColorStop(0, "rgba(10,8,7,0.7)");
+    tableShade.addColorStop(0.3, "rgba(10,8,7,0.1)");
+    tableShade.addColorStop(1, "rgba(10,8,7,0.5)");
+    g.fillStyle = tableShade;
+    g.fillRect(0, 530, W, H - 530);
+    // тепле світло від свічки: ближче до полумʼя — світліше
+    const spr = candle.meta.sprite;
+    const tx = CANDLE.x + (candle.meta.wick.tip[0] - spr.x) * CANDLE.scale;
+    const ty = CANDLE.by - spr.h * CANDLE.scale + (candle.meta.wick.tip[1] - spr.y) * CANDLE.scale;
+    g.globalCompositeOperation = "multiply";
+    const lg = g.createRadialGradient(tx, ty, 10, tx, ty, 700);
+    lg.addColorStop(0, `rgb(255,${Math.round(225 + 20 * (1 - k))},${Math.round(190 + 50 * (1 - k))})`);
+    lg.addColorStop(0.35, `rgb(${Math.round(150 + 80 * k)},${Math.round(120 + 70 * k)},${Math.round(110 + 50 * k)})`);
+    lg.addColorStop(1, `rgb(${Math.round(70 + 40 * k)},${Math.round(64 + 30 * k)},${Math.round(72 + 20 * k)})`);
+    g.fillStyle = lg;
+    g.fillRect(0, 0, W, H);
+    return c;
+  };
+
   const wake = useFrameLoop(rootRef, (dt, now) => {
     const g = canvasRef.current?.getContext("2d");
     if (!g || !size.width) return false;
@@ -333,15 +391,35 @@ function Stay({ candle, plate, wallSrc, setHint, onInteract, reducedMotion }: Sc
     g.save();
     g.translate(ox, oy);
     g.scale(s, s);
-    // стіна — та сама тепла темрява, що й у свічки (з гілочкою ліворуч)
-    g.drawImage(wallSrc, 0, 0, 630, 300, -20, 0, W + 40, 540);
-    g.fillStyle = "rgba(12,9,8,0.35)";
-    g.fillRect(0, 0, W, 540);
-    // вікно: рама, скло, підвіконня
-    g.fillStyle = "#1c130f";
-    g.fillRect(GLASS.x - 16, GLASS.y - 16, GLASS.w + 32, GLASS.h + 32);
-    drawGlass(g, dt);
-    g.strokeStyle = "#1c130f";
+    const L = layers.current;
+    const key = `${size.width}x${size.height}@${size.dpr}`;
+    if (L.key !== key) {
+      L.key = key;
+      L.lit = buildRoom(1, s * size.dpr);
+      L.dim = buildRoom(0.12, s * size.dpr);
+      L.glass = document.createElement("canvas");
+      L.glass.width = Math.round(GLASS.w * s * size.dpr);
+      L.glass.height = Math.round(GLASS.h * s * size.dpr);
+      L.glassAge = 1;
+    }
+    g.drawImage(L.dim!, 0, 0, W, H);
+    g.globalAlpha = Math.max(0, Math.min(1, (light - 0.12) / 0.88));
+    g.drawImage(L.lit!, 0, 0, W, H);
+    g.globalAlpha = 1;
+    // скло перескладаємо ~20 разів на секунду (краплі й туман повільні)
+    L.glassAge += dt;
+    if (L.glassAge > 0.05) {
+      const gg = L.glass!.getContext("2d")!;
+      const k = (s * size.dpr);
+      gg.setTransform(k, 0, 0, k, -GLASS.x * k, -GLASS.y * k);
+      drawGlass(gg, L.glassAge);
+      L.glassAge = 0;
+    }
+    g.drawImage(L.glass!, GLASS.x, GLASS.y, GLASS.w, GLASS.h);
+    // скло трохи темніє, коли свічка згасла
+    g.fillStyle = `rgba(6,5,6,${0.35 * (1 - light)})`;
+    g.fillRect(GLASS.x, GLASS.y, GLASS.w, GLASS.h);
+    g.strokeStyle = `rgb(${Math.round(16 + 20 * light)},${Math.round(11 + 12 * light)},${Math.round(9 + 8 * light)})`;
     g.lineWidth = 10;
     g.beginPath();
     g.moveTo(GLASS.x + GLASS.w / 2, GLASS.y);
@@ -349,16 +427,6 @@ function Stay({ candle, plate, wallSrc, setHint, onInteract, reducedMotion }: Sc
     g.moveTo(GLASS.x, GLASS.y + GLASS.h * 0.42);
     g.lineTo(GLASS.x + GLASS.w, GLASS.y + GLASS.h * 0.42);
     g.stroke();
-    g.fillStyle = "#2a1c15";
-    g.fillRect(GLASS.x - 30, GLASS.y + GLASS.h + 14, GLASS.w + 60, 18);
-    // стіл — мармур зі свічкової сцени
-    g.drawImage(wallSrc, 0, 700, 630, 136, -20, 530, W + 40, H - 530);
-    const tableShade = g.createLinearGradient(0, 530, 0, H);
-    tableShade.addColorStop(0, "rgba(10,8,7,0.7)");
-    tableShade.addColorStop(0.3, "rgba(10,8,7,0.1)");
-    tableShade.addColorStop(1, "rgba(10,8,7,0.5)");
-    g.fillStyle = tableShade;
-    g.fillRect(0, 530, W, H - 530);
 
     // свічка
     const cs = CANDLE.scale;
@@ -389,18 +457,6 @@ function Stay({ candle, plate, wallSrc, setHint, onInteract, reducedMotion }: Sc
     }
     g.restore();
 
-    // тепле світло свічки на кімнаті: темніше далі від полумʼя
-    g.save();
-    g.globalCompositeOperation = "multiply";
-    const lx = tip[0] + f.sway() * 6;
-    const lg = g.createRadialGradient(lx, tip[1], 10, lx, tip[1], 700);
-    const k = Math.max(0.12, f.level * f.flicker());
-    lg.addColorStop(0, `rgb(${Math.round(255)},${Math.round(225 + 20 * (1 - k))},${Math.round(190 + 50 * (1 - k))})`);
-    lg.addColorStop(0.35, `rgb(${Math.round(150 + 80 * k)},${Math.round(120 + 70 * k)},${Math.round(110 + 50 * k)})`);
-    lg.addColorStop(1, `rgb(${Math.round(70 + 40 * k)},${Math.round(64 + 30 * k)},${Math.round(72 + 20 * k)})`);
-    g.fillStyle = lg;
-    g.fillRect(-W, -H, W * 3, H * 3);
-    g.restore();
     f.draw(g, tip[0], tip[1] + 1, cs * 0.9);
     f.drawSmoke(g, cs);
     g.restore();
@@ -459,22 +515,28 @@ function Stay({ candle, plate, wallSrc, setHint, onInteract, reducedMotion }: Sc
     },
   });
 
+  /** Мʼякий пензель для сліду пальця (без дорогого розмиття на кожен рух). */
+  const brush = useLazyRef(() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 48;
+    const g = c.getContext("2d")!;
+    const gr = g.createRadialGradient(24, 24, 6, 24, 24, 24);
+    gr.addColorStop(0, "rgba(0,0,0,0.9)");
+    gr.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 48, 48);
+    return c;
+  });
+
   /** Слід пальця на запітнілому склі (поступово затягується знову). */
   const rub = (x0: number, y0: number, x1: number, y1: number) => {
     const fg = glass.current.fog.getContext("2d")!;
     fg.save();
     fg.globalCompositeOperation = "destination-out";
-    fg.lineCap = "round";
-    fg.lineJoin = "round";
-    fg.strokeStyle = "rgba(0,0,0,0.85)";
-    fg.lineWidth = 30;
-    fg.shadowColor = "rgba(0,0,0,1)";
-    fg.shadowBlur = 10;
-    fg.beginPath();
-    fg.moveTo(x0, y0);
-    fg.lineTo(x1 + 0.01, y1);
-    fg.stroke();
+    const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 6));
+    for (let i = 0; i <= n; i++) fg.drawImage(brush.current, x0 + ((x1 - x0) * i) / n - 24, y0 + ((y1 - y0) * i) / n - 24);
     fg.restore();
+    layers.current.glassAge = 1;
   };
 
   const toggleCandle = () => {
