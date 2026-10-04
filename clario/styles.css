@@ -133,7 +133,8 @@ address { font-style: normal; }
 }
 .site-header.is-solid .brand { color: var(--graphite-800); }
 .site-header.is-solid .brand-text span { color: var(--gray-500); }
-.header-inner { height: 100%; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.header-inner { height: 100%; display: flex; align-items: center; gap: 24px; }
+.header-inner .brand { margin-right: auto; }
 .nav { display: flex; align-items: center; gap: clamp(18px, 2.4vw, 36px); }
 .nav a:not(.btn) { text-decoration: none; font-size: .9rem; font-weight: 500; opacity: .86; position: relative; padding: 6px 0; }
 .nav a:not(.btn)::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: currentColor; transform: scaleX(0); transform-origin: left; transition: transform .3s var(--ease); }
@@ -141,10 +142,20 @@ address { font-style: normal; }
 .nav a:not(.btn):hover::after { transform: scaleX(1); }
 .site-header:not(.is-solid) .nav-cta { --bg: var(--white); --fg: var(--graphite-800); }
 .nav-toggle { display: none; }
+.lang { display: inline-flex; padding: 3px; border-radius: 999px; border: 1px solid currentColor; border-color: rgba(255, 255, 255, .35); flex: none; }
+.site-header.is-solid .lang, .site-header.menu-open .lang { border-color: var(--line); }
+.lang button {
+  min-width: 38px; height: 30px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; color: inherit;
+  font: 600 .74rem/1 var(--font); letter-spacing: .08em; cursor: pointer; opacity: .7; transition: background-color .25s var(--ease), color .25s var(--ease), opacity .25s;
+}
+.lang button:hover { opacity: 1; }
+.lang button[aria-pressed="true"] { opacity: 1; background: var(--white); color: var(--graphite-800); }
+.site-header.is-solid .lang button[aria-pressed="true"], .site-header.menu-open .lang button[aria-pressed="true"] { background: var(--graphite-800); color: var(--white); }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   :root { --header-h: 66px; }
   .brand-mark { width: 34px; }
+  .header-inner { gap: 8px; }
   .nav-toggle {
     display: inline-flex; flex-direction: column; justify-content: center; gap: 6px;
     width: 44px; height: 44px; padding: 0 11px; border: 0; background: transparent; color: inherit; cursor: pointer;
@@ -211,6 +222,7 @@ address { font-style: normal; }
   .hero-content { align-self: end; padding-bottom: 32px; }
   .hero-facts { grid-template-columns: 1fr; gap: 14px; }
   .hero-facts > div { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; }
+  .hero-facts dt { white-space: nowrap; }
   .hero-facts dd { margin: 0; text-align: right; }
   .scroll-cue { display: none; }
 }

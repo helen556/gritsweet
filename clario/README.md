@@ -1,7 +1,14 @@
 # Clario Vision Clinic — website
 
-Static, dependency-free site (`index.html`, `styles.css`, `main.js`). Open `index.html`
+Static, dependency-free site (`index.html`, `styles.css`, `main.js`, `i18n.js`). Open `index.html`
 through any static server, e.g. `python3 -m http.server` from this folder.
+
+## Languages
+
+Ukrainian is the default and is written directly in `index.html`. English lives in
+`i18n.js` (`CLARIO_EN`), keyed by the `data-i18n` / `data-i18n-<attr>` attributes in the page.
+The UA / EN switch in the header remembers the choice; `?lang=en` opens the English version
+directly. To edit copy, change the Ukrainian text in `index.html` and the matching key in `i18n.js`.
 
 ## Visual system
 
@@ -33,6 +40,6 @@ lower-right corner and soft edge bars stay out of frame.
 
 ## Before launch
 
-- Replace the placeholder address, phone and email in the footer.
+- Replace the placeholder address, phone and email in the footer (both languages).
 - The booking form validates and confirms on the client only — connect it to the
   clinic's booking system or form endpoint in `main.js`.
