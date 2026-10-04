@@ -1,4 +1,4 @@
-import clinic from "@/assets/04_clear_clinic.png";
+import clinic from "@/assets/clinic-room.png";
 import type { Dictionary } from "@/content/dictionaries";
 import { ParallaxImage } from "@/components/ParallaxImage";
 import { Reveal } from "@/components/motion";
@@ -21,7 +21,7 @@ export function Contacts({ t }: { t: Dictionary["contacts"] }) {
         </Reveal>
         <div className="relative mt-14 lg:mt-20">
           <Reveal>
-            <ParallaxImage src={clinic} alt={t.imageAlt} sizes="(min-width: 1320px) 1240px, 100vw" className="aspect-[4/3] rounded-[2rem] sm:aspect-[16/9] lg:aspect-[21/10]" imageClassName="object-[60%_50%]" />
+            <ParallaxImage src={clinic} alt={t.imageAlt} sizes="(min-width: 1320px) 1240px, 100vw" className="aspect-[4/3] rounded-[2rem] sm:aspect-[16/9] lg:aspect-[21/10]" imageClassName="object-[55%_55%]" />
           </Reveal>
           <Reveal delay={0.15} className="relative -mt-24 px-3 sm:-mt-32 sm:px-6 lg:absolute lg:top-1/2 lg:left-10 lg:mt-0 lg:w-[27rem] lg:-translate-y-1/2 lg:px-0">
             <address className="rounded-[1.75rem] border border-white/80 bg-white/90 p-7 backdrop-blur-2xl not-italic shadow-[var(--shadow-lift)] sm:p-9">

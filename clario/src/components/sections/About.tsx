@@ -1,4 +1,4 @@
-import clinic from "@/assets/04_clear_clinic.png";
+import consultation from "@/assets/consultation.png";
 import type { Dictionary } from "@/content/dictionaries";
 import { ParallaxImage } from "@/components/ParallaxImage";
 import { Reveal } from "@/components/motion";
@@ -40,7 +40,7 @@ export function About({ t }: { t: Dictionary["about"] }) {
 
         <Reveal delay={0.1} className="lg:col-span-6">
           <div className="relative">
-            <ParallaxImage src={clinic} alt={t.imageAlt} sizes="(min-width: 1024px) 50vw, 100vw" className="aspect-[4/5] rounded-[2rem] shadow-[var(--shadow-lift)] sm:aspect-[5/4] lg:aspect-[4/5]" imageClassName="object-[18%_50%]" />
+            <ParallaxImage src={consultation} alt={t.imageAlt} sizes="(min-width: 1024px) 50vw, 100vw" className="aspect-[4/5] rounded-[2rem] shadow-[var(--shadow-lift)] sm:aspect-[4/3] lg:aspect-[4/5]" imageClassName="object-[42%_50%]" />
             <div className="glass absolute bottom-5 left-5 flex items-center gap-3 rounded-full py-2.5 pr-5 pl-3 text-[0.82rem] font-medium shadow-[var(--shadow-soft)]" aria-hidden="true">
               <span className="relative grid size-6 place-items-center">
                 <span className="absolute size-6 animate-ping rounded-full bg-leaf-500/25 [animation-duration:2.8s]" />

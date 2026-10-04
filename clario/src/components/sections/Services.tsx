@@ -1,4 +1,6 @@
+import slitLampExam from "@/assets/slit-lamp-exam.png";
 import type { Dictionary } from "@/content/dictionaries";
+import { ParallaxImage } from "@/components/ParallaxImage";
 import { BookButton } from "@/components/booking/BookingProvider";
 import { ArrowIcon, ServiceIcon } from "@/components/Icon";
 import { Reveal } from "@/components/motion";
@@ -13,7 +15,11 @@ export function Services({ t }: { t: Dictionary["services"] }) {
           <h2 id="services-title" className="h-section mt-6">{t.title}</h2>
         </Reveal>
 
-        <ul className="mt-14 grid gap-4 sm:grid-cols-2 lg:mt-20 lg:grid-cols-3 lg:gap-5">
+        <Reveal delay={0.1} className="mt-14 lg:mt-20">
+          <ParallaxImage src={slitLampExam} alt={t.imageAlt} sizes="(min-width: 1320px) 1240px, 100vw" className="aspect-[4/3] rounded-[2rem] shadow-[var(--shadow-soft)] sm:aspect-[16/9] lg:aspect-[21/9]" imageClassName="object-[50%_32%]" />
+        </Reveal>
+
+        <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:mt-5 lg:grid-cols-3 lg:gap-5">
           {t.items.map((s, i) => (
             <Reveal as="li" key={s.id} delay={(i % 3) * 0.08}>
               <article className="group relative flex h-full min-h-[17rem] flex-col overflow-hidden rounded-[1.75rem] border border-white bg-white/75 p-7 shadow-[0_1px_2px_rgb(21_24_26/0.03)] backdrop-blur-xl transition-[transform,box-shadow,border-color] duration-700 ease-[var(--ease-out-expo)] hover:-translate-y-1.5 hover:border-ice-200 hover:shadow-[var(--shadow-lift)] sm:p-8">

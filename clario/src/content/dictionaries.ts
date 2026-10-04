@@ -48,12 +48,13 @@ const uk = {
     title: "Комплексна турбота про зір — в одному місці",
     text: "Clario Vision Clinic — сучасна офтальмологічна клініка, де точна діагностика, сучасні технології та уважний підхід до пацієнта працюють разом. Тут можна пройти консультацію, обстеження, підібрати корекцію зору та отримати рекомендації для дітей і дорослих.",
     points: ["Сучасне обладнання", "Досвідчені лікарі", "Для дітей і дорослих", "Комфортний сервіс"],
-    imageAlt: "Світлий кабінет Clario Vision Clinic з офтальмологічним кріслом, щілинною лампою та панорамними вікнами.",
+    imageAlt: "Лікар Clario Vision Clinic пояснює пацієнтці результати діагностики на моніторі.",
   },
   services: {
     eyebrow: "Послуги",
     title: "Послуги",
     book: "Записатися",
+    imageAlt: "Офтальмолог оглядає пацієнтку за щілинною лампою.",
     items: [
       { id: "consultation", title: "Первинна консультація офтальмолога" },
       { id: "diagnostics", title: "Комплексна діагностика зору" },
@@ -76,8 +77,8 @@ const uk = {
   technology: {
     eyebrow: "Технології",
     title: "Технології",
-    imageAlt: "Щілинна лампа в оглядовому кабінеті Clario Vision Clinic.",
-    macroAlt: "Огляд ока пацієнта крупним планом.",
+    imageAlt: "Монітор із результатами ОКТ-діагностики та знімком сітківки в кабінеті Clario Vision Clinic.",
+    macroAlt: "Око пацієнта крупним планом під час огляду на щілинній лампі.",
     items: [
       { title: "ОКТ-діагностика", text: "Пошарове зображення сітківки та зорового нерва — без контакту з оком, за кілька хвилин." },
       { title: "Цифрова діагностика сітківки", text: "Знімки очного дна у високій якості, щоб помітити зміни на ранній стадії та порівнювати їх із часом." },
@@ -161,7 +162,7 @@ const uk = {
     hours: "Пн–Сб: 09:00–19:00",
     labels: { address: "Адреса", phone: "Телефон", email: "Email", hours: "Графік" },
     map: "Відкрити на мапі",
-    imageAlt: "Інтер’єр Clario Vision Clinic.",
+    imageAlt: "Оглядовий кабінет Clario Vision Clinic з панорамними вікнами.",
   },
   footer: { rights: "Усі права захищено." },
   notFound: {
@@ -208,12 +209,13 @@ const en: Dictionary = {
     title: "Comprehensive eye care — all in one place",
     text: "Clario Vision Clinic is a modern ophthalmology clinic where precise diagnostics, modern technology and an attentive approach to each patient work together. Here you can have a consultation and an examination, choose vision correction and get recommendations for children and adults.",
     points: ["Modern equipment", "Experienced doctors", "For children and adults", "Comfortable service"],
-    imageAlt: "A bright Clario Vision Clinic examination room with an ophthalmic chair, slit lamp and panoramic windows.",
+    imageAlt: "A Clario Vision Clinic doctor explaining diagnostic results to a patient on a monitor.",
   },
   services: {
     eyebrow: "Services",
     title: "Services",
     book: "Book",
+    imageAlt: "An ophthalmologist examining a patient at a slit lamp.",
     items: [
       { id: "consultation", title: "Initial ophthalmologist consultation" },
       { id: "diagnostics", title: "Comprehensive eye examination" },
@@ -236,8 +238,8 @@ const en: Dictionary = {
   technology: {
     eyebrow: "Technology",
     title: "Technology",
-    imageAlt: "A slit lamp in a Clario Vision Clinic examination room.",
-    macroAlt: "Close-up of a patient's eye during an examination.",
+    imageAlt: "A monitor showing OCT results and a retinal image at Clario Vision Clinic.",
+    macroAlt: "Close-up of a patient's eye during a slit lamp examination.",
     items: [
       { title: "OCT diagnostics", text: "Layer-by-layer images of the retina and optic nerve — no contact with the eye, in just a few minutes." },
       { title: "Digital retinal imaging", text: "High-quality images of the back of the eye to spot changes early and compare them over time." },
@@ -320,7 +322,7 @@ const en: Dictionary = {
     hours: "Mon–Sat: 09:00–19:00",
     labels: { address: "Address", phone: "Phone", email: "Email", hours: "Hours" },
     map: "Open in maps",
-    imageAlt: "Clario Vision Clinic interior.",
+    imageAlt: "A Clario Vision Clinic examination room with panoramic windows.",
   },
   footer: { rights: "All rights reserved." },
   notFound: {

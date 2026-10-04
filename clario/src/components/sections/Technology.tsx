@@ -1,5 +1,5 @@
-import slitLamp from "@/assets/02_slit_lamp_closeup.png";
-import eyeMacro from "@/assets/03_eye_exam_macro.png";
+import eyeMacro from "@/assets/eye-exam-macro.png";
+import oct from "@/assets/oct-diagnostics.png";
 import type { Dictionary } from "@/content/dictionaries";
 import { ParallaxImage } from "@/components/ParallaxImage";
 import { Reveal } from "@/components/motion";
@@ -15,13 +15,13 @@ export function Technology({ t }: { t: Dictionary["technology"] }) {
         </Reveal>
 
         <Reveal delay={0.1} className="mt-14 lg:mt-20">
-          <ParallaxImage src={eyeMacro} alt={t.macroAlt} sizes="(min-width: 1320px) 1240px, 100vw" className="aspect-[4/3] rounded-[1.75rem] sm:aspect-[16/9] lg:aspect-[21/9]" imageClassName="object-[55%_45%]" strength={5} />
+          <ParallaxImage src={oct} alt={t.imageAlt} sizes="(min-width: 1320px) 1240px, 100vw" className="aspect-[4/3] rounded-[1.75rem] sm:aspect-[16/9]" imageClassName="object-[60%_50%]" />
         </Reveal>
 
         <div className="mt-16 grid gap-12 lg:mt-24 lg:grid-cols-12 lg:gap-16">
           <div className="lg:col-span-5">
             <Reveal className="lg:sticky lg:top-28">
-              <ParallaxImage src={slitLamp} alt={t.imageAlt} sizes="(min-width: 1024px) 40vw, 100vw" className="aspect-[4/5] rounded-[1.75rem] sm:aspect-[4/3] lg:aspect-[4/5]" imageClassName="object-[45%_40%]" />
+              <ParallaxImage src={eyeMacro} alt={t.macroAlt} sizes="(min-width: 1024px) 40vw, 100vw" className="aspect-[4/5] rounded-[1.75rem] sm:aspect-[4/3] lg:aspect-[4/5]" imageClassName="object-[60%_50%]" />
             </Reveal>
           </div>
           <ol className="lg:col-span-7">
