@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/* Palette drawn from the hero video: graphite feature wall, cold gray surfaces,
+   white equipment, pale cold-blue daylight and restrained greenery. */
+@theme {
+  --color-graphite-950: #15181a;
+  --color-graphite-900: #1b1e21;
+  --color-graphite-800: #24282c;
+  --color-graphite-700: #31363b;
+  --color-graphite-600: #474d53;
+  --color-cold-500: #7b838b;
+  --color-cold-400: #9ba2a9;
+  --color-cold-300: #c4cad0;
+  --color-cold-200: #dde2e6;
+  --color-cold-100: #edf0f2;
+  --color-cold-50: #f5f7f8;
+  --color-ice-50: #f2f6f9;
+  --color-ice-100: #e5edf3;
+  --color-ice-200: #d0dde7;
+  --color-ice-300: #b3c7d6;
+  --color-ice-600: #5d7a90;
+  --color-ice-700: #46617a;
+  --color-leaf-500: #5f7d64;
+  --color-leaf-100: #e1e9e2;
+
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-soft: 0 1px 2px rgb(21 24 26 / 0.04), 0 18px 40px -18px rgb(21 24 26 / 0.18);
+  --shadow-lift: 0 2px 4px rgb(21 24 26 / 0.04), 0 28px 60px -24px rgb(21 24 26 / 0.28);
+  --shadow-glow: 0 0 0 1px rgb(208 221 231 / 0.55), 0 10px 40px -8px rgb(179 199 214 / 0.55);
+
+  --ease-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-white text-graphite-800 antialiased;
+    font-feature-settings: "ss01", "cv11";
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
+    letter-spacing: -0.025em;
+  }
+  ::selection {
+    background: var(--color-ice-200);
+    color: var(--color-graphite-900);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ice-600);
+    outline-offset: 3px;
+    border-radius: 10px;
+  }
+  .on-dark :focus-visible {
+    outline-color: var(--color-ice-200);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .container-x {
+    @apply mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-10;
+  }
+  .section-y {
+    @apply py-24 md:py-32 lg:py-40;
+  }
+  .eyebrow {
+    @apply inline-flex items-center gap-3 text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-ice-700;
+  }
+  .eyebrow::before {
+    content: "";
+    @apply h-px w-6 bg-current opacity-70;
+  }
+  .on-dark .eyebrow {
+    @apply text-ice-200;
+  }
+  .h-section {
+    @apply text-[clamp(2.1rem,4.4vw,3.6rem)] font-light leading-[1.06];
+  }
+  .glass {
+    background: rgb(255 255 255 / 0.8);
+    backdrop-filter: blur(18px) saturate(1.4);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    border: 1px solid rgb(255 255 255 / 0.7);
+  }
+}
+
+/* Custom cursor: only hide the native pointer while the custom one is active */
+html.has-cursor,
+html.has-cursor a,
+html.has-cursor button,
+html.has-cursor summary,
+html.has-cursor label,
+html.has-cursor [role="button"] {
+  cursor: none;
+}
+html.has-cursor input,
+html.has-cursor textarea,
+html.has-cursor select {
+  cursor: auto;
+}
