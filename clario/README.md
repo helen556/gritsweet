@@ -11,6 +11,18 @@ npm run lint && npm run typecheck
 
 Set `NEXT_PUBLIC_SITE_URL` (e.g. `https://clariovision.com`) for canonical URLs, OG, sitemap and robots.
 
+## Deploy to Vercel
+
+The repository root holds another app, so this site is deployed as its own Vercel project:
+
+1. Vercel → **Add New… → Project** → import this GitHub repository.
+2. **Root Directory:** `clario` (Framework Preset: Next.js is detected automatically; leave build/install commands empty).
+3. **Environment Variables:** `NEXT_PUBLIC_SITE_URL` = the production URL, e.g. `https://clariovision.com`.
+4. **Deploy.** Every push to the branch then gets its own preview URL.
+
+CLI alternative: `cd clario && npx vercel link && npx vercel build && npx vercel deploy --prebuilt`.
+Node.js 20.9+ is required (`engines` in package.json).
+
 ## Structure
 
 ```

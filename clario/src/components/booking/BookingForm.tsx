@@ -62,6 +62,11 @@ export function BookingForm({ t, services, lang, initialService = "" }: Props) {
       return;
     }
     setStatus("sending");
+    // Static preview build has no server: show the success state without sending anything
+    if (process.env.NEXT_PUBLIC_STATIC_PREVIEW === "1") {
+      window.setTimeout(() => setStatus("success"), 700);
+      return;
+    }
     try {
       const website = (form.elements.namedItem("website") as HTMLInputElement | null)?.value ?? "";
       const res = await fetch("/api/booking", {
