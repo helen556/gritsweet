@@ -1,4 +1,4 @@
-import slitLampExam from "@/assets/slit-lamp-exam.png";
+import slitLampExam from "@/assets/slit-lamp-exam.webp";
 import type { Dictionary } from "@/content/dictionaries";
 import { ParallaxImage } from "@/components/ParallaxImage";
 import { BookButton } from "@/components/booking/BookingProvider";

@@ -1,4 +1,4 @@
-import consultation from "@/assets/consultation.png";
+import consultation from "@/assets/consultation.webp";
 import type { Dictionary } from "@/content/dictionaries";
 import { ParallaxImage } from "@/components/ParallaxImage";
 import { Reveal } from "@/components/motion";

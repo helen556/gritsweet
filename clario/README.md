@@ -63,6 +63,6 @@ it to the clinic's CRM / email / messenger at the `TODO` in `src/app/api/booking
   WebM + MP4): a native 1080×1920 vertical crop for portrait screens, native 3412×1920 for retina
   desktops, plus 1440p and 1080p. File names carry a version (`hero-v2-*`) because `/media` is cached
   as immutable — use a new name whenever a video changes. Posters are art-directed the same way.
-- Keyframes use the original PNGs as the single source; `next/image` encodes them once at quality 92
+- Keyframes use lossless WebP copies of the original PNGs (pixel-identical) as the single source; `next/image` encodes them once at quality 92
   (AVIF/WebP, responsive sizes, blur placeholders, lazy). Source resolution is 1672×941 — supply larger
   originals in `src/assets/` for even sharper results on large retina screens.

@@ -1,5 +1,5 @@
-import eyeMacro from "@/assets/eye-exam-macro.png";
-import oct from "@/assets/oct-diagnostics.png";
+import eyeMacro from "@/assets/eye-exam-macro.webp";
+import oct from "@/assets/oct-diagnostics.webp";
 import type { Dictionary } from "@/content/dictionaries";
 import { ParallaxImage } from "@/components/ParallaxImage";
 import { Reveal } from "@/components/motion";

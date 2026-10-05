@@ -1,4 +1,4 @@
-import blurred from "@/assets/01_blurred_clinic.png";
+import blurred from "@/assets/01_blurred_clinic.webp";
 import type { Dictionary, Locale } from "@/content/dictionaries";
 import { BookingForm } from "@/components/booking/BookingForm";
 import { ParallaxImage } from "@/components/ParallaxImage";

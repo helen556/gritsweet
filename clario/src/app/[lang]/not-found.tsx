@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import blurred from "@/assets/01_blurred_clinic.png";
+import blurred from "@/assets/01_blurred_clinic.webp";
 import { getDictionary, locales } from "@/content/dictionaries";
 import { EyeMark } from "@/components/Icon";
 import { btn } from "@/components/ui";

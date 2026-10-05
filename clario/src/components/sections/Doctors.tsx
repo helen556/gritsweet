@@ -1,5 +1,5 @@
 import Image from "next/image";
-import blurredClinic from "@/assets/01_blurred_clinic.png";
+import blurredClinic from "@/assets/01_blurred_clinic.webp";
 import type { Dictionary } from "@/content/dictionaries";
 import { doctorPhotos } from "@/content/doctor-photos";
 import { EyeMark } from "@/components/Icon";

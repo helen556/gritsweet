@@ -1,8 +1,8 @@
 import type { StaticImageData } from "next/image";
-import kravchenko from "@/assets/doctors/kravchenko.png";
-import hnatiuk from "@/assets/doctors/hnatiuk.png";
-import melnyk from "@/assets/doctors/melnyk.png";
-import sokolova from "@/assets/doctors/sokolova.png";
+import kravchenko from "@/assets/doctors/kravchenko.webp";
+import hnatiuk from "@/assets/doctors/hnatiuk.webp";
+import melnyk from "@/assets/doctors/melnyk.webp";
+import sokolova from "@/assets/doctors/sokolova.webp";
 
 /**
  * Doctor portraits, in the same order as `doctors.items` in dictionaries.ts.

@@ -3,8 +3,8 @@
 import { getImageProps } from "next/image";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import poster from "@/assets/hero-poster.png";
-import posterPortrait from "@/assets/hero-poster-portrait.png";
+import poster from "@/assets/hero-poster.webp";
+import posterPortrait from "@/assets/hero-poster-portrait.webp";
 import type { Dictionary } from "@/content/dictionaries";
 import { BookButton } from "@/components/booking/BookingProvider";
 import { btn } from "@/components/ui";
