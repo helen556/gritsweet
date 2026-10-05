@@ -1,14 +1,25 @@
 "use client";
 
-import Image from "next/image";
+import { getImageProps } from "next/image";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import poster from "@/assets/hero-poster.png";
+import posterPortrait from "@/assets/hero-poster-portrait.png";
 import type { Dictionary } from "@/content/dictionaries";
 import { BookButton } from "@/components/booking/BookingProvider";
 import { btn } from "@/components/ui";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
+
+// Portrait phones/tablets get a native 1080×1920 vertical crop instead of an upscaled landscape frame
+const PORTRAIT = "(orientation: portrait) and (max-width: 1023px)";
+
+const HIRES = "(min-width: 1280px) and (min-resolution: 1.5dppx), (min-width: 2400px)";
+const MIDRES = "(min-width: 1600px), (min-width: 900px) and (min-resolution: 1.5dppx)";
+
+const posterCommon = { alt: "", fill: true, sizes: "100vw", quality: 92, priority: true, placeholder: "blur" } as const;
+const { props: { srcSet: posterPortraitSet } } = getImageProps({ ...posterCommon, src: posterPortrait });
+const { props: posterProps } = getImageProps({ ...posterCommon, src: poster });
 
 type Props = { t: Dictionary["hero"]; cta: Dictionary["cta"]; scrollLabel: string };
 
@@ -52,7 +63,11 @@ export function Hero({ t, cta, scrollLabel }: Props) {
       {/* Media */}
       <motion.div className="absolute inset-0 -z-10" style={reduce ? undefined : { y: mediaY }} aria-hidden="true">
         <div className="absolute inset-0">
-          <Image src={poster} alt="" fill priority fetchPriority="high" sizes="100vw" quality={92} placeholder="blur" className="object-cover" />
+          <picture>
+            <source media={PORTRAIT} srcSet={posterPortraitSet} sizes="100vw" />
+            {/* eslint-disable-next-line jsx-a11y/alt-text -- decorative, alt="" comes from posterProps */}
+            <img {...posterProps} className="object-cover" />
+          </picture>
           {playVideo && (
             <video
               ref={video}
@@ -62,16 +77,17 @@ export function Hero({ t, cta, scrollLabel }: Props) {
               loop
               playsInline
               preload="auto"
-              poster={poster.src}
               onPlaying={() => setReady(true)}
             >
-              {/* 1440p for large / retina desktops, 1080p for laptops and tablets, 720p for phones */}
-              <source src="/media/hero-1440.webm" type="video/webm" media="(min-width: 1600px), (min-width: 1024px) and (min-resolution: 1.5dppx)" />
-              <source src="/media/hero-1440.mp4" type="video/mp4" media="(min-width: 1600px), (min-width: 1024px) and (min-resolution: 1.5dppx)" />
-              <source src="/media/hero-1080.webm" type="video/webm" media="(min-width: 768px), (min-resolution: 2.5dppx)" />
-              <source src="/media/hero-1080.mp4" type="video/mp4" media="(min-width: 768px), (min-resolution: 2.5dppx)" />
-              <source src="/media/hero-720.webm" type="video/webm" />
-              <source src="/media/hero-720.mp4" type="video/mp4" />
+              {/* Native vertical crop for portrait screens; native 3412×1920 for retina desktops; 1440p / 1080p otherwise */}
+              <source src="/media/hero-v2-portrait.webm" type="video/webm" media={PORTRAIT} />
+              <source src="/media/hero-v2-portrait.mp4" type="video/mp4" media={PORTRAIT} />
+              <source src="/media/hero-v2-1920p.webm" type="video/webm" media={HIRES} />
+              <source src="/media/hero-v2-1920p.mp4" type="video/mp4" media={HIRES} />
+              <source src="/media/hero-v2-1440p.webm" type="video/webm" media={MIDRES} />
+              <source src="/media/hero-v2-1440p.mp4" type="video/mp4" media={MIDRES} />
+              <source src="/media/hero-v2-1080p.webm" type="video/webm" />
+              <source src="/media/hero-v2-1080p.mp4" type="video/mp4" />
             </video>
           )}
         </div>
