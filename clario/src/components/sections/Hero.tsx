@@ -65,7 +65,9 @@ export function Hero({ t, cta, scrollLabel }: Props) {
               poster={poster.src}
               onPlaying={() => setReady(true)}
             >
-              {/* 1080p for larger / high-density screens, 720p for small screens */}
+              {/* 1440p for large / retina desktops, 1080p for laptops and tablets, 720p for phones */}
+              <source src="/media/hero-1440.webm" type="video/webm" media="(min-width: 1600px), (min-width: 1024px) and (min-resolution: 1.5dppx)" />
+              <source src="/media/hero-1440.mp4" type="video/mp4" media="(min-width: 1600px), (min-width: 1024px) and (min-resolution: 1.5dppx)" />
               <source src="/media/hero-1080.webm" type="video/webm" media="(min-width: 768px), (min-resolution: 2.5dppx)" />
               <source src="/media/hero-1080.mp4" type="video/mp4" media="(min-width: 768px), (min-resolution: 2.5dppx)" />
               <source src="/media/hero-720.webm" type="video/webm" />

@@ -59,10 +59,10 @@ it to the clinic's CRM / email / messenger at the `TODO` in `src/app/api/booking
 
 ## Media
 
-- Hero video: cropped to remove the generator mark in the source's lower-right corner and its soft edge bars,
-  upscaled with Lanczos + light sharpening and encoded at 1080p and 720p (WebM + MP4, no audio, faststart).
-  The first frame (1080p) is the poster and LCP image; the video fades in once it plays and is
-  skipped for reduced motion / data saver.
+- Hero video: from the 4K upscaled master (3836×2010). Its soft top bar is cropped, then it is
+  downscaled with Lanczos to 1440p, 1080p and 720p (WebM + MP4, 30 fps, no audio, faststart); the
+  browser picks the size by screen width and pixel density. The first frame (1440p) is the poster and
+  LCP image; the video fades in once it plays and is skipped for reduced motion / data saver.
 - Keyframes use the original PNGs as the single source; `next/image` encodes them once at quality 92
   (AVIF/WebP, responsive sizes, blur placeholders, lazy). Source resolution is 1672×941 — supply larger
   originals in `src/assets/` for even sharper results on large retina screens.
