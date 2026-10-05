@@ -1,6 +1,8 @@
 import type { StaticImageData } from "next/image";
 import kravchenko from "@/assets/doctors/kravchenko.png";
+import hnatiuk from "@/assets/doctors/hnatiuk.png";
 import melnyk from "@/assets/doctors/melnyk.png";
+import sokolova from "@/assets/doctors/sokolova.png";
 
 /**
  * Doctor portraits, in the same order as `doctors.items` in dictionaries.ts.
@@ -11,6 +13,6 @@ import melnyk from "@/assets/doctors/melnyk.png";
 export const doctorPhotos: (StaticImageData | null)[] = [
   kravchenko, // Олена Кравченко
   melnyk, // Андрій Мельник
-  null, // Ірина Соколова
-  null, // Максим Гнатюк
+  sokolova, // Ірина Соколова
+  hnatiuk, // Максим Гнатюк
 ];
