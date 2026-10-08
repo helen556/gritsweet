@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { preload } from "react-dom";
 import Picture from "./Picture";
 import StardustIntro from "./effects/StardustIntro";
 import { Sprig } from "./Leaves";
@@ -23,6 +24,11 @@ export default function Hero({ lang, t }: { lang: "uk" | "en"; t: T }) {
   const [shown, setShown] = useState(false); // відео видно (є кадр)
   const [src, setSrc] = useState(false);
   const hs = manifest["hero-start"];
+  // LCP: постер hero завантажується з найвищим пріоритетом
+  preload(`/media/hero-start-${hs.widths[1]}.avif`, {
+    as: "image", type: "image/avif", fetchPriority: "high",
+    imageSrcSet: hs.widths.map((w) => `/media/hero-start-${w}.avif ${w}w`).join(", "), imageSizes: "(min-width: 1024px) 640px, 100vw",
+  });
 
   useEffect(() => {
     const n = navigator as Navigator & { connection?: { saveData?: boolean } };

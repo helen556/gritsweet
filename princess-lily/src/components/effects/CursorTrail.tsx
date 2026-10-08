@@ -19,7 +19,7 @@ export default function CursorTrail() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     canvas.style.display = "block";
-    const sprites = [makeGlow(PALETTE.gold, 24), makeGlow(PALETTE.champagne, 24), makeGlow(PALETTE.pearl, 24), makeStar(PALETTE.gold, 32), makeStar(PALETTE.deepGold, 32)];
+    const sprites = [makeGlow(PALETTE.gold, 32), makeGlow(PALETTE.deepGold, 32), makeGlow(PALETTE.champagne, 32, "#fff3d6"), makeStar(PALETTE.gold, 40), makeStar(PALETTE.deepGold, 40)];
     let maxP = isLowPower() ? 36 : 70;
     const pool: P[] = [];
     let dpr = 1, W = 0, H = 0;
@@ -39,7 +39,7 @@ export default function CursorTrail() {
       pool.push({
         x: x + (Math.random() - 0.5) * 6, y: y + (Math.random() - 0.5) * 6,
         vx: Math.cos(a) * sp, vy: Math.sin(a) * sp + 8, born: now, life: 400 + Math.random() * 400,
-        size: star ? 6 + Math.random() * 5 : 4 + Math.random() * 6, sprite: star ? 3 + (Math.random() < 0.5 ? 0 : 1) : Math.floor(Math.random() * 3), star, tw: Math.random() * 6,
+        size: star ? 10 + Math.random() * 7 : 7 + Math.random() * 9, sprite: star ? 3 + (Math.random() < 0.5 ? 0 : 1) : Math.floor(Math.random() * 3), star, tw: Math.random() * 6,
       });
     };
     const frame = (now: number) => {
@@ -63,7 +63,7 @@ export default function CursorTrail() {
         const s = dt / 1000;
         p.x += p.vx * s; p.y += p.vy * s; p.vx *= 0.96; p.vy *= 0.96;
         const tw = p.star ? 0.65 + 0.35 * Math.sin(p.tw + age / 60) : 1;
-        ctx.globalAlpha = (1 - k) * (1 - k) * 0.85 * tw;
+        ctx.globalAlpha = Math.min(1, (1 - k) * (1.15 - k) * tw);
         const size = p.size * (1 - k * 0.4);
         ctx.drawImage(sprites[p.sprite], p.x - size / 2, p.y - size / 2, size, size);
       }

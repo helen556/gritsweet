@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["better-sqlite3", "sharp"],
   experimental: {
     globalNotFound: true,
+    // CSS невеликий (Tailwind) — вбудовуємо в HTML, щоб не блокувати перше малювання
+    inlineCss: true,
   },
   async headers() {
     return [
