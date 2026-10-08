@@ -8,6 +8,10 @@ import { confirmPaymentAction, cancelOrderAction, shippingAction, resendPdfActio
 
 export const metadata = { title: "Замовлення" };
 const PS: Record<string, string> = { pending_payment: "Очікує оплату", pending_verification: "Очікує перевірки", paid: "Оплачено", failed: "Неуспішно", cancelled: "Скасовано" };
+const FS: Record<string, string> = {
+  awaiting_payment: "очікує оплату", ready: "готується лист", sent: "посилання надіслано", email_failed: "лист не надіслано (буде повтор)",
+  email_not_configured: "email не налаштовано — створіть посилання вручну", to_ship: "до відправлення", shipped: "відправлено", delivered: "доставлено", cancelled: "скасовано",
+};
 const kyiv = (iso: string | null) => iso ? new Date(iso.includes("T") ? iso : iso.replace(" ", "T") + "Z").toLocaleString("uk-UA", { timeZone: "Europe/Kyiv" }) : "—";
 
 export default async function OrderAdmin({ params }: PageProps<"/admin/orders/[id]">) {
@@ -30,8 +34,8 @@ export default async function OrderAdmin({ params }: PageProps<"/admin/orders/[i
           <dt className="text-ink-soft">Покупець</dt><dd>{o.name} · <a className="underline" href={`mailto:${o.email}`}>{o.email}</a>{o.phone && <> · <a className="underline" href={`tel:${o.phone}`}>{o.phone}</a></>}</dd>
           <dt className="text-ink-soft">Мова сайту</dt><dd>{o.site_locale}</dd>
           <dt className="text-ink-soft">Оплата</dt><dd><strong>{PS[o.payment_status]}</strong> · режим: {o.payment_mode}{o.payment_reference && ` · ${o.payment_reference}`}{o.paid_at && ` · ${kyiv(o.paid_at)}`}</dd>
-          {digital && (<><dt className="text-ink-soft">Видача PDF</dt><dd>{digital.status}</dd></>)}
-          {shipping && (<><dt className="text-ink-soft">Доставка</dt><dd>{shipping.status}{shipping.ttn && ` · ТТН ${shipping.ttn}`}<br /><span className="text-ink-soft">{o.np_city}, {o.np_point}</span></dd></>)}
+          {digital && (<><dt className="text-ink-soft">Видача PDF</dt><dd>{FS[digital.status] ?? digital.status}</dd></>)}
+          {shipping && (<><dt className="text-ink-soft">Доставка</dt><dd>{FS[shipping.status] ?? shipping.status}{shipping.ttn && ` · ТТН ${shipping.ttn}`}<br /><span className="text-ink-soft">{o.np_city}, {o.np_point}</span></dd></>)}
           {o.customer_note && (<><dt className="text-ink-soft">Коментар</dt><dd className="whitespace-pre-wrap">{o.customer_note}</dd></>)}
         </dl>
         <table className="mt-5 w-full text-left text-sm"><thead><tr className="border-b border-black/10"><th className="py-2">Позиція (знімок на момент купівлі)</th><th>К-сть</th><th className="text-right">Сума</th></tr></thead>

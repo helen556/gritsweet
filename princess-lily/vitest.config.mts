@@ -11,7 +11,8 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
     env: {
-      DATABASE_URL: ":memory:",
+      // TEST_DATABASE_URL=postgres://… — прогнати ті самі тести на PostgreSQL
+      DATABASE_URL: process.env.TEST_DATABASE_URL ?? ":memory:",
       SESSION_SECRET: "test-secret-test-secret-test-secret-123",
       PAYMENT_MODE: "provider",
       PAYMENT_PROVIDER: "test",

@@ -66,13 +66,13 @@ export default function Header({ lang, t }: { lang: "uk" | "en"; t: Pick<Dict, "
           ))}
         </div>
         <Link href={`/${lang}/cart`} className="btn btn-ghost btn-sm !px-3" aria-label={`${t.nav.cart}${ready && count ? `: ${count}` : ""}`}>
-          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 7h12l-1 13H7L6 7Z" /><path d="M9 7a3 3 0 0 1 6 0" /></svg>
+          <svg aria-hidden="true" className="shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 7h12l-1 13H7L6 7Z" /><path d="M9 7a3 3 0 0 1 6 0" /></svg>
           <span className="hidden sm:inline">{t.nav.cart}</span>
           {ready && count > 0 && <span className="grid h-6 min-w-6 place-items-center rounded-full bg-rose px-1.5 text-xs font-bold text-paper">{count}</span>}
         </Link>
         <button ref={btnRef} type="button" className="btn btn-ghost btn-sm !px-3 md:hidden" aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen((o) => !o)}>
           <span className="sr-only">{open ? t.nav.close : t.nav.menu}</span>
-          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">{open ? <path d="M6 6l12 12M18 6 6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}</svg>
+          <svg aria-hidden="true" className="shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">{open ? <path d="M6 6l12 12M18 6 6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}</svg>
         </button>
       </div>
       <div id="mobile-nav" ref={panelRef} hidden={!open} className="border-t border-black/5 bg-milk md:hidden">

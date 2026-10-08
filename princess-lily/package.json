@@ -13,7 +13,8 @@
     "assets:build": "tsx scripts/build-assets.ts",
     "admin:create": "tsx --import ./scripts/shim/register.mjs scripts/create-admin.ts",
     "email:retry": "tsx --import ./scripts/shim/register.mjs scripts/email-retry.ts",
-    "demo:fixtures": "tsx --import ./scripts/shim/register.mjs scripts/demo-fixtures.ts"
+    "demo:fixtures": "tsx --import ./scripts/shim/register.mjs scripts/demo-fixtures.ts",
+    "test:e2e": "node tests/e2e/flow.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
