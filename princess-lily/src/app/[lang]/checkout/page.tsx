@@ -1,0 +1,23 @@
+import type { Metadata } from "next";
+import { notFound, redirect } from "next/navigation";
+import { getDict, hasLocale } from "@/i18n";
+import { effectivePaymentMode } from "@/lib/orders";
+import { novaPoshtaMode } from "@/lib/delivery/nova-poshta";
+import CheckoutForm from "@/components/cart/CheckoutForm";
+
+export async function generateMetadata({ params }: PageProps<"/[lang]/checkout">): Promise<Metadata> {
+  const { lang } = await params;
+  return { title: getDict(hasLocale(lang) ? lang : "uk").checkout.title, robots: { index: false, follow: false } };
+}
+export default async function Checkout({ params }: PageProps<"/[lang]/checkout">) {
+  const { lang } = await params;
+  if (!hasLocale(lang)) notFound();
+  if ((await effectivePaymentMode()) === "disabled") redirect(`/${lang}/payment-unavailable`);
+  const t = getDict(lang);
+  return (
+    <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
+      <h1 className="text-5xl text-moss-900">{t.checkout.title}</h1>
+      <CheckoutForm lang={lang} npMode={novaPoshtaMode()} t={{ checkout: t.checkout, cart: t.cart, formats: t.formats, bookLocales: t.bookLocales }} />
+    </div>
+  );
+}

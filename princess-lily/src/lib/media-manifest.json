@@ -1,0 +1,50 @@
+{
+  "cover-bublik": {
+    "width": 1254,
+    "height": 1254,
+    "widths": [
+      360,
+      640,
+      960,
+      1254
+    ]
+  },
+  "lily-portrait": {
+    "width": 1254,
+    "height": 1254,
+    "widths": [
+      360,
+      640,
+      960
+    ]
+  },
+  "characters-lineup": {
+    "width": 1536,
+    "height": 1024,
+    "widths": [
+      640,
+      1024,
+      1536
+    ]
+  },
+  "hero-start": {
+    "width": 1672,
+    "height": 941,
+    "widths": [
+      640,
+      960,
+      1280,
+      1672
+    ]
+  },
+  "hero-end": {
+    "width": 1672,
+    "height": 941,
+    "widths": [
+      640,
+      960,
+      1280,
+      1672
+    ]
+  }
+}

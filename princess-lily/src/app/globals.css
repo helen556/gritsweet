@@ -1,0 +1,136 @@
+@import "tailwindcss";
+@import "@fontsource-variable/manrope/wght.css";
+@import "@fontsource-variable/cormorant/wght.css";
+
+/* Палітра: теплий молочний фон, природні зелені, спокійний темний текст, стримані рожеві/мідні акценти з ілюстрацій */
+@theme {
+  --color-milk: #faf6ee;
+  --color-paper: #fffdf8;
+  --color-cream: #f2eadb;
+  --color-ink: #2a2924;
+  --color-ink-soft: #57534a;
+  --color-moss-900: #263d2d;
+  --color-moss-700: #3f5f47;
+  --color-moss-500: #6b8a66;
+  --color-moss-200: #d5e0cd;
+  --color-moss-100: #e8eee1;
+  --color-rose: #c97b7e;
+  --color-rose-100: #f5e3de;
+  --color-copper: #a9643f;
+  --color-gold: #d8bb84;
+  --font-sans: "Manrope Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Cormorant Variable", Georgia, "Times New Roman", serif;
+  --ease-soft: cubic-bezier(.22,.8,.28,1);
+}
+
+:root { color-scheme: light; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--color-milk);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  text-rendering: optimizeLegibility;
+  overflow-x: clip;
+}
+h1, h2, h3, .font-display { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.005em; line-height: 1.12; }
+::selection { background: var(--color-rose-100); }
+
+:focus-visible { outline: 3px solid var(--color-moss-700); outline-offset: 3px; border-radius: 6px; }
+
+.skip-link { position: absolute; left: 1rem; top: -4rem; z-index: 100; background: var(--color-paper); padding: .75rem 1rem; border-radius: .75rem; }
+.skip-link:focus { top: 1rem; }
+
+@layer components {
+/* ---------- Легкі напівпрозорі кнопки ---------- */
+.btn {
+  --b-bg: rgba(255, 253, 248, .62);
+  --b-fg: var(--color-ink);
+  --b-line: rgba(255, 255, 255, .75);
+  --b-line-hover: rgba(255, 255, 255, .95);
+  position: relative; isolation: isolate; overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  min-height: 44px; padding: .7rem 1.4rem; border-radius: 999px;
+  font-weight: 600; font-size: 1rem; line-height: 1.2; text-decoration: none; cursor: pointer;
+  color: var(--b-fg); background: var(--b-bg);
+  border: 1px solid var(--b-line);
+  box-shadow: 0 1px 0 rgba(255,255,255,.7) inset, 0 6px 18px -8px rgba(38, 61, 45, .35);
+  -webkit-backdrop-filter: blur(10px) saturate(1.15); backdrop-filter: blur(10px) saturate(1.15);
+  transition: transform 220ms var(--ease-soft), box-shadow 220ms var(--ease-soft), border-color 220ms var(--ease-soft), background-color 220ms var(--ease-soft);
+}
+.btn::after { /* м'який світловий перелив */
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,.45) 48%, transparent 66%);
+  transform: translateX(-110%); transition: transform 600ms var(--ease-soft);
+}
+.btn:hover { transform: translateY(-1.5px); border-color: var(--b-line-hover); box-shadow: 0 1px 0 rgba(255,255,255,.8) inset, 0 10px 24px -10px rgba(38, 61, 45, .45); }
+.btn:hover::after { transform: translateX(110%); }
+.btn:active { transform: translateY(0) scale(.985); transition-duration: 120ms; }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .55; cursor: not-allowed; transform: none; }
+.btn-primary {
+  --b-bg: rgba(49, 78, 58, .9); --b-fg: #fffdf8; --b-line: rgba(255, 255, 255, .35); --b-line-hover: rgba(255,255,255,.6);
+  text-shadow: 0 1px 1px rgba(0,0,0,.12);
+}
+.btn-primary:hover { --b-bg: rgba(38, 61, 45, .94); }
+.btn-ghost { --b-bg: rgba(255, 253, 248, .38); }
+.btn-sm { min-height: 44px; padding: .5rem 1rem; font-size: .95rem; }
+.btn-danger { --b-bg: rgba(255, 244, 242, .9); --b-fg: #8a2f2a; --b-line: rgba(138, 47, 42, .35); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .btn { --b-bg: rgba(255, 253, 248, .94); }
+  .btn-primary { --b-bg: #314e3a; }
+}
+
+/* Карткові поверхні */
+.card { background: rgba(255, 253, 248, .78); border: 1px solid rgba(42, 41, 36, .07); border-radius: 1.5rem; box-shadow: 0 18px 40px -28px rgba(38, 61, 45, .35); }
+.chip { display:inline-flex; align-items:center; gap:.35rem; min-height: 44px; padding: .45rem 1rem; border-radius: 999px; border: 1px solid rgba(42,41,36,.14); background: rgba(255,253,248,.7); cursor: pointer; transition: background-color 200ms, border-color 200ms, color 200ms; font-weight: 500; }
+.chip[aria-pressed="true"], .chip:has(input:checked) { background: var(--color-moss-700); border-color: var(--color-moss-700); color: #fffdf8; }
+.chip:has(input:focus-visible) { outline: 3px solid var(--color-moss-700); outline-offset: 3px; }
+.chip:has(input:disabled) { opacity: .5; cursor: not-allowed; }
+
+/* Поля форм */
+.field label { display:block; font-weight: 600; margin-bottom: .35rem; }
+.field .hint { font-size: .9rem; color: var(--color-ink-soft); margin-top: .25rem; }
+.input { width: 100%; min-height: 48px; padding: .7rem .95rem; border-radius: .9rem; border: 1px solid rgba(42,41,36,.2); background: #fffdf8; color: var(--color-ink); transition: border-color 180ms, box-shadow 180ms; }
+.input:focus { outline: none; border-color: var(--color-moss-700); box-shadow: 0 0 0 3px rgba(63, 95, 71, .25); }
+.input[aria-invalid="true"] { border-color: #a33a33; }
+.err { color: #9a2f28; font-size: .92rem; margin-top: .3rem; }
+
+}
+
+/* Поява секцій: один раз, fade + 12px */
+html.js [data-reveal] { opacity: 0; transform: translate3d(0, 12px, 0); transition: opacity 450ms var(--ease-soft), transform 450ms var(--ease-soft); }
+html.js [data-reveal].is-in { opacity: 1; transform: none; }
+
+/* Hero: поява тексту разом зі сценою (контент доступний одразу, лише візуальна поява) */
+@keyframes hero-in { from { opacity: 0; transform: translate3d(0, 10px, 0); } to { opacity: 1; transform: none; } }
+html.js.intro-play .hero-copy > * { animation: hero-in 900ms var(--ease-soft) both; }
+html.js.intro-play .hero-copy > *:nth-child(2) { animation-delay: 120ms; }
+html.js.intro-play .hero-copy > *:nth-child(3) { animation-delay: 220ms; }
+html.js.intro-play .hero-copy > *:nth-child(4) { animation-delay: 320ms; }
+html.js.intro-play .hero-media { animation: hero-in 1000ms var(--ease-soft) both; }
+
+details.faq > summary { list-style: none; cursor: pointer; }
+details.faq > summary::-webkit-details-marker { display: none; }
+details.faq .faq-icon { transition: transform 250ms var(--ease-soft); }
+details.faq[open] .faq-icon { transform: rotate(45deg); }
+
+.prose-soft p + p { margin-top: .9rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 80ms !important; scroll-behavior: auto !important; }
+  html.js [data-reveal] { opacity: 1; transform: none; }
+  .btn:hover { transform: none; }
+  .btn::after { display: none; }
+  [data-parallax] { transform: none !important; }
+}
+
+@layer components {
+/* Короткий блиск на CTA при натисканні на touch */
+@keyframes glint { 0% { opacity: 0; transform: scale(.4); } 30% { opacity: 1; } 100% { opacity: 0; transform: scale(1.25); } }
+.btn.sparkle::before {
+  content: ""; position: absolute; inset: -30%; z-index: -1; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(circle, rgba(255, 244, 214, .55) 0%, rgba(241, 223, 184, .25) 35%, transparent 65%);
+  animation: glint 600ms var(--ease-soft) both;
+}
+}
