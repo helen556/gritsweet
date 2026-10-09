@@ -8,7 +8,21 @@ import manifest from "../lib/media-manifest.json";
  * не підтверджено, тому створено лише українські варіанти (PDF і друк), обидва неактивні.
  * Опис конкретної книжки не надано — поле порожнє, не вигадуємо.
  */
+/** Типові налаштування (лише якщо ще не задані): режим ручної оплати за наданим посиланням monobank. */
+async function seedSettings(db: Kysely<Database>) {
+  const defaults: [string, string][] = [
+    ["payment_mode", "manual_link"],
+    // Надане замовницею посилання. Тип посилання й передача суми НЕ підтверджені — сума не дописується в URL.
+    ["payment_link_url", "https://send.monobank.ua/7ZH664WCkK"],
+  ];
+  for (const [key, value] of defaults) {
+    const ex = await db.selectFrom("settings").select("key").where("key", "=", key).executeTakeFirst();
+    if (!ex) await db.insertInto("settings").values({ key, value }).execute();
+  }
+}
+
 export async function seed(db: Kysely<Database>) {
+  await seedSettings(db);
   const exists = await db.selectFrom("products").select("id").where("slug", "=", "yak-lili-vchyla-bublyka").executeTakeFirst();
   if (exists) return;
   const c = manifest["cover-bublik"];

@@ -5,6 +5,15 @@ import type { Database } from "./types";
  * Ідемпотентна схема (SQLite і PostgreSQL). Гроші — цілі копійки (integer), без float.
  * Для Supabase додатково див. supabase/policies.sql (RLS, приватний bucket).
  */
+/** Додає відсутні колонки (ідемпотентно; SQLite і PostgreSQL). */
+async function addColumns(db: Kysely<Database>, table: string, cols: [string, "text" | "integer"][]) {
+  const tables = await db.introspection.getTables();
+  const existing = new Set(tables.find((x) => x.name === table)?.columns.map((c) => c.name) ?? []);
+  for (const [name, type] of cols) {
+    if (!existing.has(name)) await db.schema.alterTable(table).addColumn(name, type).execute();
+  }
+}
+
 export async function migrate(db: Kysely<Database>) {
   const t = (name: string) => db.schema.createTable(name).ifNotExists();
   const now = sql`CURRENT_TIMESTAMP`;
@@ -187,6 +196,54 @@ export async function migrate(db: Kysely<Database>) {
     .addColumn("entity_id", "text")
     .addColumn("details", "text")
     .addColumn("created_at", "text", (c) => c.notNull().defaultTo(now))
+    .execute();
+
+  // ---- v2 (CRM, квитанції, Telegram) ----
+  await addColumns(db, "orders", [
+    ["first_name", "text"], ["last_name", "text"],
+    ["recipient_first_name", "text"], ["recipient_last_name", "text"], ["recipient_phone", "text"],
+    ["sender_contact", "text"],
+    ["order_status", "text"], // new | processing | completed | cancelled — окремо від оплати й доставки
+    ["payment_method", "text"], ["payment_checked_by", "text"], ["payment_checked_at", "text"], ["provider_receipt_url", "text"],
+    ["search_text", "text"], // нормалізований (lowercase у JS) текст для пошуку: SQLite lower() не знає кирилиці
+  ]);
+  await idx("orders_payment_status", "orders", ["payment_status"]);
+
+  await t("order_events")
+    .addColumn("id", "text", (c) => c.primaryKey())
+    .addColumn("order_id", "text", (c) => c.notNull().references("orders.id").onDelete("cascade"))
+    .addColumn("kind", "text", (c) => c.notNull()) // order | payment | digital | shipping | note | receipt
+    .addColumn("from_status", "text")
+    .addColumn("to_status", "text")
+    .addColumn("actor", "text", (c) => c.notNull()) // email адміна / "покупець" / "система" / "провайдер:mono"
+    .addColumn("details", "text")
+    .addColumn("created_at", "text", (c) => c.notNull())
+    .execute();
+  await idx("order_events_order", "order_events", ["order_id", "created_at"]);
+
+  await t("receipts")
+    .addColumn("id", "text", (c) => c.primaryKey())
+    .addColumn("order_id", "text", (c) => c.notNull().references("orders.id").onDelete("cascade"))
+    .addColumn("storage_key", "text", (c) => c.notNull())
+    .addColumn("content_type", "text", (c) => c.notNull())
+    .addColumn("size_bytes", "integer", (c) => c.notNull())
+    .addColumn("original_name", "text", (c) => c.notNull())
+    .addColumn("uploaded_by", "text", (c) => c.notNull()) // "покупець" або email адміна
+    .addColumn("created_at", "text", (c) => c.notNull())
+    .execute();
+
+  await t("notifications")
+    .addColumn("id", "text", (c) => c.primaryKey())
+    .addColumn("channel", "text", (c) => c.notNull()) // telegram
+    .addColumn("dedupe_key", "text", (c) => c.notNull().unique())
+    .addColumn("order_id", "text")
+    .addColumn("payload", "text", (c) => c.notNull())
+    .addColumn("status", "text", (c) => c.notNull()) // queued | sent | failed | not_configured
+    .addColumn("attempts", "integer", (c) => c.notNull().defaultTo(0))
+    .addColumn("last_error", "text")
+    .addColumn("next_attempt_at", "text")
+    .addColumn("sent_at", "text")
+    .addColumn("created_at", "text", (c) => c.notNull())
     .execute();
 
   await t("rate_limits")

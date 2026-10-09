@@ -6,6 +6,8 @@ import { getAdmin } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { privateStorage } from "@/lib/storage";
 import { randomBytes } from "node:crypto";
+import { setSetting } from "@/lib/settings";
+import { saveReceipt } from "@/lib/receipts";
 
 const MAX_PDF = 100 * 1024 * 1024, MAX_IMG = 10 * 1024 * 1024;
 const COVER_WIDTHS = [360, 640, 960, 1254];
@@ -60,6 +62,36 @@ export async function POST(req: Request) {
     }
     await db.updateTable("products").set({ cover_base: `/uploads/covers/${base}`, cover_widths: JSON.stringify(widths), cover_width: meta.width, cover_height: meta.height, updated_at: new Date().toISOString() }).where("id", "=", p.id).execute();
     await audit(admin, "product.cover_upload", "product", p.id);
+    return Response.json({ ok: true });
+  }
+  if (kind === "receipt") {
+    const o = await db.selectFrom("orders").select("id").where("id", "=", id).executeTakeFirst();
+    if (!o) return err("Замовлення не знайдено");
+    const r = await saveReceipt(o.id, buf, file.name, admin.email, MAX_IMG);
+    if (!r.ok) return err(r.error === "type" ? "Лише PDF, JPG, PNG або WebP" : r.error === "limit" ? "Забагато квитанцій" : "Файл до 10 МБ");
+    await audit(admin, "receipt.upload", "order", o.id);
+    return Response.json({ ok: true });
+  }
+  if (kind === "author") {
+    // Необов'язкове фото авторки (authorPhoto): лише власниця; перекодування без метаданих
+    if (admin.role !== "owner") return err("Лише власниця може змінювати фото авторки", 403);
+    if (buf.length > MAX_IMG) return err("Зображення до 10 МБ");
+    let meta: Metadata;
+    try { meta = await sharp(buf).rotate().metadata(); } catch { return err("Непідтримуваний формат зображення"); }
+    if (!meta.width || !meta.height || !["jpeg", "png", "webp"].includes(meta.format ?? "")) return err("Лише JPG, PNG або WebP");
+    const dir = path.resolve(process.env.UPLOADS_DIR ?? "storage/uploads", "covers");
+    await fs.mkdir(dir, { recursive: true });
+    const base = `author-${Date.now().toString(36)}`;
+    const rotated = await sharp(buf).rotate().toBuffer({ resolveWithObject: true });
+    const W = rotated.info.width, H = rotated.info.height;
+    const widths = [480, 800, 1200].filter((w) => w <= W);
+    if (!widths.length) widths.push(W);
+    for (const w of widths) {
+      await sharp(rotated.data).resize({ width: w }).avif({ quality: 60 }).toFile(path.join(dir, `${base}-${w}.avif`));
+      await sharp(rotated.data).resize({ width: w }).webp({ quality: 80 }).toFile(path.join(dir, `${base}-${w}.webp`));
+    }
+    await setSetting("author_photo", JSON.stringify({ base: `/uploads/covers/${base}`, widths, width: W, height: H }));
+    await audit(admin, "settings.author_photo_upload", "settings");
     return Response.json({ ok: true });
   }
   return err("Невідомий тип");

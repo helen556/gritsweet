@@ -86,6 +86,52 @@ export interface OrdersTable {
   paid_at: string | null;
   created_at: Generated<string>;
   updated_at: Generated<string>;
+  first_name: string | null;
+  last_name: string | null;
+  recipient_first_name: string | null;
+  recipient_last_name: string | null;
+  recipient_phone: string | null;
+  sender_contact: string | null;
+  order_status: OrderStatus | null;
+  payment_method: string | null;
+  payment_checked_by: string | null;
+  payment_checked_at: string | null;
+  provider_receipt_url: string | null;
+  search_text: string | null;
+}
+export type OrderStatus = "new" | "processing" | "completed" | "cancelled";
+export interface OrderEventsTable {
+  id: string;
+  order_id: string;
+  kind: "order" | "payment" | "digital" | "shipping" | "note" | "receipt" | "export";
+  from_status: string | null;
+  to_status: string | null;
+  actor: string;
+  details: string | null;
+  created_at: string;
+}
+export interface ReceiptsTable {
+  id: string;
+  order_id: string;
+  storage_key: string;
+  content_type: string;
+  size_bytes: number;
+  original_name: string;
+  uploaded_by: string;
+  created_at: string;
+}
+export interface NotificationsTable {
+  id: string;
+  channel: "telegram";
+  dedupe_key: string;
+  order_id: string | null;
+  payload: string;
+  status: "queued" | "sent" | "failed" | "not_configured";
+  attempts: Generated<number>;
+  last_error: string | null;
+  next_attempt_at: string | null;
+  sent_at: string | null;
+  created_at: string;
 }
 export interface OrderItemsTable {
   id: string;
@@ -184,6 +230,9 @@ export interface Database {
   settings: SettingsTable;
   audit_log: AuditLogTable;
   rate_limits: RateLimitsTable;
+  order_events: OrderEventsTable;
+  receipts: ReceiptsTable;
+  notifications: NotificationsTable;
 }
 
 export type Product = Selectable<ProductsTable>;

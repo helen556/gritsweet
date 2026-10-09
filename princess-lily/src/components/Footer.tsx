@@ -4,7 +4,7 @@ import type { Dict } from "@/i18n";
 export default function Footer({ lang, t }: { lang: "uk" | "en"; t: Dict }) {
   const f = t.footer.links;
   return (
-    <footer className="mt-24 border-t border-black/5 bg-cream/60">
+    <footer className="relative mt-16 bg-[linear-gradient(180deg,rgba(242,234,219,0),rgba(242,234,219,.75)_35%,#efe7d6)]">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr]">
         <div>
           <p className="font-display text-2xl font-semibold text-moss-900">{t.brand.name}</p>

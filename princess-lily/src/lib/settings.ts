@@ -5,7 +5,7 @@ import { db } from "@/db";
 export const SETTING_KEYS = [
   "contact_email", "contact_phone", "contact_instagram", "contact_telegram",
   "payment_link_url", "payment_link_note_uk", "payment_link_note_en",
-  "seller_details_uk", "seller_details_en",
+  "seller_details_uk", "seller_details_en", "author_photo", "payment_mode",
 ] as const;
 export type SettingKey = (typeof SETTING_KEYS)[number];
 

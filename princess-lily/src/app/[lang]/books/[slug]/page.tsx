@@ -26,6 +26,8 @@ export default async function BookPage({ params }: PageProps<"/[lang]/books/[slu
   if (!p) notFound();
   const t = getDict(lang);
   const sellable = p.variants.filter((v) => v.sellable);
+  // у характеристиках — лише варіанти, які реально доступні (або всі заплановані, поки нічого не продається)
+  const shown = sellable.length ? sellable : p.variants;
   const price = priceLabel(p, lang, t);
   // у клієнтський компонент — лише рядки (без функцій)
   const { age: _age, ...productStrings } = t.product;
@@ -59,8 +61,8 @@ export default async function BookPage({ params }: PageProps<"/[lang]/books/[slu
           {!p.translationConfirmed && t.product.originalTitleNote && <p className="mt-2 text-sm text-ink-soft">{t.product.originalTitleNote}</p>}
           <dl className="mt-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-[1.02rem]">
             {p.age_from != null && p.age_to != null && (<><dt className="text-ink-soft">{t.product.ageLabel}</dt><dd>{t.product.age(p.age_from, p.age_to)}</dd></>)}
-            <dt className="text-ink-soft">{t.product.languageLabel}</dt><dd>{[...new Set(p.variants.map((v) => t.bookLocales[v.book_locale]))].join(", ")}</dd>
-            <dt className="text-ink-soft">{t.product.formatLabel}</dt><dd>{[...new Set(p.variants.map((v) => t.formats[v.format]))].join(", ")}</dd>
+            <dt className="text-ink-soft">{t.product.languageLabel}</dt><dd>{[...new Set(shown.map((v) => t.bookLocales[v.book_locale]))].join(", ")}</dd>
+            <dt className="text-ink-soft">{t.product.formatLabel}</dt><dd>{[...new Set(shown.map((v) => t.formats[v.format]))].join(", ")}</dd>
             {p.pages != null && (<><dt className="text-ink-soft">{t.product.pages}</dt><dd>{p.pages}</dd></>)}
             {p.size_label && (<><dt className="text-ink-soft">{t.product.size}</dt><dd>{p.size_label}</dd></>)}
             {p.binding_label && (<><dt className="text-ink-soft">{t.product.binding}</dt><dd>{p.binding_label}</dd></>)}

@@ -6,16 +6,19 @@ import "server-only";
  */
 const isProd = () => process.env.NODE_ENV === "production";
 
-export type PaymentMode = "disabled" | "manual_link" | "provider";
+/** Режими: disabled | manual_link | mono_acquiring | provider (лише тестовий провайдер для розробки). */
+export type PaymentMode = "disabled" | "manual_link" | "mono_acquiring" | "provider";
+export const PAYMENT_MODES: PaymentMode[] = ["disabled", "manual_link", "mono_acquiring", "provider"];
 
 export function paymentConfig() {
-  const raw = (process.env.PAYMENT_MODE ?? "disabled") as PaymentMode;
-  const mode: PaymentMode = ["disabled", "manual_link", "provider"].includes(raw) ? raw : "disabled";
+  const raw = (process.env.PAYMENT_MODE ?? "") as PaymentMode;
+  const envMode: PaymentMode | "" = PAYMENT_MODES.includes(raw) ? raw : "";
   const provider = process.env.PAYMENT_PROVIDER ?? "";
   const secret = process.env.PAYMENT_WEBHOOK_SECRET ?? "";
   // Тестовий провайдер ніколи не працює в production.
-  const providerReady = mode === "provider" && !!provider && !!secret && !(provider === "test" && isProd());
-  return { mode, provider, secret, providerReady };
+  const testReady = provider === "test" && !!secret && !isProd();
+  const monoToken = process.env.MONOBANK_TOKEN ?? "";
+  return { envMode, provider, secret, testReady, monoToken, mode: envMode || "disabled", providerReady: envMode === "provider" && testReady };
 }
 
 export function emailConfig() {

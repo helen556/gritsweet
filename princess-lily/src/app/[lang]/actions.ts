@@ -3,7 +3,9 @@ import { z } from "zod";
 import { db } from "@/db";
 import { quoteCart, type CartLineInput } from "@/lib/quote";
 import { createOrder, customerClaimsPaid, effectivePaymentMode, orderByToken } from "@/lib/orders";
-import { activeAdapter } from "@/lib/payments/providers";
+import { activePaymentAdapter } from "@/lib/orders";
+import { after } from "next/server";
+import { notifyNewOrder } from "@/lib/telegram";
 import { rateLimit } from "@/lib/rate-limit";
 import { appUrl } from "@/lib/config";
 import { newId } from "@/lib/ids";
@@ -25,8 +27,13 @@ const checkoutSchema = z.object({
   expectedTotalMinor: z.number().int().nonnegative(),
   idempotencyKey: z.string().min(16).max(80),
   email: z.string().trim().toLowerCase().email().max(200),
-  name: z.string().trim().min(1).max(120),
+  firstName: z.string().trim().min(1).max(80),
+  lastName: z.string().trim().min(1).max(80),
   phone: z.string().trim().max(32).optional().default(""),
+  otherRecipient: z.boolean().optional().default(false),
+  recipientFirstName: z.string().trim().max(80).optional().default(""),
+  recipientLastName: z.string().trim().max(80).optional().default(""),
+  recipientPhone: z.string().trim().max(32).optional().default(""),
   npCity: z.string().trim().max(200).optional().default(""),
   npCityRef: z.string().trim().max(64).optional().default(""),
   npPoint: z.string().trim().max(300).optional().default(""),
@@ -48,11 +55,13 @@ export async function placeOrder(payload: CheckoutPayload): Promise<CheckoutResu
   const phoneOk = /^\+?[\d\s()-]{9,20}$/.test(d.phone);
   const q = await quoteCart(d.lines, d.lang);
   if (q.shippingRequired) {
-    const missing = [!phoneOk && "phone", !d.npCity && "npCity", !d.npPoint && "npPoint"].filter(Boolean) as string[];
+    const recOk = !d.otherRecipient || (d.recipientFirstName && d.recipientLastName && /^\+?[\d\s()-]{9,20}$/.test(d.recipientPhone));
+    const missing = [!phoneOk && "phone", !d.npCity && "npCity", !d.npPoint && "npPoint", !recOk && "recipient"].filter(Boolean) as string[];
     if (missing.length) return { ok: false, error: "invalid", fields: missing };
   }
   const r = await createOrder({
-    lines: d.lines, email: d.email, name: d.name, phone: d.phone || null,
+    lines: d.lines, email: d.email, firstName: d.firstName, lastName: d.lastName, phone: d.phone || null,
+    recipient: d.otherRecipient ? { firstName: d.recipientFirstName, lastName: d.recipientLastName, phone: d.recipientPhone } : null,
     npCity: d.npCity || null, npCityRef: d.npCityRef || null, npPoint: d.npPoint || null, npPointRef: d.npPointRef || null,
     note: d.note || null, siteLocale: d.lang, idempotencyKey: d.idempotencyKey,
   }, d.expectedTotalMinor);
@@ -60,8 +69,11 @@ export async function placeOrder(payload: CheckoutPayload): Promise<CheckoutResu
   if (r.duplicate || !r.accessToken) return { ok: false, error: "duplicate" };
 
   const statusUrl = `/${d.lang}/order/${r.accessToken}`;
+  // Сповіщення власниці — після відповіді покупцю; недоступність Telegram не впливає на оформлення
+  const orderId = r.orderId;
+  after(() => notifyNewOrder(orderId).catch(() => {}));
   if ((await effectivePaymentMode()) === "provider") {
-    const adapter = activeAdapter();
+    const adapter = await activePaymentAdapter();
     const order = await db.selectFrom("orders").select(["number", "total_minor", "currency"]).where("id", "=", r.orderId).executeTakeFirstOrThrow();
     try {
       const co = await adapter!.createCheckout({ orderId: r.orderId, orderNumber: order.number, amountMinor: order.total_minor, currency: order.currency, description: `Order ${order.number}`, returnUrl: `${appUrl()}${statusUrl}` });

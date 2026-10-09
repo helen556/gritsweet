@@ -13,7 +13,7 @@ export function resolveLine(line: string, lang: "uk" | "en", t: Dict, pdfMode: "
 
 export default function Faq({ lang, t, pdfMode }: { lang: "uk" | "en"; t: Dict; pdfMode: "auto" | "manual" }) {
   return (
-    <div className="divide-y divide-black/8 overflow-hidden rounded-[1.5rem] border border-black/6 bg-paper/80">
+    <div className="surface divide-y divide-black/[.06] overflow-hidden">
       {t.faq.items.map((item, i) => (
         <details key={i} className="faq group" id={`faq-${i + 1}`}>
           <summary className="flex min-h-14 items-center gap-4 px-5 py-4 text-left text-[1.05rem] font-semibold transition-colors hover:bg-moss-100/50 sm:px-7">

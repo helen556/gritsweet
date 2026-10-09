@@ -1,12 +1,15 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { paymentConfig, appUrl } from "../config";
+import { monoAdapter } from "./monobank";
 
 /** Перевірене (підписане) повідомлення від платіжного провайдера. */
 export type VerifiedNotification = {
   provider: string;
   eventId: string;
   orderId: string;
+  /** ID платежу/рахунку у провайдера (для CRM) */
+  paymentId?: string;
   amountMinor: number;
   currency: string;
   status: "success" | "failure" | "pending";
@@ -20,6 +23,8 @@ export type CheckoutRequest = { orderId: string; orderNumber: string; amountMino
  */
 export interface PaymentAdapter {
   id: string;
+  /** Додаткова серверна перевірка платежу у провайдера перед зарахуванням (якщо API це дозволяє). */
+  confirmWithProvider?(n: VerifiedNotification): Promise<boolean>;
   createCheckout(req: CheckoutRequest): Promise<{ redirectUrl: string; reference: string }>;
   /** null — підпис невірний або тіло пошкоджене. */
   parseWebhook(rawBody: string, headers: Headers): Promise<VerifiedNotification | null>;
@@ -53,14 +58,11 @@ const testAdapter: PaymentAdapter = {
   },
 };
 
-const adapters: Record<string, PaymentAdapter> = { test: testAdapter };
 
-export function activeAdapter(): PaymentAdapter | null {
-  const cfg = paymentConfig();
-  if (!cfg.providerReady) return null;
-  return adapters[cfg.provider] ?? null;
-}
+/** Адаптер, доступний для вебхуків/оплати (залежить лише від серверних ключів). */
 export function adapterById(id: string): PaymentAdapter | null {
-  const a = activeAdapter();
-  return a && a.id === id ? a : null;
+  const cfg = paymentConfig();
+  if (id === "test") return cfg.testReady ? testAdapter : null;
+  if (id === "mono") return cfg.monoToken ? monoAdapter : null;
+  return null;
 }

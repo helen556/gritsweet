@@ -6,10 +6,13 @@ import { newId, newToken, sha256 } from "./ids";
 import { appUrl, downloadMax, downloadTtlHours } from "./config";
 import { escapeHtml, sendEmail } from "./email";
 import { formatMinor } from "./money";
+import { logOrderEvent } from "./events";
+import { notifyPaid } from "./telegram";
+import { adapterById } from "./payments/providers";
 
 const nowIso = () => new Date().toISOString();
 
-export type PaymentResult = "applied" | "duplicate" | "unknown_order" | "amount_mismatch" | "currency_mismatch" | "already_paid" | "failed_recorded" | "ignored";
+export type PaymentResult = "applied" | "duplicate" | "unknown_order" | "amount_mismatch" | "currency_mismatch" | "already_paid" | "failed_recorded" | "ignored" | "not_confirmed";
 
 /**
  * Обробка ПЕРЕВІРЕНОГО (підпис уже перевірено) повідомлення провайдера.
@@ -25,6 +28,9 @@ export async function processPaymentNotification(n: VerifiedNotification): Promi
     else if (n.amountMinor !== order.total_minor) result = "amount_mismatch";
     else if (order.payment_status === "paid") result = "already_paid";
     else result = "applied";
+    // додаткова серверна перевірка у провайдера (якщо адаптер це підтримує)
+    const confirm = adapterById(n.provider)?.confirmWithProvider;
+    if (result === "applied" && confirm && !(await confirm(n))) result = "not_confirmed";
   } else if (n.status === "failure") result = order.payment_status === "paid" ? "ignored" : "failed_recorded";
   else result = "ignored";
 
@@ -34,10 +40,15 @@ export async function processPaymentNotification(n: VerifiedNotification): Promi
   }).onConflict((oc) => oc.columns(["provider", "event_id"]).doNothing()).executeTakeFirst();
   if (!ins.numInsertedOrUpdatedRows || Number(ins.numInsertedOrUpdatedRows) === 0) return "duplicate";
 
+  if (n.paymentId && order) await db.updateTable("orders").set({ payment_reference: n.paymentId }).where("id", "=", order.id).where("payment_reference", "is", null).execute();
   if (result === "applied") await markPaid(order!.id, { source: `provider:${n.provider}` });
-  if (result === "failed_recorded")
-    await db.updateTable("orders").set({ payment_status: "failed", updated_at: nowIso() }).where("id", "=", order!.id).where("payment_status", "in", ["pending_payment", "pending_verification"]).execute();
-  if (result === "amount_mismatch" || result === "currency_mismatch")
+  if (result === "failed_recorded") {
+    const f = await db.updateTable("orders").set({ payment_status: "failed", updated_at: nowIso() }).where("id", "=", order!.id).where("payment_status", "in", ["pending_payment", "pending_verification"]).executeTakeFirst();
+    if (Number(f.numUpdatedRows)) await logOrderEvent(order!.id, "payment", order!.payment_status, "failed", `провайдер:${n.provider}`);
+  }
+  if (result === "amount_mismatch" || result === "currency_mismatch" || result === "not_confirmed")
+    await logOrderEvent(order!.id, "payment", order!.payment_status, "pending_verification", `провайдер:${n.provider}`, `Відхилено автоматичне зарахування: ${result}`);
+  if (result === "amount_mismatch" || result === "currency_mismatch" || result === "not_confirmed")
     await db.updateTable("orders").set({ payment_status: "pending_verification", admin_note: sql`admin_note || ${`\n[${nowIso()}] Провайдер повідомив іншу суму/валюту: ${n.amountMinor} ${n.currency}. Перевірте вручну.`}`, updated_at: nowIso() })
       .where("id", "=", order!.id).where("payment_status", "!=", "paid").execute();
   return result;
@@ -47,10 +58,18 @@ export async function processPaymentNotification(n: VerifiedNotification): Promi
  * Переводить замовлення в «оплачено» рівно один раз (умовне оновлення) і запускає видачу.
  * Викликається з перевіреного вебхука або з ручного підтвердження адміністратора.
  */
-export async function markPaid(orderId: string, by: { source: string }): Promise<boolean> {
-  const res = await db.updateTable("orders").set({ payment_status: "paid", paid_at: nowIso(), updated_at: nowIso() })
-    .where("id", "=", orderId).where("payment_status", "!=", "paid").where("payment_status", "!=", "cancelled").executeTakeFirst();
+export async function markPaid(orderId: string, by: { source: string; checkedBy?: string }): Promise<boolean> {
+  const before = await db.selectFrom("orders").select(["payment_status", "order_status"]).where("id", "=", orderId).executeTakeFirst();
+  const res = await db.updateTable("orders").set({
+    payment_status: "paid", paid_at: nowIso(), updated_at: nowIso(),
+    payment_checked_by: by.checkedBy ?? by.source, payment_checked_at: nowIso(),
+  }).where("id", "=", orderId).where("payment_status", "!=", "paid").where("payment_status", "!=", "cancelled").executeTakeFirst();
   if (Number(res.numUpdatedRows) !== 1) return false;
+  await logOrderEvent(orderId, "payment", before?.payment_status ?? null, "paid", by.checkedBy ?? by.source);
+  if (before?.order_status === "new") {
+    await db.updateTable("orders").set({ order_status: "processing" }).where("id", "=", orderId).execute();
+    await logOrderEvent(orderId, "order", "new", "processing", "система");
+  }
   const items = await db.selectFrom("order_items").selectAll().where("order_id", "=", orderId).execute();
   // Списання залишку друкованих книжок після оплати; нестачу позначаємо для адміністратора
   for (const it of items.filter((i) => i.format === "print")) {
@@ -62,7 +81,8 @@ export async function markPaid(orderId: string, by: { source: string }): Promise
   await db.updateTable("fulfillments").set({ status: "to_ship", updated_at: nowIso() }).where("order_id", "=", orderId).where("kind", "=", "shipping").where("status", "=", "awaiting_payment").execute();
   await db.updateTable("fulfillments").set({ status: "ready", updated_at: nowIso() }).where("order_id", "=", orderId).where("kind", "=", "digital").where("status", "=", "awaiting_payment").execute();
   if (items.some((i) => i.format === "pdf")) await deliverPdfEmail(orderId, `pdf:${orderId}`);
-  void by;
+  // Telegram «оплату підтверджено» — лише тут, тобто після перевіреного вебхука або ручного підтвердження
+  await notifyPaid(orderId, by.source.startsWith("provider:") ? `підписаний вебхук ${by.source.slice(9)}` : `перевірено вручну: ${by.checkedBy ?? by.source}`).catch(() => {});
   return true;
 }
 
@@ -121,6 +141,7 @@ export async function deliverPdfEmail(orderId: string, dedupeKey: string) {
   if (res.ok) {
     await db.updateTable("email_deliveries").set({ status: "sent", provider_message_id: res.id, sent_at: nowIso(), last_error: null, next_attempt_at: null }).where("id", "=", row.id).execute();
     await db.updateTable("fulfillments").set({ status: "sent", updated_at: nowIso() }).where("order_id", "=", orderId).where("kind", "=", "digital").execute();
+    await logOrderEvent(orderId, "digital", null, "sent", "система", "Лист із посиланнями на PDF надіслано");
     return { status: "sent" as const };
   }
   // Невдала спроба: щойно видані токени відкликаємо (лист їх не доставив)
@@ -129,6 +150,7 @@ export async function deliverPdfEmail(orderId: string, dedupeKey: string) {
   const next = res.notConfigured || attempts >= MAX_EMAIL_ATTEMPTS ? null : new Date(Date.now() + RETRY_MIN[Math.min(attempts - 1, RETRY_MIN.length - 1)] * 60_000).toISOString();
   await db.updateTable("email_deliveries").set({ status: res.notConfigured ? "not_configured" : "failed", last_error: res.error, next_attempt_at: next }).where("id", "=", row.id).execute();
   await db.updateTable("fulfillments").set({ status: res.notConfigured ? "email_not_configured" : "email_failed", updated_at: nowIso() }).where("order_id", "=", orderId).where("kind", "=", "digital").execute();
+  await logOrderEvent(orderId, "digital", null, res.notConfigured ? "email_not_configured" : "email_failed", "система", res.error);
   return { status: res.notConfigured ? ("not_configured" as const) : ("failed" as const), error: res.error };
 }
 

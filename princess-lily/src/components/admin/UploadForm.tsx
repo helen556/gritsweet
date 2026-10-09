@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 /** Завантаження обкладинки / приватного PDF через захищений ендпоінт /api/admin/upload. */
-export default function UploadForm({ kind, targetId, accept, label }: { kind: "cover" | "pdf"; targetId: string; accept: string; label: string }) {
+export default function UploadForm({ kind, targetId, accept, label }: { kind: "cover" | "pdf" | "author" | "receipt"; targetId: string; accept: string; label: string }) {
   const [msg, setMsg] = useState<{ ok?: string; error?: string }>({});
   const [busy, setBusy] = useState(false);
   const router = useRouter();

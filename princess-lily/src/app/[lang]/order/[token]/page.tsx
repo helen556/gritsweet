@@ -6,6 +6,8 @@ import { orderByToken, orderDetails } from "@/lib/orders";
 import { getSettings } from "@/lib/settings";
 import { formatMinor } from "@/lib/money";
 import { claimPaidAction } from "../../actions";
+import CopyAmount from "@/components/CopyAmount";
+import ReceiptUpload from "@/components/ReceiptUpload";
 
 export const metadata: Metadata = { robots: { index: false, follow: false }, referrer: "no-referrer" };
 
@@ -41,15 +43,23 @@ export default async function OrderPage({ params }: PageProps<"/[lang]/order/[to
         {st === "pending_payment" && o.payment_mode === "manual_link" && s.payment_link_url && (
           <div className="mt-8 rounded-2xl bg-cream/70 p-5">
             <h2 className="text-2xl text-moss-900">{t.order.manualTitle}</h2>
-            <p className="mt-2">{t.order.manualText(o.number, formatMinor(o.total_minor, lang))}</p>
+            <p className="mt-3 text-sm uppercase tracking-wider text-ink-soft">{t.order.toPay}</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-4xl font-semibold text-moss-900">{formatMinor(o.total_minor, lang)}</p>
+              <CopyAmount value={(o.total_minor / 100).toFixed(2)} label={t.order.copyAmount} done={t.order.copied} />
+            </div>
+            <p className="mt-3">{t.order.manualText(o.number, formatMinor(o.total_minor, lang))}</p>
             {note && <p className="mt-2 text-ink-soft">{note}</p>}
             <div className="mt-4 flex flex-wrap gap-3">
-              <a href={s.payment_link_url} target="_blank" rel="noopener noreferrer" className="btn btn-primary">{t.order.payLink}</a>
+              <a href={s.payment_link_url} target="_blank" rel="noopener noreferrer" className="btn btn-primary">{t.order.payLink} ↗</a>
               <form action={claimPaidAction.bind(null, token, lang)}><button className="btn btn-ghost">{t.order.claimPaid}</button></form>
             </div>
           </div>
         )}
         {st === "pending_verification" && o.payment_mode === "manual_link" && <p className="mt-6 text-ink-soft">{t.order.claimNote}</p>}
+        {o.payment_mode === "manual_link" && (st === "pending_payment" || st === "pending_verification") && (
+          <ReceiptUpload token={token} t={{ title: t.order.receiptTitle, hint: t.order.receiptHint, upload: t.order.receiptUpload, ok: t.order.receiptOk, err: t.order.receiptErr }} />
+        )}
         {st === "pending_payment" && o.payment_mode === "provider" && (
           <div className="mt-6"><p className="text-ink-soft">{t.order.providerWaiting}</p>
             <Link href={`/${lang}/order/${token}`} className="btn btn-ghost btn-sm mt-3" prefetch={false}>{t.order.refresh}</Link></div>

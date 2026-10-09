@@ -1,4 +1,5 @@
 /**
+// перед запуском: демо-залишок друку відновлюється, щоб сценарій був відтворюваним
  * Наскрізна перевірка на локальному dev-сервері з демо-БД і тестовим провайдером:
  *   DATABASE_URL=file:./data/demo.db PAYMENT_MODE=provider PAYMENT_PROVIDER=test PAYMENT_WEBHOOK_SECRET=… EMAIL_PROVIDER=outbox npm run dev
  *   node tests/e2e/flow.mjs [screenshotsDir]
@@ -12,20 +13,34 @@ const OUT = process.argv[2] ?? "test-results/e2e";
 fs.mkdirSync(OUT, { recursive: true });
 const results = [];
 const check = (name, ok, extra = "") => { results.push({ name, ok }); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${extra ? "  — " + extra : ""}`); };
+// демо-БД: відновити залишок друку й ліміти (лише локальна demo.db)
+{ const { default: Database } = await import("better-sqlite3"); const d = new Database("data/demo.db"); d.prepare("update product_variants set stock = 5 where id = 'var_demo_uk_print'").run(); d.prepare("delete from rate_limits").run(); d.close(); }
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
 
 // ---------- Покупка: змішаний кошик ----------
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } });
 const page = await ctx.newPage();
 await page.goto(`${BASE}/uk/books/demo-book`);
-await page.getByText("Друкована", { exact: true }).click();
+check("до вибору варіанта покупка неактивна", await page.getByRole("button", { name: "Купити зараз" }).isDisabled());
+await page.getByText("Українська", { exact: true }).first().click();
+await page.getByText("Друкована книга", { exact: true }).click();
+check("ціна оновлюється за варіантом (друк 380,50)", (await page.locator("main").innerText()).includes("380,50 грн"));
 await page.getByRole("button", { name: "Додати в кошик" }).click();
-await page.getByText("Електронна (PDF)", { exact: true }).click();
+check("підтвердження додавання з кількістю в кошику", await page.getByText("У кошику: 1").isVisible());
+await page.getByText("Електронна книга (PDF)", { exact: true }).click();
 await page.getByRole("button", { name: "Додати в кошик" }).click();
+// «Купити зараз» — лише ця книжка, кошик не змінюється
+await page.getByRole("button", { name: "Купити зараз" }).click();
+await page.waitForURL(/checkout\?buy=/);
+await page.getByText("Швидка покупка").waitFor();
+const buyText = await page.locator("aside").innerText();
+check("«Купити зараз»: у підсумку лише обрана книжка (199 грн)", buyText.includes("199 грн") && !buyText.includes("380,50"));
+const cartAfter = await page.evaluate(() => JSON.parse(localStorage.getItem("pl_cart_v1")).length);
+check("«Купити зараз» не змінює кошик (2 рядки)", cartAfter === 2);
 await page.goto(`${BASE}/uk/cart`);
 await page.getByText("Разом за книжки").waitFor();
 const cartText = await page.locator("main").innerText();
-check("кошик: окремі рядки PDF і друк", cartText.includes("Друкована · Українська") && cartText.includes("Електронна (PDF) · Українська"));
+check("кошик: окремі рядки PDF і друк", cartText.includes("Друкована книга · Українська") && cartText.includes("Електронна книга (PDF) · Українська"));
 check("кошик: серверна сума 199 + 380,50", cartText.includes("579,50 грн"));
 await page.screenshot({ path: path.join(OUT, "cart-desktop.png"), fullPage: true });
 
@@ -37,7 +52,8 @@ check("checkout: поля доставки є для друку", await page.get
 await page.getByRole("button", { name: "Перейти до оплати" }).click();
 check("checkout: валідація порожніх полів", await page.getByText("Вкажіть коректний email.").isVisible());
 await page.getByLabel("Email").fill("parent@example.com");
-await page.getByLabel("Ім’я").fill("Олена Тест");
+await page.getByLabel("Ім’я", { exact: true }).fill("Олена");
+await page.getByLabel("Прізвище", { exact: true }).fill("Тестова");
 await page.getByLabel("Телефон").fill("+380 50 123 45 67");
 await page.getByLabel("Місто або населений пункт").fill("Київ");
 await page.getByLabel("Відділення або поштомат").fill("Відділення №1");
@@ -95,7 +111,16 @@ await admin.getByRole("button", { name: "Увійти" }).click();
 await admin.waitForURL(`${BASE}/admin`, { timeout: 60000 });
 await admin.screenshot({ path: path.join(OUT, "admin-dashboard.png"), fullPage: true });
 await admin.goto(`${BASE}/admin/orders`);
-await admin.locator("main a[href^='/admin/orders/ord_']").first().click();
+const table = await admin.locator("table").innerText();
+check("CRM: замовлення в таблиці з ім’ям, змішаним типом і сумою", table.includes("Олена Тестова") && table.includes("Змішане") && table.includes("579,50 грн"));
+await admin.screenshot({ path: path.join(OUT, "admin-crm-table.png"), fullPage: true });
+const xl = await admin.request.get(`${BASE}/admin/orders-export?format=xlsx&kind=mixed`);
+check("експорт Excel (адмін): 200, .xlsx", xl.status() === 200 && (xl.headers()["content-type"] ?? "").includes("spreadsheetml") && (await xl.body()).subarray(0, 2).toString() === "PK");
+const pd = await admin.request.get(`${BASE}/admin/orders-export?format=pdf`);
+check("експорт PDF (адмін): 200, %PDF", pd.status() === 200 && (await pd.body()).subarray(0, 5).toString() === "%PDF-");
+check("експорт без входу → 401", (await fetch(`${BASE}/admin/orders-export?format=xlsx`)).status === 401);
+check("квитанція без входу → 401", (await fetch(`${BASE}/admin/receipt/rcp_x`)).status === 401);
+await admin.locator("main table a[href^='/admin/orders/ord_']").first().click();
 await admin.getByText("Доставка (Нова пошта)").waitFor();
 await admin.getByLabel("Статус", { exact: true }).selectOption("shipped");
 await admin.getByLabel("ТТН (номер накладної)").fill("20450012345678");
@@ -142,7 +167,7 @@ for (const p of ["/uk", "/uk/books", "/uk/books/demo-book", "/uk/contacts", "/en
   check(`360px без горизонтального скролу: ${p}`, ov <= 0, `overflow=${ov}`);
 }
 await mp.goto(`${BASE}/uk/books/demo-book`);
-await mp.getByText("Друкована", { exact: true }).click();
+await mp.getByText("Друкована книга", { exact: true }).click();
 await mp.getByRole("button", { name: "Додати в кошик" }).click();
 await mp.goto(`${BASE}/uk/checkout`);
 await mp.getByLabel("Email").waitFor();

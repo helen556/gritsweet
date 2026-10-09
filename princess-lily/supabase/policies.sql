@@ -10,7 +10,7 @@ begin
   foreach t in array array[
     'admin_users','products','product_translations','product_variants','orders','order_items',
     'payment_events','fulfillments','download_grants','email_deliveries','contact_messages',
-    'settings','audit_log','rate_limits'
+    'settings','audit_log','rate_limits','order_events','receipts','notifications'
   ] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('alter table public.%I force row level security', t);
@@ -20,7 +20,7 @@ end $$;
 
 -- Приватний bucket для куплених PDF (не публічний; доступ лише через service role на сервері)
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('private-books', 'private-books', false, 104857600, array['application/pdf'])
+values ('private-books', 'private-books', false, 104857600, array['application/pdf','image/jpeg','image/png','image/webp'])
 on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
 -- Жодних політик для anon/authenticated на storage.objects цього bucket → прямий доступ заборонено.
@@ -34,7 +34,7 @@ begin
   foreach t in array array[
     'admin_users','products','product_translations','product_variants','orders','order_items',
     'payment_events','fulfillments','download_grants','email_deliveries','contact_messages',
-    'settings','audit_log','rate_limits'
+    'settings','audit_log','rate_limits','order_events','receipts','notifications'
   ] loop
     execute format('drop policy if exists server_all on public.%I', t);
     execute format('create policy server_all on public.%I for all to postgres using (true) with check (true)', t);

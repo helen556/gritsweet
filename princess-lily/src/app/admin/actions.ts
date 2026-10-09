@@ -10,7 +10,9 @@ import { parseUahToMinor } from "@/lib/money";
 import { markPaid, deliverPdfEmail, issueDownloadGrants } from "@/lib/fulfillment";
 import { setSetting, SETTING_KEYS, type SettingKey } from "@/lib/settings";
 import { appUrl } from "@/lib/config";
+import { logOrderEvent, ORDER_TRANSITIONS } from "@/lib/events";
 import { privateStorage } from "@/lib/storage";
+import { retryDueNotifications } from "@/lib/telegram";
 
 export type ActionState = { ok?: string; error?: string; links?: { title: string; url: string }[] };
 const now = () => new Date().toISOString();
@@ -119,7 +121,7 @@ export async function confirmPaymentAction(_: ActionState, fd: FormData): Promis
   const o = await db.selectFrom("orders").select(["payment_status", "payment_mode", "total_minor"]).where("id", "=", id).executeTakeFirst();
   if (!o) return { error: "Замовлення не знайдено" };
   if (!["pending_payment", "pending_verification", "failed"].includes(o.payment_status)) return { error: "Замовлення вже оплачене або скасоване" };
-  const ok = await markPaid(id, { source: `admin:${admin.email}` });
+  const ok = await markPaid(id, { source: `admin:${admin.email}`, checkedBy: admin.email });
   await audit(admin, "order.payment_confirmed_manual", "order", id, { amount: o.total_minor, mode: o.payment_mode });
   revalidatePath(`/admin/orders/${id}`);
   return ok ? { ok: "Оплату підтверджено. Видачу запущено." } : { error: "Стан змінився — оновіть сторінку" };
@@ -129,7 +131,12 @@ export async function cancelOrderAction(_: ActionState, fd: FormData): Promise<A
   const admin = await requireAdmin();
   const id = str(fd, "id", 64);
   if (fd.get("confirm") !== "on") return { error: "Підтвердіть скасування позначкою" };
-  const res = await db.updateTable("orders").set({ payment_status: "cancelled", updated_at: now() }).where("id", "=", id).where("payment_status", "!=", "cancelled").executeTakeFirst();
+  const before = await db.selectFrom("orders").select(["payment_status", "order_status"]).where("id", "=", id).executeTakeFirst();
+  const res = await db.updateTable("orders").set({ payment_status: "cancelled", order_status: "cancelled", updated_at: now() }).where("id", "=", id).where("payment_status", "!=", "cancelled").executeTakeFirst();
+  if (Number(res.numUpdatedRows)) {
+    await logOrderEvent(id, "order", before?.order_status ?? null, "cancelled", admin.email);
+    await logOrderEvent(id, "payment", before?.payment_status ?? null, "cancelled", admin.email);
+  }
   await db.updateTable("download_grants").set({ revoked: 1 }).where("order_id", "=", id).execute();
   await db.updateTable("fulfillments").set({ status: "cancelled", updated_at: now() }).where("order_id", "=", id).where("kind", "=", "shipping").where("status", "in", ["awaiting_payment", "to_ship"]).execute();
   await audit(admin, "order.cancel", "order", id);
@@ -147,7 +154,9 @@ export async function shippingAction(_: ActionState, fd: FormData): Promise<Acti
   if (status.data === "shipped" && !ttn) return { error: "Для «Відправлено» вкажіть ТТН" };
   const o = await db.selectFrom("orders").select("payment_status").where("id", "=", id).executeTakeFirst();
   if (o?.payment_status !== "paid" && status.data !== "cancelled") return { error: "Доставка можлива лише після оплати" };
+  const prev = await db.selectFrom("fulfillments").select(["status", "ttn"]).where("order_id", "=", id).where("kind", "=", "shipping").executeTakeFirst();
   await db.updateTable("fulfillments").set({ status: status.data, ttn: ttn || null, updated_at: now() }).where("order_id", "=", id).where("kind", "=", "shipping").execute();
+  if (prev?.status !== status.data || (prev?.ttn ?? "") !== ttn) await logOrderEvent(id, "shipping", prev?.status ?? null, status.data, admin.email, ttn ? `ТТН ${ttn}` : undefined);
   await audit(admin, "order.shipping", "order", id, { status: status.data, ttn });
   revalidatePath(`/admin/orders/${id}`);
   return { ok: "Доставку оновлено" };
@@ -179,7 +188,8 @@ export async function makeLinksAction(_: ActionState, fd: FormData): Promise<Act
 export async function orderNoteAction(_: ActionState, fd: FormData): Promise<ActionState> {
   const admin = await requireAdmin();
   const id = str(fd, "id", 64);
-  await db.updateTable("orders").set({ admin_note: str(fd, "admin_note", 4000), updated_at: now() }).where("id", "=", id).execute();
+  await db.updateTable("orders").set({ admin_note: str(fd, "admin_note", 4000), sender_contact: str(fd, "sender_contact", 300) || null, updated_at: now() }).where("id", "=", id).execute();
+  await logOrderEvent(id, "note", null, null, admin.email, "Оновлено внутрішню примітку / дані відправника");
   await audit(admin, "order.note", "order", id);
   return { ok: "Нотатку збережено" };
 }
@@ -203,8 +213,10 @@ export async function saveSettingsAction(_: ActionState, fd: FormData): Promise<
   if (url && !/^https:\/\/[^\s]+$/.test(url)) return { error: "Платіжне посилання має починатися з https://" };
   const email = str(fd, "contact_email", 200);
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Невірний email" };
-  for (const k of SETTING_KEYS) await setSetting(k as SettingKey, str(fd, k, 2000));
-  await audit(admin, "settings.update", "settings", undefined, { payment_link_set: !!url });
+  const mode = str(fd, "payment_mode", 30);
+  if (mode && !["manual_link", "mono_acquiring", "disabled"].includes(mode)) return { error: "Невірний режим оплати" };
+  for (const k of SETTING_KEYS) if (fd.has(k)) await setSetting(k as SettingKey, str(fd, k, 2000));
+  await audit(admin, "settings.update", "settings", undefined, { payment_link_set: !!url, payment_mode: mode });
   revalidatePath("/", "layout");
   return { ok: "Налаштування збережено" };
 }
@@ -220,4 +232,28 @@ export async function changePasswordAction(_: ActionState, fd: FormData): Promis
   await createSession({ id: admin.id, email: admin.email, session_version: u.session_version + 1 }); // інші сесії анульовано
   await audit(admin, "account.password_change");
   return { ok: "Пароль змінено; інші сесії завершено" };
+}
+
+/** Зміна загального статусу замовлення — лише дозволені переходи, з хронологією. */
+export async function orderStatusAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const admin = await requireAdmin();
+  const id = str(fd, "id", 64), to = str(fd, "order_status", 20);
+  const o = await db.selectFrom("orders").select("order_status").where("id", "=", id).executeTakeFirst();
+  if (!o) return { error: "Замовлення не знайдено" };
+  const from = o.order_status ?? "new";
+  if (from === to) return { ok: "Без змін" };
+  if (!(ORDER_TRANSITIONS[from] ?? []).includes(to)) return { error: `Перехід «${from} → ${to}» не дозволено` };
+  await db.updateTable("orders").set({ order_status: to as never, updated_at: now() }).where("id", "=", id).execute();
+  await logOrderEvent(id, "order", from, to, admin.email);
+  await audit(admin, "order.status", "order", id, { from, to });
+  revalidatePath(`/admin/orders/${id}`);
+  return { ok: "Статус оновлено" };
+}
+
+export async function retryNotificationsAction(): Promise<ActionState> {
+  const admin = await requireAdmin();
+  const r = await retryDueNotifications(true);
+  await audit(admin, "notifications.retry", "notifications", undefined, { count: r.length });
+  revalidatePath("/admin");
+  return r.length ? { ok: `Оброблено: ${r.join(", ")}` } : { ok: "Немає сповіщень для повтору" };
 }

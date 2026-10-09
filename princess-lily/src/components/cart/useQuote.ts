@@ -2,27 +2,32 @@
 import { useEffect, useState } from "react";
 import { quoteAction } from "@/app/[lang]/actions";
 import type { Quote } from "@/lib/quote";
-import { useCart } from "./CartProvider";
+import { useCart, type CartLine } from "./CartProvider";
 
-/** Тягне серверний розрахунок для поточного кошика; недоступні позиції прибирає з кошика. */
-export function useQuote(lang: "uk" | "en") {
+/**
+ * Серверний розрахунок. Для кошика — поточні рядки (недоступні прибираються з кошика);
+ * для «Купити зараз» — передані рядки, кошик не читається й не змінюється.
+ */
+export function useQuote(lang: "uk" | "en", direct?: CartLine[] | null) {
   const cart = useCart();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [removed, setRemoved] = useState(false);
-  const key = JSON.stringify(cart.lines);
+  const lines = direct ?? cart.lines;
+  const ready = direct ? true : cart.ready;
+  const key = JSON.stringify(lines);
   useEffect(() => {
-    if (!cart.ready) return;
+    if (!ready) return;
     let cancelled = false;
-    quoteAction(cart.lines, lang).then((q) => {
+    quoteAction(lines, lang).then((q) => {
       if (cancelled) return;
       setQuote(q);
-      if (q.unavailable.length) {
+      if (!direct && q.unavailable.length) {
         setRemoved(true);
         cart.replace(cart.lines.filter((l) => !q.unavailable.includes(l.variantId)));
       }
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, cart.ready, lang]);
-  return { quote, removed, cart };
+  }, [key, ready, lang]);
+  return { quote, removed, cart, lines, ready };
 }
