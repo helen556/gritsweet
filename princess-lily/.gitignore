@@ -8,3 +8,4 @@ data/
 storage/
 test-results/
 playwright-report/
+.vercel

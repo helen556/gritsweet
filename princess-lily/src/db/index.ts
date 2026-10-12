@@ -5,15 +5,34 @@ import type { Database } from "./types";
 //   file:./data/dev.db           → SQLite (локальна розробка, один сервер)
 //   postgres://user:pass@host/db → PostgreSQL (продакшен, напр. Supabase)
 //   :memory:                     → SQLite у пам'яті (лише тести)
+/** DATABASE_URL, або POSTGRES_URL / POSTGRES_URL_NON_POOLING, які Vercel задає автоматично при підключенні Neon/Supabase. */
+export function databaseUrl(): string {
+  return process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_URL_NON_POOLING || "";
+}
+/**
+ * SSL для PostgreSQL: перевірка сертифіката за замовчуванням.
+ * DATABASE_SSL=no-verify — шифрування без перевірки ланцюжка (деякі пулери Supabase), DATABASE_SSL=off — без SSL (лише локально).
+ */
+function sslOption(url: string) {
+  const mode = process.env.DATABASE_SSL ?? "";
+  if (mode === "off" || /@(localhost|127\.0\.0\.1)[:/]/.test(url)) return undefined;
+  if (mode === "no-verify") return { rejectUnauthorized: false };
+  return { rejectUnauthorized: true };
+}
+/** sslmode у рядку підключення перекриває налаштування ssl у pg — прибираємо його, керуємо через DATABASE_SSL. */
+function stripSslMode(url: string) {
+  try { const u = new URL(url); u.searchParams.delete("sslmode"); return u.toString(); } catch { return url; }
+}
+
 function createDb(): Kysely<Database> {
-  const url = process.env.DATABASE_URL;
+  const url = databaseUrl();
   if (!url) throw new Error("DATABASE_URL не задано (див. .env.example)");
   if (url.startsWith("postgres")) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { Pool } = require("pg");
     return new Kysely<Database>({
       dialect: new PostgresDialect({
-        pool: new Pool({ connectionString: url, max: 3, ssl: url.includes("localhost") ? undefined : { rejectUnauthorized: true } }),
+        pool: new Pool({ connectionString: stripSslMode(url), max: 3, ssl: sslOption(url) }),
       }),
     });
   }
@@ -38,4 +57,4 @@ const g = globalThis as unknown as { __plDb?: Kysely<Database> };
 export const db: Kysely<Database> = g.__plDb ?? createDb();
 g.__plDb = db;
 
-export const isPostgres = () => (process.env.DATABASE_URL ?? "").startsWith("postgres");
+export const isPostgres = () => databaseUrl().startsWith("postgres");

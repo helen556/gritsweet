@@ -136,6 +136,8 @@ CHROMIUM_PATH=… npm run test:e2e                                  # наскр
 `email_deliveries`, `contact_messages`, `settings`, `audit_log`, `admin_users`, `rate_limits`, а також `order_events` (хронологія), `receipts` (приватні квитанції), `notifications` (outbox Telegram). Нові колонки додаються ідемпотентно (`db:setup`). Див. `src/db/migrate.ts` і `src/db/types.ts`.
 
 ## Публікація демо на Vercel (безкоштовна адреса `*.vercel.app`)
+
+**Покрокова інструкція — `DEPLOY_VERCEL.md`.** Нижче — стисло.
 Потрібні: доступ до Vercel (акаунт власниці/розробника) і безкоштовна база Postgres (Supabase або Neon). SQLite на Vercel не працює
 (файлова система лише для читання), тому для публічної адреси потрібен Postgres.
 1. Supabase → New project → Settings → Database → Connection string (URI, **Session pooler**) → це `DATABASE_URL`.
@@ -145,7 +147,7 @@ CHROMIUM_PATH=… npm run test:e2e                                  # наскр
    `UPLOADS_DIR=/tmp/uploads` (завантажені з адмінки обкладинки на Vercel тимчасові — для постійних потрібне інше сховище).
 4. Deploy. `vercel.json` запускає `npm run vercel-build` (= `db:setup` + `next build`): таблиці й чернетка товару створюються автоматично.
 5. Виконати `supabase/policies.sql` у Supabase SQL Editor (RLS, приватний bucket).
-6. Створити власницю: локально `DATABASE_URL=<той самий> npm run admin:create -- email@… owner` (тимчасовий пароль виводиться один раз).
+6. Власниця створюється під час збірки зі змінних `ADMIN_EMAIL` + `ADMIN_INITIAL_PASSWORD` (або локально `npm run admin:create`). База може бути задана як `DATABASE_URL` або `POSTGRES_URL` (Vercel Storage).
 7. Перевірити `https://<проєкт>.vercel.app/uk` на телефоні й комп’ютері, тестове замовлення (коли буде товар із ціною) і Telegram.
 Альтернатива без Vercel: будь-який Node-хостинг з постійним диском (`npm ci && npm run build && npm run db:setup && npm start`, SQLite можна).
 
