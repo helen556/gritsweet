@@ -8,6 +8,8 @@ export type SellableInput = {
   format: BookFormat;
   stock: number | null;
   privatePdfKey: string | null;
+  /** PDF без завантаженого файлу дозволено продавати: після підтвердження оплати власниця надсилає книжку вручну */
+  manualPdf?: boolean;
 };
 export type UnavailableReason = "not_published" | "inactive" | "no_price" | "no_file" | "out_of_stock";
 
@@ -15,7 +17,7 @@ export function sellability(v: SellableInput): { ok: true } | { ok: false; reaso
   if (v.productStatus !== "published") return { ok: false, reason: "not_published" };
   if (!v.isActive) return { ok: false, reason: "inactive" };
   if (v.priceMinor == null || !Number.isSafeInteger(v.priceMinor) || v.priceMinor <= 0) return { ok: false, reason: "no_price" };
-  if (v.format === "pdf" && !v.privatePdfKey) return { ok: false, reason: "no_file" };
+  if (v.format === "pdf" && !v.privatePdfKey && !v.manualPdf) return { ok: false, reason: "no_file" };
   if (v.format === "print" && !(v.stock != null && v.stock > 0)) return { ok: false, reason: "out_of_stock" };
   return { ok: true };
 }

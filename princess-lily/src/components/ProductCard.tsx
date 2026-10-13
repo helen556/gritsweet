@@ -13,6 +13,14 @@ export function priceLabel(p: CatalogProduct, lang: "uk" | "en", t: Dict) {
   return { text: `${all ? "" : lang === "uk" ? "від " : "from "}${formatMinor(min, lang)}`, soon: false };
 }
 
+/** Ціна для кожного формату окремо: «399 грн — друкована», «299 грн — PDF» (найменша ціна серед мовних версій). */
+export function priceByFormat(p: CatalogProduct, lang: "uk" | "en", t: Dict) {
+  return (["print", "pdf"] as const).flatMap((f) => {
+    const ps = p.variants.filter((v) => v.sellable && v.format === f).map((v) => v.price_minor!);
+    return ps.length ? [{ f, text: formatMinor(Math.min(...ps), lang), label: f === "pdf" ? t.product.cardPdf : t.product.cardPrint }] : [];
+  });
+}
+
 /**
  * Картка книжки. Телефон: горизонтальна (обкладинка ~42% ширини, назва поруч) — усі книжки на сторінці, читабельно.
  * ≥ 640 px: вертикальна. Обкладинка — для мови сайту (або загальна), повністю (object-contain).
@@ -39,7 +47,11 @@ export default function ProductCard({ p, lang, t, headingLevel = "h3" }: { p: Ca
           {langs.map((l) => <li key={l} className="rounded-full bg-moss-100/80 px-2.5 py-0.5">{l === "uk" ? "UA" : "EN"}</li>)}
           {formats.map((f) => <li key={f} className="rounded-full bg-rose-100/70 px-2.5 py-0.5">{f === "pdf" ? "PDF" : t.formats.print}</li>)}
         </ul>
-        <p className={`mt-auto pt-1 text-lg font-semibold ${price.soon ? "text-copper" : "text-ink"}`}>{price.text}</p>
+        {price.soon ? <p className="mt-auto pt-1 text-lg font-semibold text-copper">{price.text}</p> : (
+          <ul className="mt-auto space-y-0.5 pt-1">
+            {priceByFormat(p, lang, t).map((x) => <li key={x.f} className="text-ink"><span className="text-lg font-semibold">{x.text}</span> <span className="text-sm text-ink-soft">/ {x.label}</span></li>)}
+          </ul>
+        )}
       </div>
     </article>
   );

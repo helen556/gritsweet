@@ -111,7 +111,7 @@ const en: Dict = {
     comingSoon: "Coming soon",
     comingSoonNote: "This book is being prepared for sale. Price and availability will appear here once everything is ready.",
     descriptionPending: "A description of this book is coming soon.",
-    inStock: "In stock", outOfStock: "Temporarily out of stock", digital: "Digital, delivered by email",
+    inStock: "In stock", outOfStock: "Temporarily out of stock", digital: "Digital, delivered by email", pdfHint: "The PDF is easy to read on a phone, tablet or computer. We’ll email you the book once the payment is confirmed.", cardPdf: "PDF", cardPrint: "printed",
     add: "Add to cart", added: "Added to cart", goCart: "Go to cart", buyNow: "Buy now", inCart: "In cart",
     chooseVariant: "Choose the book language and format",
     originalTitleNote: "Original Ukrainian title. An English edition of this book has not been announced yet.",
@@ -166,7 +166,7 @@ const en: Dict = {
       pending_payment: "Awaiting payment", pending_verification: "Checking your payment", paid: "Paid", failed: "Payment failed", cancelled: "Cancelled",
     },
     digitalStatus: {
-      awaiting_payment: "Will be sent once payment is confirmed", ready: "Preparing your email", sent: "Download link sent to your email", email_failed: "We couldn’t send the email yet — we’ll retry", email_not_configured: "We’ll send your link shortly",
+      awaiting_payment: "Will be sent once payment is confirmed", manual: "We’ll email you the book shortly", ready: "Preparing your email", sent: "Download link sent to your email", email_failed: "We couldn’t send the email yet — we’ll retry", email_not_configured: "We’ll send your link shortly",
     },
     shippingStatus: {
       awaiting_payment: "Ships once payment is confirmed", to_ship: "Preparing for dispatch (1–3 business days)", shipped: "Shipped", delivered: "Delivered", cancelled: "Cancelled",

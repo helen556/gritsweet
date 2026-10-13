@@ -50,7 +50,7 @@ async function hydrate(products: Product[], locale: Locale): Promise<CatalogProd
       widths: JSON.parse(p.cover_widths) as number[],
       // мова сайту — першою (UA-сайт: спершу українське видання)
       variants: vars.filter((v) => v.product_id === p.id).sort((a, b) => Number(a.book_locale !== locale) - Number(b.book_locale !== locale)).map((v) => {
-        const s = sellability({ productStatus: p.status, isActive: v.is_active, priceMinor: v.price_minor, format: v.format, stock: v.stock, privatePdfKey: v.private_pdf_key });
+        const s = sellability({ productStatus: p.status, isActive: v.is_active, priceMinor: v.price_minor, format: v.format, stock: v.stock, privatePdfKey: v.private_pdf_key, manualPdf: true });
         return { ...v, sellable: s.ok, reason: s.ok ? null : s.reason };
       }),
     };

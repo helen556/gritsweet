@@ -81,6 +81,40 @@ check("експорт Excel", xl.status() === 200 && (await xl.body()).subarray(
 const pd = await p.request.get(`${BASE}/admin/orders-export?format=pdf`);
 check("експорт PDF", pd.status() === 200 && (await pd.body()).subarray(0, 5).toString() === "%PDF-");
 
+// ---------- PDF без завантаженого файлу: продається, власниця надсилає вручну ----------
+{
+  const c2 = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true });
+  const b2 = await c2.newPage();
+  await b2.goto(`${BASE}/uk`);
+  const card = await b2.locator("#catalog").innerText();
+  check("картка: ціни «399 грн / друкована» і «299 грн / PDF»", card.includes("399 грн") && card.includes("/ друкована") && card.includes("299 грн") && card.includes("/ PDF"));
+  await b2.screenshot({ path: path.join(OUT, "0-cards.png") });
+  await b2.goto(`${BASE}/uk/books/yak-lili-vchyla-bublyka`);
+  check("сторінка книжки: підказка про PDF на телефоні/планшеті", (await b2.locator("main").innerText()).includes("PDF зручно читати на телефоні"));
+  await b2.locator("label.chip", { hasText: "Українська" }).click();
+  await b2.locator("label.chip", { hasText: "Електронна книга (PDF)" }).click();
+  await b2.getByRole("button", { name: "Купити зараз" }).click();
+  await b2.waitForURL(/checkout/);
+  await b2.getByLabel("Email").fill("pdf-buyer@example.com");
+  await b2.getByLabel("Ім’я", { exact: true }).fill("Ірина");
+  await b2.getByLabel("Прізвище", { exact: true }).fill("Читачка");
+  await b2.locator("form button[type=submit], form button:not([type])").last().click();
+  await b2.waitForURL(/order\//, { timeout: 30000 });
+  await b2.setInputFiles("input[type=file]", "assets-src/covers/lili-ide-do-likarya-uk.png");
+  await b2.getByRole("button", { name: /надіслати квитанцію/ }).click();
+  await b2.getByText("Дякуємо за покупку!").waitFor({ timeout: 30000 });
+  check("PDF-замовлення оформлено з квитанцією", true);
+  await c2.close();
+  await p.goto(`${BASE}/admin/orders`);
+  await p.locator("main a[href^='/admin/orders/ord_']:visible").first().click();
+  await p.getByLabel(/Я звірив\(ла\) суму/).check();
+  await p.getByRole("button", { name: "Оплату звірено — підтвердити" }).click();
+  await p.getByRole("button", { name: "PDF надіслано" }).waitFor({ timeout: 20000 });
+  check("адмінка: PDF без файлу → підказка надіслати вручну", (await p.locator("main").innerText()).includes("pdf-buyer@example.com"));
+  await p.getByRole("button", { name: "PDF надіслано" }).click();
+  check("позначка «PDF надіслано»", await p.getByText("Позначено: PDF надіслано").waitFor({ timeout: 20000 }).then(() => true, () => false));
+}
+
 // ---------- Нова книжка з обкладинками ----------
 await p.goto(`${BASE}/admin/products`);
 check("товари: без горизонтального скролу", (await overflow()) <= 0);

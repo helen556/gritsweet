@@ -7,12 +7,12 @@ import { kyiv, PAYMENT_LABEL, ORDER_LABEL, DIGITAL_LABEL, SHIPPING_LABEL, METHOD
 import { ORDER_TRANSITIONS } from "@/lib/events";
 import UploadForm from "@/components/admin/UploadForm";
 import ActionForm from "@/components/admin/ActionForm";
-import { confirmPaymentAction, cancelOrderAction, shippingAction, resendPdfAction, makeLinksAction, orderNoteAction, orderStatusAction } from "../../../actions";
+import { confirmPaymentAction, cancelOrderAction, shippingAction, resendPdfAction, makeLinksAction, markPdfSentAction, orderNoteAction, orderStatusAction } from "../../../actions";
 
 export const metadata = { title: "Замовлення" };
 const PS: Record<string, string> = { pending_payment: "Очікує оплату", pending_verification: "Очікує перевірки", paid: "Оплачено", failed: "Неуспішно", cancelled: "Скасовано" };
 const FS: Record<string, string> = {
-  awaiting_payment: "очікує оплату", ready: "готується лист", sent: "посилання надіслано", email_failed: "лист не надіслано (буде повтор)",
+  awaiting_payment: "очікує оплату", ready: "готується лист", manual: "надішліть PDF вручну", sent: "посилання надіслано", email_failed: "лист не надіслано (буде повтор)",
   email_not_configured: "email не налаштовано — створіть посилання вручну", to_ship: "до відправлення", shipped: "відправлено", delivered: "доставлено", cancelled: "скасовано",
 };
 const KIND_EV: Record<string, string> = { order: "Замовлення", payment: "Оплата", digital: "PDF", shipping: "Доставка", note: "Примітка", receipt: "Квитанція", export: "Експорт" };
@@ -83,8 +83,13 @@ export default async function OrderAdmin({ params }: PageProps<"/admin/orders/[i
         {digital && o.payment_status === "paid" && (
           <section className="card p-5">
             <h2 className="text-2xl">Електронна книжка</h2>
-            <ActionForm action={resendPdfAction} submit="Надіслати лист із PDF повторно" className="mt-3"><input type="hidden" name="id" value={o.id} /></ActionForm>
-            <ActionForm action={makeLinksAction} submit="Створити посилання для ручного надсилання" className="mt-4"><input type="hidden" name="id" value={o.id} /></ActionForm>
+            {digital.status === "manual" ? (<>
+              <p className="mt-2 rounded-xl bg-cream px-4 py-3">PDF-файлу цієї книжки ще немає на сайті. Надішліть книжку покупцю на <a className="font-semibold underline" href={`mailto:${o.email}`}>{o.email}</a> зі своєї пошти, а потім натисніть кнопку нижче.</p>
+              <ActionForm action={markPdfSentAction} submit="PDF надіслано" className="mt-3"><input type="hidden" name="id" value={o.id} /></ActionForm>
+            </>) : (<>
+              <ActionForm action={resendPdfAction} submit="Надіслати лист із PDF повторно" className="mt-3"><input type="hidden" name="id" value={o.id} /></ActionForm>
+              <ActionForm action={makeLinksAction} submit="Створити посилання для ручного надсилання" className="mt-4"><input type="hidden" name="id" value={o.id} /></ActionForm>
+            </>)}
             <h3 className="mt-5 font-semibold">Журнал листів</h3>
             <ul className="mt-2 space-y-1 text-sm">{emails.map((e) => <li key={e.id}>{kyiv(e.created_at)} · {e.status} · спроб: {e.attempts}{e.last_error && ` · ${e.last_error}`}{e.next_attempt_at && ` · наступна: ${kyiv(e.next_attempt_at)}`}</li>)}{!emails.length && <li className="text-ink-soft">Немає</li>}</ul>
           </section>

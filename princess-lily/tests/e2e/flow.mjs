@@ -197,7 +197,8 @@ for (const p of ["/uk", "/uk/books", "/uk/books/demo-book", "/uk/contacts", "/en
   check(`360px без горизонтального скролу: ${p}`, ov <= 0, `overflow=${ov}`);
 }
 await mp.goto(`${BASE}/uk/books/demo-book`);
-await mp.getByText("Друкована книга", { exact: true }).click();
+await mp.locator("label.chip", { hasText: "Українська" }).click();
+await mp.locator("label.chip", { hasText: "Друкована книга" }).click();
 await mp.getByRole("button", { name: "Додати в кошик" }).click();
 await mp.goto(`${BASE}/uk/checkout`);
 await mp.getByLabel("Email").waitFor();

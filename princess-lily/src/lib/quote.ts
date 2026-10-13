@@ -32,7 +32,7 @@ export async function quoteCart(input: CartLineInput[], locale: Locale): Promise
   for (const id of ids) {
     const r = rows.find((x) => x.id === id);
     if (!r || r.currency !== "UAH") { unavailable.push(id); continue; }
-    const s = sellability({ productStatus: r.status, isActive: r.is_active, priceMinor: r.price_minor, format: r.format, stock: r.stock, privatePdfKey: r.private_pdf_key });
+    const s = sellability({ productStatus: r.status, isActive: r.is_active, priceMinor: r.price_minor, format: r.format, stock: r.stock, privatePdfKey: r.private_pdf_key, manualPdf: true });
     if (!s.ok) { unavailable.push(id); continue; }
     const qty = clampQty(r.format, merged.get(id)!, r.stock);
     const tr = trs.find((t) => t.product_id === r.product_id && t.locale === locale) ?? trs.find((t) => t.product_id === r.product_id);

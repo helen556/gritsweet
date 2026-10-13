@@ -80,7 +80,16 @@ export async function markPaid(orderId: string, by: { source: string; checkedBy?
   }
   await db.updateTable("fulfillments").set({ status: "to_ship", updated_at: nowIso() }).where("order_id", "=", orderId).where("kind", "=", "shipping").where("status", "=", "awaiting_payment").execute();
   await db.updateTable("fulfillments").set({ status: "ready", updated_at: nowIso() }).where("order_id", "=", orderId).where("kind", "=", "digital").where("status", "=", "awaiting_payment").execute();
-  if (items.some((i) => i.format === "pdf")) await deliverPdfEmail(orderId, `pdf:${orderId}`);
+  const pdfItems = items.filter((i) => i.format === "pdf");
+  if (pdfItems.length) {
+    const files = await db.selectFrom("product_variants").select(["id", "private_pdf_key"]).where("id", "in", pdfItems.map((i) => i.variant_id)).execute();
+    if (pdfItems.every((i) => files.find((f) => f.id === i.variant_id)?.private_pdf_key)) await deliverPdfEmail(orderId, `pdf:${orderId}`);
+    else {
+      // файлу на сайті ще немає — книжку надсилає власниця сама (адмінка показує підказку й кнопку «PDF надіслано»)
+      await db.updateTable("fulfillments").set({ status: "manual", updated_at: nowIso() }).where("order_id", "=", orderId).where("kind", "=", "digital").execute();
+      await logOrderEvent(orderId, "digital", "ready", "manual", "система", "PDF-файлу немає на сайті — надішліть книжку покупцю вручну");
+    }
+  }
   // Telegram «оплату підтверджено» — лише тут, тобто після перевіреного вебхука або ручного підтвердження
   await notifyPaid(orderId, by.source.startsWith("provider:") ? `підписаний вебхук ${by.source.slice(9)}` : `перевірено вручну: ${by.checkedBy ?? by.source}`).catch(() => {});
   return true;

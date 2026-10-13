@@ -27,15 +27,15 @@ describe("money", () => {
 });
 
 describe("catalog rules", () => {
-  it("seeded books: 399 print in stock, 299 PDF (sellable only once the PDF file is uploaded), UA+EN titles", async () => {
+  it("seeded books: 399 print in stock, 299 PDF (sold even before the PDF file is uploaded — manual delivery), UA+EN titles", async () => {
     const v = await db.selectFrom("product_variants").selectAll().where("product_id", "=", "prd_bublik").execute();
     expect(v.length).toBe(4);
     expect(new Set(v.map((x) => x.book_locale))).toEqual(new Set(["uk", "en"]));
     expect(v.filter((x) => x.format === "print").every((x) => x.price_minor === 39900 && x.is_active === 1 && (x.stock ?? 0) > 0)).toBe(true);
     expect(v.filter((x) => x.format === "pdf").every((x) => x.price_minor === 29900 && x.is_active === 1)).toBe(true);
     const q = await quoteCart(v.map((x) => ({ variantId: x.id, quantity: 1 })), "uk");
-    expect(q.lines.map((l) => l.format).sort()).toEqual(["print", "print"]);
-    expect(q.unavailable).toHaveLength(2); // PDF без файлу не продається
+    expect(q.lines.map((l) => l.format).sort()).toEqual(["pdf", "pdf", "print", "print"]);
+    expect(q.unavailable).toHaveLength(0);
     const books = await db.selectFrom("products").select(["slug", "status"]).where("id", "in", ["prd_bublik", "prd_doctor", "prd_potty"]).orderBy("sort_order").execute();
     expect(books.map((b) => b.slug)).toEqual(["lili-ide-do-likarya", "lili-yak-ya-navchylasya-sydity-na-horshchyk", "yak-lili-vchyla-bublyka"]);
     expect(books.every((b) => b.status === "published")).toBe(true);
@@ -309,5 +309,18 @@ describe("receipt storage fallback", () => {
       vi.unstubAllGlobals();
       delete process.env.PRIVATE_STORAGE; delete process.env.SUPABASE_URL; delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     }
+  });
+});
+
+describe("PDF without an uploaded file", () => {
+  it("is sold; after payment the order waits for manual delivery instead of sending broken links", async () => {
+    await db.updateTable("product_variants").set({ private_pdf_key: null }).where("id", "=", "v_pdf").execute();
+    const r = await createOrder(baseCheckout(), 25000);
+    if (!r.ok) throw new Error("order not created");
+    const o = await db.selectFrom("orders").select("id").orderBy("created_at", "desc").executeTakeFirstOrThrow();
+    await markPaid(o.id, { source: "manual", checkedBy: "owner@example.com" });
+    const f = await db.selectFrom("fulfillments").select("status").where("order_id", "=", o.id).where("kind", "=", "digital").executeTakeFirstOrThrow();
+    expect(f.status).toBe("manual");
+    expect(await db.selectFrom("email_deliveries").select("id").where("order_id", "=", o.id).execute()).toHaveLength(0);
   });
 });

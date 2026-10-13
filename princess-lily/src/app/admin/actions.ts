@@ -200,6 +200,18 @@ export async function resendPdfAction(_: ActionState, fd: FormData): Promise<Act
   return { error: `Не вдалося: ${"error" in r ? r.error : r.status}` };
 }
 
+/** Власниця надіслала PDF покупцю сама (файлу на сайті немає). */
+export async function markPdfSentAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const admin = await requireAdmin();
+  const id = str(fd, "id", 64);
+  const r = await db.updateTable("fulfillments").set({ status: "sent", updated_at: new Date().toISOString() }).where("order_id", "=", id).where("kind", "=", "digital").where("status", "=", "manual").executeTakeFirst();
+  if (Number(r.numUpdatedRows) !== 1) return { error: "Немає PDF, що чекає ручного надсилання" };
+  await logOrderEvent(id, "digital", "manual", "sent", admin.email, "PDF надіслано покупцю вручну");
+  await audit(admin, "order.pdf_manual_sent", "order", id);
+  revalidatePath(`/admin/orders/${id}`);
+  return { ok: "Позначено: PDF надіслано" };
+}
+
 /** Одноразовий показ нових посилань на PDF (для ручного надсилання, коли email не налаштовано). */
 export async function makeLinksAction(_: ActionState, fd: FormData): Promise<ActionState> {
   const admin = await requireAdmin();

@@ -109,7 +109,7 @@ const uk = {
     comingSoon: "Незабаром",
     comingSoonNote: "Книжка готується до продажу. Ціна й наявність з’являться тут, щойно все буде готово.",
     descriptionPending: "Опис цієї книжки з’явиться незабаром.",
-    inStock: "В наявності", outOfStock: "Тимчасово немає", digital: "Електронна, надсилається на email",
+    inStock: "В наявності", outOfStock: "Тимчасово немає", digital: "Електронна, надсилається на email", pdfHint: "PDF зручно читати на телефоні, планшеті чи комп’ютері. Книжку надішлемо на вашу пошту після підтвердження оплати.", cardPdf: "PDF", cardPrint: "друкована",
     add: "Додати в кошик", added: "Додано в кошик", goCart: "Перейти до кошика", buyNow: "Купити зараз", inCart: "У кошику",
     chooseVariant: "Оберіть мову книжки та формат",
     originalTitleNote: "",
@@ -164,7 +164,7 @@ const uk = {
       pending_payment: "Очікує оплату", pending_verification: "Перевіряємо оплату", paid: "Оплачено", failed: "Оплата неуспішна", cancelled: "Скасовано",
     } as Record<string, string>,
     digitalStatus: {
-      awaiting_payment: "Буде надіслано після підтвердження оплати", ready: "Готуємо лист", sent: "Посилання надіслано на email", email_failed: "Лист не вдалося надіслати — ми повторимо спробу", email_not_configured: "Надішлемо посилання найближчим часом",
+      awaiting_payment: "Буде надіслано після підтвердження оплати", manual: "Надішлемо книжку на вашу пошту найближчим часом", ready: "Готуємо лист", sent: "Посилання надіслано на email", email_failed: "Лист не вдалося надіслати — ми повторимо спробу", email_not_configured: "Надішлемо посилання найближчим часом",
     } as Record<string, string>,
     shippingStatus: {
       awaiting_payment: "Надішлемо після підтвердження оплати", to_ship: "Готуємо до відправлення (1–3 робочі дні)", shipped: "Відправлено", delivered: "Доставлено", cancelled: "Скасовано",

@@ -52,6 +52,7 @@ export default function AddToCart({ lang, t, variants, onLocaleChange }: { lang:
             <label key={f} className="chip"><input className="sr-only" type="radio" name="fmt" value={f} disabled={!bl} checked={fmt === f} onChange={() => { setFmt(f); setAdded(false); setQty(1); }} />{t.formats[f]}</label>
           ))}
         </div>
+        {available.some((v) => v.format === "pdf") && <p className="mt-3 flex gap-2 text-sm text-ink-soft"><span aria-hidden="true">📱</span><span>{t.product.pdfHint}</span></p>}
       </fieldset>
 
       <div className="mt-6 min-h-[4.5rem]" aria-live="polite">
