@@ -1,11 +1,14 @@
 import "server-only";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { db } from "@/db";
 
 /**
  * Приватне сховище для куплених PDF і квитанцій. НІКОЛИ не в public/.
  *   PRIVATE_STORAGE=local    → тека PRIVATE_STORAGE_DIR (за замовч. ./storage/private), потрібен постійний диск
- *   PRIVATE_STORAGE=supabase → приватний bucket Supabase Storage (service role key лише на сервері)
+ *   PRIVATE_STORAGE=supabase → приватний bucket Supabase Storage (service role key лише на сервері);
+ *                              якщо Supabase відхиляє запис (напр. неправильний ключ) — файл зберігається в БД
+ *   PRIVATE_STORAGE=database → таблиця private_files (для невеликих файлів: квитанції до ~4 МБ)
  */
 export interface PrivateStorage {
   kind: string;
@@ -52,7 +55,39 @@ function supabase(): PrivateStorage {
   };
 }
 
+function database(): PrivateStorage {
+  return {
+    kind: "database",
+    async put(key, data, contentType) {
+      assertKey(key);
+      const row = { key, content_type: contentType, size_bytes: data.length, data_b64: data.toString("base64"), created_at: new Date().toISOString() };
+      await db.insertInto("private_files").values(row).onConflict((oc) => oc.column("key").doUpdateSet(row)).execute();
+    },
+    async get(key) {
+      assertKey(key);
+      const r = await db.selectFrom("private_files").select("data_b64").where("key", "=", key).executeTakeFirst();
+      return r ? Buffer.from(r.data_b64, "base64") : null;
+    },
+    async remove(key) { assertKey(key); await db.deleteFrom("private_files").where("key", "=", key).execute(); },
+  };
+}
+
+/** Supabase, а при помилці запису — БД: квитанція покупця не губиться через неправильно налаштований ключ сховища. */
+function withDbFallback(primary: PrivateStorage): PrivateStorage {
+  const fallback = database();
+  return {
+    kind: `${primary.kind}+database`,
+    async put(key, data, contentType) {
+      try { await primary.put(key, data, contentType); }
+      catch (e) { console.error(`private storage (${primary.kind}) failed, saving to database:`, e); await fallback.put(key, data, contentType); }
+    },
+    async get(key) { return (await fallback.get(key)) ?? (await primary.get(key)); },
+    async remove(key) { await fallback.remove(key); await primary.remove(key); },
+  };
+}
+
 export function privateStorage(): PrivateStorage {
-  if (process.env.PRIVATE_STORAGE === "supabase" && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) return supabase();
+  if (process.env.PRIVATE_STORAGE === "supabase" && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) return withDbFallback(supabase());
+  if (process.env.PRIVATE_STORAGE === "database" || process.env.VERCEL) return database();
   return local();
 }

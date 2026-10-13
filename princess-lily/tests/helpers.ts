@@ -5,7 +5,7 @@ import { sql } from "kysely";
 
 /** Тестові фікстури — ЛИШЕ в тестах (in-memory SQLite). Позначені [TEST]. */
 export async function resetDb() {
-  const tables = ["order_events", "receipts", "notifications", "download_grants", "email_deliveries", "payment_events", "fulfillments", "order_items", "orders", "product_images", "product_variants", "product_translations", "products", "contact_messages", "settings", "audit_log", "rate_limits", "admin_users"];
+  const tables = ["private_files", "order_events", "receipts", "notifications", "download_grants", "email_deliveries", "payment_events", "fulfillments", "order_items", "orders", "product_images", "product_variants", "product_translations", "products", "contact_messages", "settings", "audit_log", "rate_limits", "admin_users"];
   await migrate(db);
   for (const t of tables) await sql`DELETE FROM ${sql.table(t)}`.execute(db);
   await seed(db);

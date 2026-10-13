@@ -294,3 +294,20 @@ describe("Supabase storage auth headers", () => {
     expect(seen[1].Authorization).toBe("Bearer aaa.bbb.ccc");
   });
 });
+
+describe("receipt storage fallback", () => {
+  it("Supabase rejects the upload (bad key) → the file is kept in the database and can be read back", async () => {
+    const { privateStorage } = await import("@/lib/storage");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response('{"error":"Unauthorized"}', { status: 400 })));
+    Object.assign(process.env, { PRIVATE_STORAGE: "supabase", SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "wrong" });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const s = privateStorage();
+      await s.put("receipts/ord_a/rcp_z.png", Buffer.from("receipt-bytes"), "image/png");
+      expect((await s.get("receipts/ord_a/rcp_z.png"))?.toString()).toBe("receipt-bytes");
+    } finally {
+      vi.unstubAllGlobals();
+      delete process.env.PRIVATE_STORAGE; delete process.env.SUPABASE_URL; delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    }
+  });
+});

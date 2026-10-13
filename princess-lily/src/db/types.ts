@@ -139,6 +139,13 @@ export interface ReceiptsTable {
   uploaded_by: string;
   created_at: string;
 }
+export interface PrivateFilesTable {
+  key: string;
+  content_type: string;
+  size_bytes: number;
+  data_b64: string;
+  created_at: string;
+}
 export interface NotificationsTable {
   id: string;
   channel: "telegram";
@@ -253,6 +260,7 @@ export interface Database {
   receipts: ReceiptsTable;
   notifications: NotificationsTable;
   product_images: ProductImagesTable;
+  private_files: PrivateFilesTable;
 }
 
 export type Product = Selectable<ProductsTable>;
