@@ -17,29 +17,37 @@ async function seedSettings(db: Kysely<Database>) {
 }
 
 type BookSeed = {
-  id: string; slug: string; status: "draft" | "coming_soon"; sort: number;
-  ukTitle: string; ukAlt: string;
+  id: string; slug: string; sort: number;
+  ukTitle: string; ukAlt: string; enTitle: string; enAlt: string;
   cover?: { base: string; key: keyof typeof manifest } | null;
 };
 
 /**
  * Три книжки серії, кожна у двох мовних версіях (UA/EN) і двох форматах (PDF/друк).
- * Ціни, описи, англійські назви та обкладинки нових книжок ще не надані — нічого не вигадуємо:
- *  - ціна null → «Незабаром», не продається; варіанти неактивні;
- *  - англійський переклад не підтверджено (is_confirmed=0) — на EN-сторінці показується оригінальна назва з позначкою;
- *  - книжки без обкладинки мають статус «чернетка» й не показуються на сайті, доки власниця не завантажить
- *    обкладинки в адмінці та не опублікує їх.
+ * Назви — точно як на наданих обкладинках. Ціни від власниці (13.10.2026): друкована 399 грн, PDF 299 грн, в наявності.
+ * PDF продається лише після завантаження файлу в адмінці (без файлу покупець нічого б не отримав).
+ * Залишок друку 100 — стартове значення, власниця змінює його в адмінці.
  * Сідування ідемпотентне: додає лише відсутні книжки й варіанти, не змінює відредаговане в адмінці.
  */
+const PRICE_PRINT = 39900, PRICE_PDF = 29900, START_STOCK = 100;
 const BOOKS: BookSeed[] = [
   {
-    id: "prd_bublik", slug: "yak-lili-vchyla-bublyka", status: "coming_soon", sort: 3,
+    id: "prd_doctor", slug: "lili-ide-do-likarya", sort: 1,
+    ukTitle: "Лілі йде до лікаря", ukAlt: "Обкладинка книжки «Історії принцеси Лілі. Лілі йде до лікаря»: мама, Лілі з зайчиком і лікар",
+    enTitle: "Princess Lily Goes to the Doctor", enAlt: "Cover of “Princess Lily Goes to the Doctor”: Mum, Lily with her bunny and the doctor",
+  },
+  {
+    id: "prd_potty", slug: "lili-yak-ya-navchylasya-sydity-na-horshchyk", sort: 2,
+    ukTitle: "Лілі: як я навчилася сидіти на горщик", ukAlt: "Обкладинка книжки «Історії принцеси Лілі. Як я навчилася сидіти на горщик»: Лілі з песиком біля горщика",
+    enTitle: "How I Learned to Sit on the Potty", enAlt: "Cover of “Princess Lily’s Stories: How I Learned to Sit on the Potty”: Lily and her puppy next to a potty",
+  },
+  {
+    id: "prd_bublik", slug: "yak-lili-vchyla-bublyka", sort: 3,
     ukTitle: "Як Лілі вчила Бублика стригти кігтики",
     ukAlt: "Обкладинка книжки «Історії принцеси Лілі. Як Лілі вчила Бублика стригти кігтики»: Лілі, мама, тато й песик Бублик на ґанку",
+    enTitle: "How Lily Helped Spotty Get His Nails Trimmed", enAlt: "Cover of “Princess Lily Stories: How Lily Helped Spotty Get His Nails Trimmed”: Lily, Mum, Dad and the puppy on the porch",
     cover: { base: "/media/cover-bublik", key: "cover-bublik" },
   },
-  { id: "prd_doctor", slug: "lili-ide-do-likarya", status: "draft", sort: 1, ukTitle: "Лілі йде до лікаря", ukAlt: "Обкладинка книжки «Лілі йде до лікаря»" },
-  { id: "prd_potty", slug: "lili-yak-ya-navchylasya-sydity-na-horshchyk", status: "draft", sort: 2, ukTitle: "Лілі: як я навчилася сидіти на горщик", ukAlt: "Обкладинка книжки «Лілі: як я навчилася сидіти на горщик»" },
 ];
 
 export async function seed(db: Kysely<Database>) {
@@ -56,21 +64,20 @@ async function seedBooks(db: Kysely<Database>) {
     if (!exists) {
       const c = b.cover ? (manifest as Record<string, { width: number; height: number; widths: number[] }>)[b.cover.key] : null;
       await db.insertInto("products").values({
-        id: b.id, slug: b.slug, status: b.status, age_from: 2, age_to: 6,
+        id: b.id, slug: b.slug, status: "published", age_from: 2, age_to: 6,
         cover_base: b.cover?.base ?? null, cover_widths: JSON.stringify(c?.widths ?? []), cover_width: c?.width ?? null, cover_height: c?.height ?? null,
         pages: null, size_label: null, binding_label: null, sort_order: b.sort,
       }).execute();
       await db.insertInto("product_translations").values([
         { product_id: b.id, locale: "uk", is_confirmed: 1, title: b.ukTitle, description: "", cover_alt: b.ukAlt, cover_base: null, cover_widths: null, cover_width: null, cover_height: null },
-        // англійська назва не надана — оригінальна назва з позначкою на сайті
-        { product_id: b.id, locale: "en", is_confirmed: 0, title: b.ukTitle, description: "", cover_alt: `Cover of “${b.ukTitle}”, Princess Lily Stories`, cover_base: null, cover_widths: null, cover_width: null, cover_height: null },
+        { product_id: b.id, locale: "en", is_confirmed: 1, title: b.enTitle, description: "", cover_alt: b.enAlt, cover_base: null, cover_widths: null, cover_width: null, cover_height: null },
       ]).execute();
     }
     for (const locale of ["uk", "en"] as Locale[]) for (const format of ["pdf", "print"] as BookFormat[]) {
       const has = await db.selectFrom("product_variants").select("id").where("product_id", "=", pid).where("book_locale", "=", locale).where("format", "=", format).executeTakeFirst();
       if (!has) await db.insertInto("product_variants").values({
         id: `var_${pid.replace(/^prd_/, "")}_${locale}_${format}`, product_id: pid, book_locale: locale, format,
-        price_minor: null, stock: null, private_pdf_key: null, is_active: 0, restock_note: null,
+        price_minor: format === "pdf" ? PRICE_PDF : PRICE_PRINT, stock: format === "print" ? START_STOCK : null, private_pdf_key: null, is_active: 1, restock_note: null,
       }).execute();
     }
   }
@@ -82,7 +89,7 @@ type Extra = { covers: Record<string, Partial<Record<Locale, ExtraImg>>>; spread
 /**
  * Матеріали з assets-src (npm run assets:build → media-extra.json) підв'язуються до книжок за slug:
  *  - обкладинка мовної версії — лише якщо в адмінці ще не завантажено іншу;
- *  - книжка-чернетка, яка вперше отримала обкладинку, стає видимою зі статусом «Незабаром» (без ціни не продається);
+ *  - книжка-чернетка, яка вперше отримала обкладинку, стає видимою зі статусом «Незабаром»;
  *  - розвороти — лише якщо в книжки ще немає жодного.
  */
 export async function applyPackagedMedia(db: Kysely<Database>) {

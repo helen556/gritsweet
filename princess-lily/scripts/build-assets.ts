@@ -94,6 +94,10 @@ async function extras() {
       if (prev[kind] && fs.existsSync(path.join(OUT, path.basename(prev[kind].src)))) hero[kind] = prev[kind];
       continue;
     }
+    // відео вже згенеровані з цього самого оригіналу — не перекодовуємо вдруге (кілька хвилин)
+    const p = prev[kind] as HeroOut | undefined;
+    const fresh = p?.sources?.every((s) => { const o = path.join(OUT, path.basename(s.src)); return fs.existsSync(o) && fs.statSync(o).mtimeMs >= fs.statSync(f).mtimeMs; });
+    if (p && fresh && process.env.FORCE_VIDEO !== "1") { hero[kind] = p; console.log(`hero-${kind}: без змін`); continue; }
     hero[kind] = await heroVideo(f, kind, cfg[kind]?.posterAt ?? 0);
   }
   return { covers, spreads, hero };

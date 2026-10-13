@@ -40,7 +40,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
   const [products, spreads, pdfMode, payMode, authorPhoto, booksPhoto] = await Promise.all([
     listPublicProducts(lang), listPublicSpreads(lang), pdfDeliveryMode(), effectivePaymentMode(), getAuthorPhoto(), getBooksPhoto(),
   ]);
-  const lu = manifest["characters-lineup"], lp = manifest["lily-portrait"];
+  const lu = manifest["characters-lineup"];
   const d = t.pages.delivery;
   const payText = payMode === "provider" ? d.paymentProvider : payMode === "manual_link" ? d.paymentManual : d.paymentDisabled;
 
@@ -108,12 +108,11 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
               <p className="mt-5 max-w-[52ch] text-lg text-ink-soft" data-reveal="left">{t.series.paragraphs[1]}</p>
               <p className="mt-6 border-l-2 border-gold pl-5 font-display text-2xl leading-snug text-moss-900" data-reveal="right">{t.series.closing}</p>
             </div>
-            <figure className="relative lg:order-1" data-reveal="left">
-              <div className="absolute -inset-4 -z-10 rounded-[50%] bg-[radial-gradient(closest-side,rgba(255,252,244,.95),rgba(255,252,244,0))]" aria-hidden="true" />
+            {/* ілюстрація в легкій шавлієвій хмаринці: краї кадру розчиняються в зелений градієнт, без жорстких меж */}
+            <figure className="world-cloud relative lg:order-1" data-reveal="left">
+              <span className="world-cloud__bg" aria-hidden="true"><i /><i /><i /><i /></span>
               <Picture base="/media/characters-lineup" widths={lu.widths} width={lu.width} height={lu.height} alt={t.series.lineupAlt}
-                sizes="(min-width: 1024px) 520px, 92vw" imgClassName="h-auto w-full object-contain mix-blend-multiply" />
-              <Picture base="/media/lily-portrait" widths={lp.widths} width={lp.width} height={lp.height} alt=""
-                sizes="160px" className="pointer-events-none absolute -bottom-6 -right-2 w-28 sm:w-36" imgClassName="h-auto w-full rounded-full [mask-image:radial-gradient(closest-side,#000_72%,transparent)]" />
+                sizes="(min-width: 1024px) 520px, 92vw" className="world-cloud__img" imgClassName="h-auto w-full object-contain mix-blend-multiply" />
             </figure>
           </div>
         </section>

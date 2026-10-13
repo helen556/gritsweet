@@ -1,5 +1,78 @@
 {
-  "covers": {},
+  "covers": {
+    "lili-ide-do-likarya": {
+      "en": {
+        "base": "/media/cover-lili-ide-do-likarya-en",
+        "width": 1254,
+        "height": 1254,
+        "widths": [
+          360,
+          640,
+          960,
+          1254
+        ]
+      },
+      "uk": {
+        "base": "/media/cover-lili-ide-do-likarya-uk",
+        "width": 1254,
+        "height": 1254,
+        "widths": [
+          360,
+          640,
+          960,
+          1254
+        ]
+      }
+    },
+    "lili-yak-ya-navchylasya-sydity-na-horshchyk": {
+      "en": {
+        "base": "/media/cover-lili-yak-ya-navchylasya-sydity-na-horshchyk-en",
+        "width": 1254,
+        "height": 1254,
+        "widths": [
+          360,
+          640,
+          960,
+          1254
+        ]
+      },
+      "uk": {
+        "base": "/media/cover-lili-yak-ya-navchylasya-sydity-na-horshchyk-uk",
+        "width": 1254,
+        "height": 1254,
+        "widths": [
+          360,
+          640,
+          960,
+          1254
+        ]
+      }
+    },
+    "yak-lili-vchyla-bublyka": {
+      "en": {
+        "base": "/media/cover-yak-lili-vchyla-bublyka-en",
+        "width": 1254,
+        "height": 1254,
+        "widths": [
+          360,
+          640,
+          960,
+          1254
+        ]
+      },
+      "uk": {
+        "base": "/media/cover-yak-lili-vchyla-bublyka-uk",
+        "width": 1254,
+        "height": 1254,
+        "widths": [
+          360,
+          640,
+          960,
+          1254
+        ]
+      }
+    }
+  },
   "spreads": {},
   "hero": {
     "desktop": {

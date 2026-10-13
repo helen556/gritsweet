@@ -14,5 +14,5 @@ export default async function Returns({ params }: PageProps<"/[lang]/returns">) 
   const { lang } = await params;
   if (!hasLocale(lang)) notFound();
   const t = getDict(lang);
-  return <InfoPage title={t.pages.returns.title} draft={t.pages.returns.draft}>{t.pages.returns.p.map((p, i) => <p key={i}>{p}</p>)}</InfoPage>;
+  return <InfoPage title={t.pages.returns.title}>{t.pages.returns.p.map((p, i) => <p key={i}>{p}</p>)}</InfoPage>;
 }

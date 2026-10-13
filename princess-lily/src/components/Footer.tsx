@@ -20,7 +20,7 @@ export default function Footer({ lang, t }: { lang: "uk" | "en"; t: Dict }) {
           </ul>
         </nav>
       </div>
-      <div className="mx-auto max-w-6xl px-4 pb-8 text-sm text-ink-soft sm:px-6">© {new Date().getFullYear()} {t.footer.rights}. {t.footer.illustrations}</div>
+      <div className="mx-auto max-w-6xl px-4 pb-8 text-sm text-ink-soft sm:px-6">© {new Date().getFullYear()} {t.footer.rights}</div>
     </footer>
   );
 }

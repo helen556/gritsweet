@@ -69,7 +69,6 @@ const en: Dict = {
     name: "Elizaveta Dyachenko",
     role: "Author of Princess Lily Stories",
     photoAlt: "Elizaveta (Liza) Dyachenko, author of Princess Lily Stories",
-    lilyCaption: "Princess Lily, the heroine of the books (illustration)",
     portraitAlt: "Illustration: Princess Lily wearing a flower crown",
     more: "More about the author",
   },
@@ -192,7 +191,6 @@ const en: Dict = {
     ok: "Thank you! Your message has been saved and we’ll reply to the email you provided.",
     errors: { invalid: "Please check the form fields.", rate: "Too many messages. Please try later.", generic: "We couldn’t send your message. Please try again." },
     direct: "Other ways to reach us",
-    notSet: "Contact details will appear once approved by the owner.",
   },
   pages: {
     about: { title: "About the author" },
@@ -211,7 +209,6 @@ const en: Dict = {
     returns: {
       title: "Returns & exchanges",
       p: ["Return and exchange conditions depend on the format of the purchased book and are governed by applicable Ukrainian law.", "If your printed book arrives damaged or you experience an issue with your digital file, please contact us. We’ll help you resolve the problem."],
-      draft: "Detailed return terms are being prepared and will be published once approved by the owner.",
     },
     privacy: { title: "Privacy policy" },
     offer: { title: "Public offer" },
@@ -221,7 +218,6 @@ const en: Dict = {
   footer: {
     rights: "Princess Lily Stories",
     links: { delivery: "Delivery & payment", returns: "Returns & exchanges", privacy: "Privacy", offer: "Public offer", contacts: "Contact" },
-    illustrations: "Illustrations and video are materials of the series.",
   },
   notFound: { title: "Page not found", text: "It may have moved, or the address may contain a typo.", home: "Go to home page" },
   error: { title: "Something went wrong", text: "Please try refreshing the page. If the problem persists, contact us.", retry: "Try again" },

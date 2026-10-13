@@ -14,7 +14,7 @@ fs.mkdirSync(OUT, { recursive: true });
 const results = [];
 const check = (name, ok, extra = "") => { results.push({ name, ok }); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${extra ? "  — " + extra : ""}`); };
 // демо-БД: відновити залишок друку й ліміти (лише локальна demo.db)
-{ const { default: Database } = await import("better-sqlite3"); const d = new Database("data/demo.db"); d.prepare("update product_variants set stock = 5 where id = 'var_demo_uk_print'").run(); d.prepare("delete from rate_limits").run(); d.close(); }
+{ const { default: Database } = await import("better-sqlite3"); const d = new Database("data/demo.db"); d.prepare("update product_variants set stock = 5 where id = 'var_demo_uk_print'").run(); d.prepare("delete from rate_limits").run(); d.prepare("insert into settings(key, value) values('payment_mode', 'provider') on conflict(key) do update set value = 'provider'").run(); d.close(); }
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
 
 // ---------- Покупка: змішаний кошик ----------
@@ -149,10 +149,10 @@ await page.waitForURL(/\/en\/books\/demo-book/);
 check("перемикач мови зберігає сторінку й параметри", page.url().endsWith("/en/books/demo-book?x=1"));
 await page.goto(`${BASE}/en/books/yak-lili-vchyla-bublyka`);
 const enBook = await page.locator("main").innerText();
-check("EN-сторінка: українська обкладинка з позначкою, Coming soon", enBook.includes("Original Ukrainian title") && enBook.includes("Coming soon"));
+check("EN-сторінка: англійська назва з обкладинки, ціна друку 399 грн", enBook.includes("How Lily Helped Spotty Get His Nails Trimmed") && (await page.locator("img[src*='cover-yak-lili-vchyla-bublyka-en'], source[srcset*='cover-yak-lili-vchyla-bublyka-en']").count()) > 0);
 const html = await (await fetch(`${BASE}/en/books/yak-lili-vchyla-bublyka`)).text();
 check("hreflang uk/en і canonical", html.includes('hrefLang="uk"') && html.includes('rel="canonical"'));
-check("немає Schema Product для товару без ціни", !html.includes('"@type":"Product"'));
+check("Schema Product для товару з ціною", html.includes('"@type":"Product"'));
 check("404 для невідомої сторінки", (await fetch(`${BASE}/uk/no-such-page`)).status === 404);
 await page.goto(`${BASE}/uk/no-such-page`);
 await page.screenshot({ path: path.join(OUT, "404.png") });

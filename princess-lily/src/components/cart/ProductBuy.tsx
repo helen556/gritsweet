@@ -39,7 +39,6 @@ export default function ProductBuy({ lang, t, covers, variants, comingSoon, chil
         <div className="relative">
           {shown && <div key={shown.base} className="animate-[cover-in_.45s_var(--ease-soft)_both]"><CoverImg c={shown} priority /></div>}
         </div>
-        {distinct && <figcaption className="mt-3 text-center text-sm text-ink-soft">{loc === "uk" ? "UA" : "EN"} · {t.bookLocales[loc]}</figcaption>}
       </figure>
       <div>
         {children}

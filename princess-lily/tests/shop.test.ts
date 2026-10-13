@@ -27,17 +27,20 @@ describe("money", () => {
 });
 
 describe("catalog rules", () => {
-  it("seeded draft book is not purchasable (no price) — shows Coming soon", async () => {
+  it("seeded books: 399 print in stock, 299 PDF (sellable only once the PDF file is uploaded), UA+EN titles", async () => {
     const v = await db.selectFrom("product_variants").selectAll().where("product_id", "=", "prd_bublik").execute();
-    // три книжки × (UA/EN × PDF/друк); ціни не надані — нічого не продається
     expect(v.length).toBe(4);
-    expect(v.every((x) => x.price_minor === null && x.is_active === 0)).toBe(true);
     expect(new Set(v.map((x) => x.book_locale))).toEqual(new Set(["uk", "en"]));
+    expect(v.filter((x) => x.format === "print").every((x) => x.price_minor === 39900 && x.is_active === 1 && (x.stock ?? 0) > 0)).toBe(true);
+    expect(v.filter((x) => x.format === "pdf").every((x) => x.price_minor === 29900 && x.is_active === 1)).toBe(true);
     const q = await quoteCart(v.map((x) => ({ variantId: x.id, quantity: 1 })), "uk");
-    expect(q.lines).toHaveLength(0);
-    expect(q.unavailable).toHaveLength(4);
+    expect(q.lines.map((l) => l.format).sort()).toEqual(["print", "print"]);
+    expect(q.unavailable).toHaveLength(2); // PDF без файлу не продається
     const books = await db.selectFrom("products").select(["slug", "status"]).where("id", "in", ["prd_bublik", "prd_doctor", "prd_potty"]).orderBy("sort_order").execute();
     expect(books.map((b) => b.slug)).toEqual(["lili-ide-do-likarya", "lili-yak-ya-navchylasya-sydity-na-horshchyk", "yak-lili-vchyla-bublyka"]);
+    expect(books.every((b) => b.status === "published")).toBe(true);
+    const en = await db.selectFrom("product_translations").select(["title", "is_confirmed"]).where("product_id", "=", "prd_bublik").where("locale", "=", "en").executeTakeFirstOrThrow();
+    expect(en).toEqual({ title: "How Lily Helped Spotty Get His Nails Trimmed", is_confirmed: 1 });
   });
   it("zero price or missing PDF file is never sellable", () => {
     const base = { productStatus: "published" as const, isActive: 1, stock: 5, privatePdfKey: "pdf/a.pdf" };
