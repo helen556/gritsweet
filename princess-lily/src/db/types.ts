@@ -139,6 +139,12 @@ export interface ReceiptsTable {
   uploaded_by: string;
   created_at: string;
 }
+export interface PublicFilesTable {
+  path: string;
+  content_type: string;
+  data_b64: string;
+  created_at: string;
+}
 export interface PrivateFilesTable {
   key: string;
   content_type: string;
@@ -261,6 +267,7 @@ export interface Database {
   notifications: NotificationsTable;
   product_images: ProductImagesTable;
   private_files: PrivateFilesTable;
+  public_files: PublicFilesTable;
 }
 
 export type Product = Selectable<ProductsTable>;

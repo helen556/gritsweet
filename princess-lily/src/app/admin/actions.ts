@@ -21,12 +21,30 @@ const intOrNull = (v: string) => (v === "" ? null : Number.isSafeInteger(Number(
 
 /* ---------------- Товари ---------------- */
 
+/** Адреса сторінки з української назви (транслітерація), якщо її не вказано вручну. */
+function slugify(s: string) {
+  const m: Record<string, string> = { а: "a", б: "b", в: "v", г: "h", ґ: "g", д: "d", е: "e", є: "ie", ж: "zh", з: "z", и: "y", і: "i", ї: "i", й: "i", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "kh", ц: "ts", ч: "ch", ш: "sh", щ: "shch", ю: "iu", я: "ia", ь: "", "’": "", "'": "" };
+  return s.toLowerCase().split("").map((c) => m[c] ?? c).join("").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+}
+
+/** Чернетка книжки для форми «Додати книжку» (обкладинки форма довантажує окремими запитами). */
+export async function createBookDraftAction(fd: FormData): Promise<{ id?: string; error?: string }> {
+  const r = await createProduct(fd);
+  return "id" in r ? { id: r.id } : { error: r.error };
+}
+
 export async function createProductAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const r = await createProduct(fd);
+  if ("error" in r) return { error: r.error };
+  redirect(`/admin/products/${r.id}`);
+}
+
+async function createProduct(fd: FormData): Promise<{ id: string } | { error: string }> {
   const admin = await requireAdmin();
-  const slug = str(fd, "slug", 80).toLowerCase();
   const title = str(fd, "title", 200);
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return { error: "Адреса (slug): лише латиниця, цифри й дефіси" };
+  const slug = (str(fd, "slug", 80) || slugify(title)).toLowerCase();
   if (!title) return { error: "Вкажіть назву" };
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return { error: "Адреса (slug): лише латиниця, цифри й дефіси" };
   if (await db.selectFrom("products").select("id").where("slug", "=", slug).executeTakeFirst()) return { error: "Така адреса вже існує" };
   const id = newId("prd");
   await db.insertInto("products").values({ id, slug, status: "draft", age_from: 2, age_to: 6, cover_base: null, cover_widths: "[]", cover_width: null, cover_height: null, pages: null, size_label: null, binding_label: null }).execute();
@@ -40,7 +58,7 @@ export async function createProductAction(_: ActionState, fd: FormData): Promise
   const max = await db.selectFrom("products").select(({ fn }) => fn.max<number>("sort_order").as("m")).executeTakeFirst();
   await db.updateTable("products").set({ sort_order: Number(max?.m ?? 0) + 1 }).where("id", "=", id).execute();
   await audit(admin, "product.create", "product", id, { slug });
-  redirect(`/admin/products/${id}`);
+  return { id };
 }
 
 export async function saveProductAction(_: ActionState, fd: FormData): Promise<ActionState> {

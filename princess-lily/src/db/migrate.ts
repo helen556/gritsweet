@@ -273,6 +273,14 @@ export async function migrate(db: Kysely<Database>) {
     .addColumn("created_at", "text", (c) => c.notNull())
     .execute();
 
+  // ---- v5: публічні завантаження адмінки (перекодовані обкладинки/фото) — у БД, бо диск Vercel тимчасовий ----
+  await t("public_files")
+    .addColumn("path", "text", (c) => c.primaryKey())
+    .addColumn("content_type", "text", (c) => c.notNull())
+    .addColumn("data_b64", "text", (c) => c.notNull())
+    .addColumn("created_at", "text", (c) => c.notNull())
+    .execute();
+
   await t("rate_limits")
     .addColumn("key", "text", (c) => c.primaryKey())
     .addColumn("count", "integer", (c) => c.notNull())

@@ -1,6 +1,3 @@
-import sharp, { type Metadata } from "sharp";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { db } from "@/db";
 import { getAdmin } from "@/lib/auth";
 import { audit } from "@/lib/audit";
@@ -9,15 +6,16 @@ import { randomBytes } from "node:crypto";
 import { setSetting } from "@/lib/settings";
 import { saveReceipt } from "@/lib/receipts";
 import { newId } from "@/lib/ids";
+import { storeImage, MAX_IMG } from "@/lib/images";
 
-const MAX_PDF = 100 * 1024 * 1024, MAX_IMG = 10 * 1024 * 1024;
+const MAX_PDF = 100 * 1024 * 1024;
 const COVER_WIDTHS = [360, 640, 960, 1254];
 const err = (error: string, status = 400) => Response.json({ error }, { status });
 
 /**
  * Завантаження для адмінки. Автентифікація й роль перевіряються тут (не лише прихованою кнопкою),
  * Origin має збігатися з хостом (захист від CSRF), розмір і тип файлу перевіряються за вмістом.
- * PDF → приватне сховище (не public). Обкладинка → перекодування sharp (без метаданих) у UPLOADS_DIR.
+ * PDF → приватне сховище (не public). Обкладинка → перекодування sharp (без метаданих), зберігається в БД.
  */
 export async function POST(req: Request) {
   const admin = await getAdmin();
@@ -108,24 +106,4 @@ export async function POST(req: Request) {
     return Response.json({ ok: true });
   }
   return err("Невідомий тип");
-}
-
-/** Перекодування зображення (JPG/PNG/WebP, до 10 МБ) в AVIF+WebP кількох ширин без метаданих; поворот за EXIF. */
-async function storeImage(buf: Buffer, name: string, targetWidths: number[]): Promise<{ base: string; widths: number[]; width: number; height: number } | { error: string }> {
-  if (buf.length > MAX_IMG) return { error: "Зображення до 10 МБ" };
-  let meta: Metadata;
-  try { meta = await sharp(buf).metadata(); } catch { return { error: "Непідтримуваний формат зображення" }; }
-  if (!meta.width || !meta.height || !["jpeg", "png", "webp"].includes(meta.format ?? "")) return { error: "Лише JPG, PNG або WebP" };
-  const rotated = await sharp(buf).rotate().toBuffer({ resolveWithObject: true });
-  const W = rotated.info.width, H = rotated.info.height;
-  const dir = path.resolve(process.env.UPLOADS_DIR ?? "storage/uploads", "covers");
-  await fs.mkdir(dir, { recursive: true });
-  const base = `${name.toLowerCase().replace(/[^a-z0-9_-]/g, "")}-${Date.now().toString(36)}`;
-  const widths = targetWidths.filter((w) => w <= W);
-  if (!widths.length) widths.push(W);
-  for (const w of widths) {
-    await sharp(rotated.data).resize({ width: w }).avif({ quality: 60 }).toFile(path.join(dir, `${base}-${w}.avif`));
-    await sharp(rotated.data).resize({ width: w }).webp({ quality: 82 }).toFile(path.join(dir, `${base}-${w}.webp`));
-  }
-  return { base: `/uploads/covers/${base}`, widths, width: W, height: H };
 }
