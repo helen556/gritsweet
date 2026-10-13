@@ -2,14 +2,13 @@
 import { z } from "zod";
 import { db } from "@/db";
 import { quoteCart, type CartLineInput } from "@/lib/quote";
-import { createOrder, customerClaimsPaid, effectivePaymentMode, orderByToken } from "@/lib/orders";
+import { createOrder, effectivePaymentMode } from "@/lib/orders";
 import { activePaymentAdapter } from "@/lib/orders";
 import { after } from "next/server";
 import { notifyNewOrder } from "@/lib/telegram";
 import { rateLimit } from "@/lib/rate-limit";
 import { appUrl } from "@/lib/config";
 import { newId } from "@/lib/ids";
-import { revalidatePath } from "next/cache";
 
 const lineSchema = z.array(z.object({ variantId: z.string().max(64), quantity: z.number().int().min(1).max(10) })).max(30);
 const langSchema = z.enum(["uk", "en"]);
@@ -84,13 +83,6 @@ export async function placeOrder(payload: CheckoutPayload): Promise<CheckoutResu
     }
   }
   return { ok: true, redirect: statusUrl };
-}
-
-export async function claimPaidAction(token: string, lang: "uk" | "en") {
-  if (!(await rateLimit("claim", 10, 600))) return;
-  const o = await orderByToken(token);
-  if (o) await customerClaimsPaid(o.id);
-  revalidatePath(`/${langSchema.parse(lang)}/order/${token}`);
 }
 
 const contactSchema = z.object({

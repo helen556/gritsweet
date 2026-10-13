@@ -5,7 +5,6 @@ import { getDict, hasLocale } from "@/i18n";
 import { orderByToken, orderDetails } from "@/lib/orders";
 import { getSettings } from "@/lib/settings";
 import { formatMinor } from "@/lib/money";
-import { claimPaidAction } from "../../actions";
 import CopyAmount from "@/components/CopyAmount";
 import ReceiptUpload from "@/components/ReceiptUpload";
 
@@ -52,13 +51,12 @@ export default async function OrderPage({ params }: PageProps<"/[lang]/order/[to
             {note && <p className="mt-2 text-ink-soft">{note}</p>}
             <div className="mt-4 flex flex-wrap gap-3">
               <a href={s.payment_link_url} target="_blank" rel="noopener noreferrer" className="btn btn-primary">{t.order.payLink} ↗</a>
-              <form action={claimPaidAction.bind(null, token, lang)}><button className="btn btn-ghost">{t.order.claimPaid}</button></form>
             </div>
           </div>
         )}
         {st === "pending_verification" && o.payment_mode === "manual_link" && <p className="mt-6 text-ink-soft">{t.order.claimNote}</p>}
         {o.payment_mode === "manual_link" && (st === "pending_payment" || st === "pending_verification") && (
-          <ReceiptUpload token={token} t={{ title: t.order.receiptTitle, hint: t.order.receiptHint, upload: t.order.receiptUpload, ok: t.order.receiptOk, err: t.order.receiptErr }} />
+          <ReceiptUpload token={token} done={st === "pending_verification"} t={{ title: t.order.receiptTitle, hint: t.order.receiptHint, upload: t.order.receiptUpload, ok: t.order.receiptOk, err: t.order.receiptErr, errSize: t.order.receiptErrSize, errType: t.order.receiptErrType, busy: t.order.receiptBusy }} />
         )}
         {st === "pending_payment" && o.payment_mode === "provider" && (
           <div className="mt-6"><p className="text-ink-soft">{t.order.providerWaiting}</p>
