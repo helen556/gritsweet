@@ -14,7 +14,7 @@ export default async function ContactDetails({ compact = false }: { lang: "uk" |
   return (
     <ul className={`flex flex-wrap gap-x-6 gap-y-1 ${compact ? "mt-4" : ""}`}>
       {items.map((i) => (
-        <li key={i.label}><span className="text-ink-soft">{i.label}: </span><a className="inline-flex min-h-11 items-center font-semibold text-moss-900 underline decoration-gold underline-offset-4" href={i.href} rel="noopener">{i.text}</a></li>
+        <li key={i.label}><span className="text-ink-soft">{i.label}: </span><a className="inline-flex min-h-11 items-center font-semibold text-plum-900 underline decoration-gold underline-offset-4" href={i.href} rel="noopener">{i.text}</a></li>
       ))}
     </ul>
   );

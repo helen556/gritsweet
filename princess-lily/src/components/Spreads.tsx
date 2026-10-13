@@ -16,7 +16,7 @@ export default function Spreads({ items, hint, close }: { items: S[]; hint: stri
       <ul className={`mt-8 grid gap-5 ${items.length > 1 ? "sm:grid-cols-2" : ""} ${items.length > 2 ? "lg:grid-cols-3" : ""}`}>
         {items.map((s, i) => (
           <li key={s.id} data-reveal={i % 2 ? "right" : "left"}>
-            <button type="button" onClick={(e) => show(s, e.currentTarget)} className="group block w-full overflow-hidden rounded-[1.25rem] bg-paper shadow-[0_20px_40px_-30px_rgba(38,61,45,.55)] focus-visible:outline-3" aria-label={`${s.alt || "Розворот"} — ${hint}`}>
+            <button type="button" onClick={(e) => show(s, e.currentTarget)} className="group block w-full overflow-hidden rounded-[1.25rem] bg-paper shadow-[0_20px_40px_-30px_rgba(105,72,86,.55)] focus-visible:outline-3" aria-label={`${s.alt || "Розворот"} — ${hint}`}>
               <picture>
                 <source type="image/avif" srcSet={set(s, "avif")} sizes="(min-width: 1024px) 380px, (min-width: 640px) 46vw, 92vw" />
                 { }

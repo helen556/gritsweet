@@ -86,7 +86,7 @@ export default function AddToCart({ lang, t, variants, onLocaleChange }: { lang:
       </div>
       <div aria-live="polite" className="mt-4 min-h-6">
         {added && sel && (
-          <p className="flex flex-wrap items-center gap-3 rounded-xl bg-moss-100/70 px-4 py-3">
+          <p className="flex flex-wrap items-center gap-3 rounded-xl bg-plum-100/70 px-4 py-3">
             <span>✓ {t.product.added}. {t.product.inCart}: <strong>{inCart}</strong></span>
             <Link href={`/${lang}/cart`} className="font-semibold underline decoration-gold underline-offset-4">{t.product.goCart}</Link>
           </p>

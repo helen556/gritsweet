@@ -75,7 +75,7 @@ export default function Hero({ t, ctaHref }: { t: T; ctaHref: string }) {
   const showStill = state !== "playing";
 
   return (
-    <section className={`hero relative isolate -mt-16 overflow-hidden bg-moss-100 ${M ? "hero--dual" : ""} ${HERO.legacyWebm ? "hero--legacy" : ""} ${showStill ? "hero--still" : ""} ${seam ? "hero--seam" : ""} ${userPlayed && state === "playing" ? "hero--playing-by-user" : ""}`} aria-labelledby="hero-title"
+    <section className={`hero relative isolate -mt-16 overflow-hidden bg-plum-100 ${M ? "hero--dual" : ""} ${HERO.legacyWebm ? "hero--legacy" : ""} ${showStill ? "hero--still" : ""} ${seam ? "hero--seam" : ""} ${userPlayed && state === "playing" ? "hero--playing-by-user" : ""}`} aria-labelledby="hero-title"
       style={{ ["--focus-d" as string]: D.focus, ["--focus-m" as string]: M?.focus ?? D.focus }}>
       <div className="hero-backdrop" aria-hidden="true" />
       <div className="hero-stage hero-media">

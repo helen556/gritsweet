@@ -1,26 +1,50 @@
 @import "tailwindcss";
-@import "@fontsource-variable/manrope/wght.css";
-@import "@fontsource/kurale/400.css";
+@import "@fontsource/montserrat/400.css";
+@import "@fontsource/montserrat/500.css";
+@import "@fontsource/montserrat/600.css";
+@import "@fontsource/comfortaa/500.css";
+@import "@fontsource/comfortaa/700.css";
 
-/* Палітра: теплий молочний фон, природні зелені, спокійний темний текст, стримані рожеві/мідні акценти з ілюстрацій */
+/*
+ * Дизайн-токени Princess Lily (референс замовниці, 13.10.2026): теплий молочно-кремовий фон, сливові заголовки,
+ * пудрові кнопки, м'який графітовий текст, світлі айворі-поверхні. Шавлієвий і золотий — лише як казкові акценти
+ * (декор, зірочки), щоб сайт не був одноколірним. Контраст тексту — WCAG AA (див. коментарі біля пар кольорів).
+ */
 @theme {
-  --color-milk: #faf6ee;
-  --color-paper: #fffdf8;
-  --color-cream: #f2eadb;
-  --color-ink: #2a2924;
-  --color-ink-soft: #57534a;
-  --color-moss-900: #263d2d;
-  --color-moss-700: #3f5f47;
-  --color-moss-500: #6b8a66;
-  --color-moss-200: #d5e0cd;
-  --color-moss-100: #e8eee1;
-  --color-rose: #c97b7e;
-  --color-rose-100: #f5e3de;
-  --color-copper: #94532f;
-  --color-gold: #d8bb84;
-  --font-sans: "Manrope Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Kurale", Georgia, "Times New Roman", serif;
+  /* поверхні */
+  --color-milk: #fff9f1;      /* основний фон */
+  --color-paper: #fffcf7;     /* картки, поля */
+  --color-cream: #f7ede6;     /* теплі підкладки (рум'яний крем) */
+  --color-blush: #fbeef0;     /* найсвітліший пудровий шар */
+  /* текст: #494747 на #fff9f1 ≈ 8.6:1; ink-soft #66605e ≈ 5.8:1 */
+  --color-ink: #494747;
+  --color-ink-soft: #66605e;
+  /* сливовий — заголовки, посилання, активні стани: #89566b на #fff9f1 ≈ 5.6:1 */
+  --color-plum-900: #89566b;
+  --color-plum-700: #74465a;  /* активні перемикачі з білим текстом ≈ 7.6:1 */
+  --color-plum-500: #b68a9a;
+  --color-plum-200: #efd8df;
+  --color-plum-100: #f8eaee;
+  /* пудрові кнопки: текст #4a2c3a на #f1c5d1 ≈ 8:1 */
+  --color-powder: #f1c5d1;
+  --color-powder-strong: #e9b3c3;
+  --color-btn-ink: #4a2c3a;
+  /* акценти */
+  --color-rose: #a65a70;      /* бейдж кошика з білим текстом ≈ 4.9:1 */
+  --color-rose-100: #f9e6ea;
+  --color-copper: #93596a;    /* надзаголовки (uppercase) ≈ 5:1 */
+  --color-gold: #dcc08c;
+  --color-sage: #9bb093;      /* природні акценти декору */
+  --color-sage-100: #edf2e8;
+  --color-line: #e6dfd7;      /* тонкі розділювачі */
+  --font-sans: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Comfortaa", "Montserrat", system-ui, sans-serif;
   --ease-soft: cubic-bezier(.22,.8,.28,1);
+  /* Comfortaa широка — заголовки на крок менші, ніж стандартна шкала Tailwind */
+  --text-5xl: 2.625rem; --text-5xl--line-height: 1.12;
+  --text-4xl: 1.875rem; --text-4xl--line-height: 1.16;
+  --text-3xl: 1.625rem; --text-3xl--line-height: 1.22;
+  --text-2xl: 1.375rem; --text-2xl--line-height: 1.3;
 }
 
 :root { color-scheme: light; }
@@ -29,17 +53,19 @@ body {
   background: var(--color-milk);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  font-size: 1.0625rem;
-  line-height: 1.65;
+  font-size: 1rem;
+  line-height: 1.7;
   text-rendering: optimizeLegibility;
   overflow-x: clip;
 }
-h1, h2, h3, .font-display { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.01em; line-height: 1.12; font-synthesis: none; }
-/* у Kurale немає курсиву — не імітуємо його браузером */
+h1, h2, h3, .font-display { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.015em; line-height: 1.18; font-synthesis: none; color: var(--color-plum-900); }
+h1, h2 { text-wrap: balance; }
+/* у Comfortaa немає курсиву — не імітуємо його браузером */
 .font-display.italic, .italic.font-display { font-style: normal; }
-::selection { background: var(--color-rose-100); }
+@media (min-width: 1024px) { body { font-size: 1.0625rem; } }
+::selection { background: var(--color-powder); color: var(--color-btn-ink); }
 
-:focus-visible { outline: 3px solid var(--color-moss-700); outline-offset: 3px; border-radius: 6px; }
+:focus-visible { outline: 3px solid var(--color-plum-700); outline-offset: 3px; border-radius: 6px; }
 
 .skip-link { position: absolute; left: 1rem; top: -4rem; z-index: 100; background: var(--color-paper); padding: .75rem 1rem; border-radius: .75rem; }
 .skip-link:focus { top: 1rem; }
@@ -54,10 +80,10 @@ h1, h2, h3, .font-display { font-family: var(--font-display); font-weight: 400; 
   position: relative; isolation: isolate; overflow: hidden;
   display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
   min-height: 44px; padding: .7rem 1.4rem; border-radius: 999px;
-  font-weight: 600; font-size: 1rem; line-height: 1.2; text-decoration: none; cursor: pointer;
+  font-family: var(--font-sans); font-weight: 600; font-size: .98rem; letter-spacing: .005em; line-height: 1.2; text-decoration: none; cursor: pointer;
   color: var(--b-fg); background: var(--b-bg);
   border: 1px solid var(--b-line);
-  box-shadow: 0 1px 0 rgba(255,255,255,.7) inset, 0 6px 18px -8px rgba(38, 61, 45, .35);
+  box-shadow: 0 1px 0 rgba(255,255,255,.7) inset, 0 6px 18px -8px rgba(105, 72, 86, .35);
   -webkit-backdrop-filter: blur(10px) saturate(1.15); backdrop-filter: blur(10px) saturate(1.15);
   transition: transform 220ms var(--ease-soft), box-shadow 220ms var(--ease-soft), border-color 220ms var(--ease-soft), background-color 220ms var(--ease-soft);
 }
@@ -66,36 +92,36 @@ h1, h2, h3, .font-display { font-family: var(--font-display); font-weight: 400; 
   background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,.45) 48%, transparent 66%);
   transform: translateX(-110%); transition: transform 600ms var(--ease-soft);
 }
-.btn:hover { transform: translateY(-1.5px); border-color: var(--b-line-hover); box-shadow: 0 1px 0 rgba(255,255,255,.8) inset, 0 10px 24px -10px rgba(38, 61, 45, .45); }
+.btn:hover { transform: translateY(-1.5px); border-color: var(--b-line-hover); box-shadow: 0 1px 0 rgba(255,255,255,.8) inset, 0 10px 24px -10px rgba(105, 72, 86, .45); }
 .btn:hover::after { transform: translateX(110%); }
 .btn:active { transform: translateY(0) scale(.985); transition-duration: 120ms; }
 .btn:disabled, .btn[aria-disabled="true"] { opacity: .55; cursor: not-allowed; transform: none; }
 .btn-primary {
-  --b-bg: rgba(49, 78, 58, .9); --b-fg: #fffdf8; --b-line: rgba(255, 255, 255, .35); --b-line-hover: rgba(255,255,255,.6);
-  text-shadow: 0 1px 1px rgba(0,0,0,.12);
+  --b-bg: var(--color-powder); --b-fg: var(--color-btn-ink); --b-line: rgba(255, 255, 255, .7); --b-line-hover: rgba(255,255,255,.95);
+  box-shadow: 0 1px 0 rgba(255,255,255,.65) inset, 0 8px 20px -10px rgba(137, 86, 107, .55);
 }
-.btn-primary:hover { --b-bg: rgba(38, 61, 45, .94); }
+.btn-primary:hover { --b-bg: var(--color-powder-strong); }
 .btn-ghost { --b-bg: rgba(255, 253, 248, .38); }
 .btn-sm { min-height: 44px; padding: .5rem 1rem; font-size: .95rem; }
 .btn-danger { --b-bg: rgba(255, 244, 242, .9); --b-fg: #8a2f2a; --b-line: rgba(138, 47, 42, .35); }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .btn { --b-bg: rgba(255, 253, 248, .94); }
-  .btn-primary { --b-bg: #314e3a; }
+  .btn-primary { --b-bg: var(--color-powder); }
 }
 
 /* Карткові поверхні */
 .card { background: linear-gradient(165deg, rgba(255, 254, 250, .9), rgba(255, 252, 245, .74)); border: 1px solid rgba(255, 255, 255, .85); border-radius: 1.5rem;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 1px 2px rgba(38, 61, 45, .05), 0 12px 26px -16px rgba(38, 61, 45, .2), 0 30px 60px -42px rgba(38, 61, 45, .3); }
-.chip { display:inline-flex; align-items:center; gap:.35rem; min-height: 44px; padding: .45rem 1rem; border-radius: 999px; border: 1px solid rgba(42,41,36,.14); background: rgba(255,253,248,.7); cursor: pointer; transition: background-color 200ms, border-color 200ms, color 200ms; font-weight: 500; }
-.chip[aria-pressed="true"], .chip:has(input:checked) { background: var(--color-moss-700); border-color: var(--color-moss-700); color: #fffdf8; }
-.chip:has(input:focus-visible) { outline: 3px solid var(--color-moss-700); outline-offset: 3px; }
+    box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 1px 2px rgba(105, 72, 86, .05), 0 12px 26px -16px rgba(105, 72, 86, .2), 0 30px 60px -42px rgba(105, 72, 86, .3); }
+.chip { display:inline-flex; align-items:center; gap:.35rem; min-height: 44px; padding: .45rem 1rem; border-radius: 999px; border: 1px solid rgba(137,86,107,.18); background: rgba(255,252,247,.75); cursor: pointer; transition: background-color 200ms, border-color 200ms, color 200ms; font-weight: 500; }
+.chip[aria-pressed="true"], .chip:has(input:checked) { background: var(--color-powder); border-color: var(--color-powder-strong); color: var(--color-btn-ink); font-weight: 600; box-shadow: 0 6px 14px -10px rgba(137, 86, 107, .6); }
+.chip:has(input:focus-visible) { outline: 3px solid var(--color-plum-700); outline-offset: 3px; }
 .chip:has(input:disabled) { opacity: .5; cursor: not-allowed; }
 
 /* Поля форм */
 .field label { display:block; font-weight: 600; margin-bottom: .35rem; }
 .field .hint { font-size: .9rem; color: var(--color-ink-soft); margin-top: .25rem; }
-.input { width: 100%; min-height: 48px; padding: .7rem .95rem; border-radius: .9rem; border: 1px solid rgba(42,41,36,.2); background: #fffdf8; color: var(--color-ink); transition: border-color 180ms, box-shadow 180ms; }
-.input:focus { outline: none; border-color: var(--color-moss-700); box-shadow: 0 0 0 3px rgba(63, 95, 71, .25); }
+.input { width: 100%; min-height: 48px; padding: .7rem .95rem; border-radius: .9rem; border: 1px solid rgba(73,71,71,.2); background: var(--color-paper); color: var(--color-ink); transition: border-color 180ms, box-shadow 180ms; }
+.input:focus { outline: none; border-color: var(--color-plum-500); box-shadow: 0 0 0 3px rgba(241, 197, 209, .55); }
 .input[aria-invalid="true"] { border-color: #a33a33; }
 .err { color: #9a2f28; font-size: .92rem; margin-top: .3rem; }
 
@@ -173,7 +199,7 @@ details.faq[open] .faq-icon { transform: rotate(45deg); }
   background:
     radial-gradient(ellipse 50% 62% at 16% 40%, rgba(250, 246, 238, .40), rgba(250, 246, 238, 0) 70%),
     linear-gradient(to bottom, rgba(250, 246, 238, .32), rgba(250, 246, 238, 0) 16%),
-    linear-gradient(to top, rgba(38, 61, 45, .18), rgba(38, 61, 45, 0) 22%);
+    linear-gradient(to top, rgba(105, 72, 86, .18), rgba(105, 72, 86, 0) 22%);
 }
 
 /* Текст: назва на хмаринці, короткий вступ і кнопка — збоку від персонажів */
@@ -186,11 +212,11 @@ details.faq[open] .faq-icon { transform: rotate(45deg); }
 .hero-copy--right { align-items: flex-end; text-align: right; }
 .hero-copy--center { align-items: center; text-align: center; }
 .hero-cloud-wrap { position: relative; width: min(30vw, 27rem); min-width: 17rem; padding: 2rem 2.2rem 1.8rem; }
-.hero-title { position: relative; font-size: clamp(2.3rem, 3.9vw, 4.2rem); color: var(--color-moss-900); line-height: 1.04; text-wrap: balance; }
+.hero-title { position: relative; font-size: clamp(2.1rem, 3.3vw, 3.6rem); color: var(--color-plum-900); line-height: 1.1; letter-spacing: -.02em; text-wrap: balance; }
 .hero-slogan { position: relative; margin-top: .8rem; font-family: var(--font-display); font-size: clamp(1.15rem, 1.5vw, 1.55rem); color: #3d3a33; line-height: 1.25; }
 .hero-lower { display: flex; flex-direction: column; align-items: inherit; gap: .9rem; max-width: min(30vw, 26rem); min-width: 17rem; padding: 0 2.2rem; }
 .hero-copy--center .hero-lower { align-items: center; }
-.hero-intro { font-size: 1rem; line-height: 1.5; color: #2a2924; text-wrap: pretty;
+.hero-intro { font-size: 1rem; line-height: 1.5; color: var(--color-ink); text-wrap: pretty;
   background: rgba(250, 246, 238, .62); border-radius: 1rem; padding: .55rem .85rem; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .hero-cta { margin: 0; }
 .hero-control { position: absolute; z-index: 30; left: max(1rem, env(safe-area-inset-left)); bottom: calc(1rem + env(safe-area-inset-bottom)); }
@@ -278,20 +304,21 @@ html.js.intro-play .hero-sparkles i:nth-child(5) { animation-delay: 1.55s; }
 .home-flow { position: relative; isolation: isolate; overflow-x: clip; }
 .ambient-glow {
   position: absolute; inset: 0;
+  /* молочно-пудрові шари з одним-двома ледь помітними шавлієвими відблисками — глибина без «рожевого всюди» */
   background:
-    radial-gradient(60rem 40rem at 82% 4%, rgba(232, 238, 225, .9), rgba(232, 238, 225, 0) 70%),
-    radial-gradient(48rem 34rem at 6% 20%, rgba(255, 251, 242, .95), rgba(255, 251, 242, 0) 70%),
-    radial-gradient(54rem 38rem at 90% 34%, rgba(245, 227, 222, .45), rgba(245, 227, 222, 0) 70%),
-    radial-gradient(70rem 44rem at 20% 50%, rgba(213, 224, 205, .55), rgba(213, 224, 205, 0) 70%),
-    radial-gradient(44rem 30rem at 72% 62%, rgba(255, 248, 230, .9), rgba(255, 248, 230, 0) 70%),
-    radial-gradient(64rem 40rem at 12% 80%, rgba(232, 238, 225, .8), rgba(232, 238, 225, 0) 70%),
-    radial-gradient(50rem 32rem at 86% 92%, rgba(242, 234, 219, .9), rgba(242, 234, 219, 0) 70%),
-    linear-gradient(180deg, #f7f4ec 0%, #faf6ee 22%, #f4f1e7 48%, #f9f5ec 70%, #faf6ee 100%);
+    radial-gradient(60rem 40rem at 82% 4%, rgba(251, 236, 240, .85), rgba(251, 236, 240, 0) 70%),
+    radial-gradient(48rem 34rem at 6% 20%, rgba(255, 252, 246, .95), rgba(255, 252, 246, 0) 70%),
+    radial-gradient(54rem 38rem at 90% 34%, rgba(241, 197, 209, .22), rgba(241, 197, 209, 0) 70%),
+    radial-gradient(70rem 44rem at 18% 52%, rgba(225, 233, 218, .32), rgba(225, 233, 218, 0) 70%),
+    radial-gradient(44rem 30rem at 72% 62%, rgba(255, 246, 236, .9), rgba(255, 246, 236, 0) 70%),
+    radial-gradient(64rem 40rem at 12% 80%, rgba(248, 234, 238, .7), rgba(248, 234, 238, 0) 70%),
+    radial-gradient(50rem 32rem at 86% 92%, rgba(247, 237, 230, .9), rgba(247, 237, 230, 0) 70%),
+    linear-gradient(180deg, #fff9f1 0%, #fffaf3 22%, #fdf5ef 48%, #fff8f1 70%, #fff9f1 100%);
 }
-.ambient-sprig { position: absolute; color: var(--color-moss-500); }
+.ambient-sprig { position: absolute; color: var(--color-sage); }
 .ambient-sprig.far { opacity: .32; filter: blur(.6px); }
-.ambient-sprig.near { opacity: .22; filter: blur(3px); color: var(--color-moss-700); }
-.ambient-sprig.near-mobile { opacity: .18; color: var(--color-moss-500); }
+.ambient-sprig.near { opacity: .22; filter: blur(3px); color: #7f9777; }
+.ambient-sprig.near-mobile { opacity: .18; color: var(--color-sage); }
 .ambient-dot, .ambient-star { position: absolute; display: block; }
 .ambient-dot { width: 7px; height: 7px; border-radius: 50%; background: radial-gradient(closest-side, #fffaf0, rgba(216, 187, 132, .45) 55%, rgba(216, 187, 132, 0)); }
 .ambient-star { width: 13px; height: 13px; background: radial-gradient(closest-side, #fff7e6, rgba(216, 187, 132, .7) 45%, rgba(216, 187, 132, 0));
@@ -306,17 +333,17 @@ html.js.intro-play .hero-sparkles i:nth-child(5) { animation-delay: 1.55s; }
     position: relative; border-radius: 1.75rem;
     background: linear-gradient(160deg, rgba(255, 254, 250, .86), rgba(255, 252, 245, .66));
     border: 1px solid rgba(255, 255, 255, .85);
-    box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 1px 2px rgba(38, 61, 45, .05), 0 10px 24px -14px rgba(38, 61, 45, .18), 0 32px 60px -40px rgba(38, 61, 45, .28);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 1px 2px rgba(105, 72, 86, .05), 0 10px 24px -14px rgba(105, 72, 86, .18), 0 32px 60px -40px rgba(105, 72, 86, .28);
   }
   @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     @media (min-width: 768px) { .surface { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); } }
   }
-  .surface-sage { background: linear-gradient(160deg, rgba(240, 244, 235, .9), rgba(232, 238, 225, .6)); }
+  .surface-sage { background: linear-gradient(160deg, rgba(251, 238, 241, .9), rgba(247, 237, 230, .65)); }
 }
 /* Фото авторки: арка, тонка «друга лінія», природні кольори (без фільтрів) */
 .author-frame { position: relative; }
 .author-frame::before { content: ""; position: absolute; inset: -14px 14px 14px -14px; border: 1px solid rgba(169, 120, 70, .35); border-radius: 999px 999px 2rem 2rem; pointer-events: none; }
-.author-frame img { border-radius: 999px 999px 2rem 2rem; box-shadow: 0 30px 60px -36px rgba(38, 61, 45, .55); }
+.author-frame img { border-radius: 999px 999px 2rem 2rem; box-shadow: 0 30px 60px -36px rgba(105, 72, 86, .55); }
 @keyframes cover-in { from { opacity: 0; transform: scale(.985); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .animate-\[cover-in_\.45s_var\(--ease-soft\)_both\] { animation: none !important; } }
 .home-flow > .ambient-glow { z-index: -1; }
@@ -327,12 +354,12 @@ html.js.intro-play .hero-sparkles i:nth-child(5) { animation-delay: 1.55s; }
     border-radius: 1.6rem; padding: .75rem;
     background: linear-gradient(165deg, rgba(255, 254, 250, .92), rgba(255, 251, 243, .74));
     border: 1px solid rgba(255, 255, 255, .9);
-    box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 12px 26px -18px rgba(38, 61, 45, .22), 0 34px 60px -44px rgba(38, 61, 45, .3);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 12px 26px -18px rgba(105, 72, 86, .22), 0 34px 60px -44px rgba(105, 72, 86, .3);
     transition: box-shadow .4s var(--ease-soft), transform .4s var(--ease-soft);
   }
   @media (min-width: 640px) { .book-card { padding: 0; } }
-  @media (hover: hover) { .book-card:hover { box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 18px 34px -18px rgba(38, 61, 45, .28), 0 44px 70px -44px rgba(38, 61, 45, .36); } }
-  .book-card:has(a:focus-visible) { outline: 3px solid var(--color-moss-700); outline-offset: 3px; }
+  @media (hover: hover) { .book-card:hover { box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 18px 34px -18px rgba(105, 72, 86, .28), 0 44px 70px -44px rgba(105, 72, 86, .36); } }
+  .book-card:has(a:focus-visible) { outline: 3px solid var(--color-plum-700); outline-offset: 3px; }
 }
 
 /* ================= Атмосферний блок «книжки на столі» =================
@@ -381,9 +408,9 @@ html.js.intro-play .hero-sparkles i:nth-child(5) { animation-delay: 1.55s; }
 
 /* Картка «Незабаром з’являться нові історії»: та сама форма, що й у книжки, м'яка шавлієва хмаринка замість обкладинки */
 .soon-art { background:
-  radial-gradient(ellipse 60% 55% at 50% 52%, rgba(214, 228, 204, .95), rgba(226, 236, 218, .6) 60%, rgba(244, 241, 231, 0) 100%),
+  radial-gradient(ellipse 60% 55% at 50% 52%, rgba(248, 222, 230, .95), rgba(251, 236, 240, .6) 60%, rgba(255, 249, 241, 0) 100%),
   radial-gradient(ellipse 40% 34% at 26% 30%, rgba(255, 252, 244, .9), rgba(255, 252, 244, 0)),
-  linear-gradient(160deg, #f6f3ea, #eef2e7); }
+  linear-gradient(160deg, #fffaf4, #f7ede6); }
 .soon-art__spark { position: absolute; width: 14px; height: 14px; background: radial-gradient(closest-side, #fff7e6, rgba(211, 169, 92, .75) 45%, rgba(211, 169, 92, 0));
   clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); }
 .soon-art__spark:nth-of-type(1) { left: 14%; top: 16%; }
@@ -392,11 +419,11 @@ html.js.intro-play .hero-sparkles i:nth-child(5) { animation-delay: 1.55s; }
 
 /* Фінальний екран замовлення: «Дякуємо за покупку!» */
 .thanks { background:
-  radial-gradient(ellipse 70% 60% at 50% 0%, rgba(214, 228, 204, .75), rgba(214, 228, 204, 0) 70%),
+  radial-gradient(ellipse 70% 60% at 50% 0%, rgba(248, 222, 230, .8), rgba(248, 222, 230, 0) 70%),
   linear-gradient(170deg, rgba(255, 254, 250, .95), rgba(250, 246, 236, .85)); }
-.thanks__badge { color: var(--color-moss-900);
-  background: radial-gradient(circle at 35% 30%, #fffdf6, #dfe9d6 70%);
-  box-shadow: 0 0 0 6px rgba(255, 255, 255, .8), 0 0 0 7px rgba(211, 169, 92, .45), 0 18px 30px -18px rgba(38, 61, 45, .5); }
+.thanks__badge { color: var(--color-plum-900);
+  background: radial-gradient(circle at 35% 30%, #fffdf9, #f4d3dc 75%);
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, .8), 0 0 0 7px rgba(211, 169, 92, .45), 0 18px 30px -18px rgba(105, 72, 86, .5); }
 @media (prefers-reduced-motion: no-preference) {
   .thanks__badge { animation: thanks-pop .6s var(--ease-soft) both; }
   @keyframes thanks-pop { from { transform: scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -428,7 +455,7 @@ html.js.intro-play .hero-sparkles i:nth-child(5) { animation-delay: 1.55s; }
 }
 
 /* «Світ Лілі» — великий заголовок розділу по центру, з тонким золотим розчерком */
-.world-title { font-family: var(--font-display); color: var(--color-moss-900); font-size: clamp(2.8rem, 9vw, 5.4rem); line-height: 1; letter-spacing: -.01em; }
+.world-title { font-family: var(--font-display); font-weight: 700; color: var(--color-plum-900); font-size: clamp(2.4rem, 7.5vw, 4.4rem); line-height: 1.05; letter-spacing: -.02em; }
 .world-title__flourish { display: block; width: min(16rem, 60%); height: 14px; margin: .9rem auto 0;
   background: radial-gradient(closest-side, #e2bd73 0 3px, transparent 4px) center / 14px 14px no-repeat,
     linear-gradient(90deg, transparent, rgba(185, 138, 62, .55) 30%, transparent 46%, transparent 54%, rgba(185, 138, 62, .55) 70%, transparent) center / 100% 1px no-repeat; }
@@ -436,12 +463,12 @@ html.js.intro-play .hero-sparkles i:nth-child(5) { animation-delay: 1.55s; }
 /* Кошик: «Можливо, ще одну книжечку?» — м'яка шавлієва хмаринка з зірочкою */
 .cart-more { background:
   radial-gradient(ellipse 60% 80% at 100% 0%, rgba(255, 248, 230, .95), rgba(255, 248, 230, 0) 70%),
-  linear-gradient(150deg, rgba(232, 238, 225, .95), rgba(244, 241, 231, .9));
-  border: 1px solid rgba(255, 255, 255, .9); box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 14px 30px -22px rgba(38, 61, 45, .35); }
+  linear-gradient(150deg, rgba(251, 236, 240, .95), rgba(255, 249, 241, .9));
+  border: 1px solid rgba(255, 255, 255, .9); box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 14px 30px -22px rgba(105, 72, 86, .35); }
 .cart-more__star { position: absolute; right: 1.1rem; top: 1rem; width: 26px; height: 26px;
   background: radial-gradient(closest-side, #fff7e6, rgba(226, 189, 115, .9) 45%, rgba(226, 189, 115, 0));
   clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); }
 @media (prefers-reduced-motion: no-preference) { .cart-more__star { animation: star-twinkle 3.6s ease-in-out infinite; } }
-.cart-more__btn { gap: .5rem; background: #fffdf7; color: var(--color-moss-900); border: 1px solid rgba(185, 138, 62, .45);
-  box-shadow: 0 8px 18px -12px rgba(38, 61, 45, .45); }
+.cart-more__btn { gap: .5rem; background: #fffdf7; color: var(--color-plum-900); border: 1px solid rgba(185, 138, 62, .45);
+  box-shadow: 0 8px 18px -12px rgba(105, 72, 86, .45); }
 .cart-more__btn:hover { background: #fff8e8; border-color: rgba(185, 138, 62, .8); }

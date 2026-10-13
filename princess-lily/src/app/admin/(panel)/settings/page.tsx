@@ -23,7 +23,7 @@ export default async function Settings() {
   return (
     <div className="space-y-8">
       <section className="card p-5 sm:p-6">
-        <h1 className="text-3xl text-moss-900">Налаштування</h1>
+        <h1 className="text-3xl text-plum-900">Налаштування</h1>
         <p className="mt-1 text-sm text-ink-soft">Ключі платіжного/email-провайдерів задаються лише змінними середовища на сервері, не тут.</p>
         <ActionForm action={saveSettingsAction} submit="Зберегти" className="mt-4 grid gap-4 sm:grid-cols-2">
           <fieldset className="rounded-2xl border border-black/10 p-4 sm:col-span-2">

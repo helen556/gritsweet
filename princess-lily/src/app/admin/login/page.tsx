@@ -8,7 +8,7 @@ export default async function Login() {
   return (
     <main className="grid min-h-dvh place-items-center px-4">
       <div className="card w-full max-w-sm p-8">
-        <h1 className="text-3xl text-moss-900">Вхід в адмінку</h1>
+        <h1 className="text-3xl text-plum-900">Вхід в адмінку</h1>
         <p className="mt-1 text-sm text-ink-soft">Історії принцеси Лілі</p>
         <LoginForm />
       </div>

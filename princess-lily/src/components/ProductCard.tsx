@@ -37,14 +37,14 @@ export default function ProductCard({ p, lang, t, headingLevel = "h3" }: { p: Ca
       <div className="book-card__cover relative sm:px-6 sm:pt-6">
         <Picture base={c.base} widths={c.widths} width={c.width} height={c.height} alt={c.alt || p.coverAlt}
           sizes="(min-width: 1024px) 360px, (min-width: 640px) 44vw, 42vw"
-          imgClassName="mx-auto aspect-square h-auto w-full rounded-[1.1rem] object-contain shadow-[0_18px_34px_-22px_rgba(38,61,45,.55)] transition-transform duration-500 ease-[var(--ease-soft)] group-hover:-translate-y-1" />
+          imgClassName="mx-auto aspect-square h-auto w-full rounded-[1.1rem] object-contain shadow-[0_18px_34px_-22px_rgba(105,72,86,.55)] transition-transform duration-500 ease-[var(--ease-soft)] group-hover:-translate-y-1" />
       </div>
       <div className="flex min-w-0 flex-col gap-2 py-2 pr-1 sm:flex-1 sm:gap-3 sm:p-6">
-        <H className="text-[1.3rem] leading-snug text-moss-900 sm:text-2xl">
+        <H className="text-[1.3rem] leading-snug text-plum-900 sm:text-2xl">
           <Link href={`/${lang}/books/${p.slug}`} className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none" lang={p.translationConfirmed ? undefined : "uk"}>{p.title}</Link>
         </H>
         <ul className="flex flex-wrap gap-1.5 text-[0.82rem] text-ink-soft sm:gap-2 sm:text-sm">
-          {langs.map((l) => <li key={l} className="rounded-full bg-moss-100/80 px-2.5 py-0.5">{l === "uk" ? "UA" : "EN"}</li>)}
+          {langs.map((l) => <li key={l} className="rounded-full bg-plum-100/80 px-2.5 py-0.5">{l === "uk" ? "UA" : "EN"}</li>)}
           {formats.map((f) => <li key={f} className="rounded-full bg-rose-100/70 px-2.5 py-0.5">{f === "pdf" ? "PDF" : t.formats.print}</li>)}
         </ul>
         {price.soon ? <p className="mt-auto pt-1 text-lg font-semibold text-copper">{price.text}</p> : (
@@ -71,7 +71,7 @@ export function ComingSoonCard({ text }: { text: string }) {
         </div>
       </div>
       <div className="flex min-w-0 flex-col justify-center py-2 pr-1 sm:flex-1 sm:p-6">
-        <p className="font-display text-[1.3rem] leading-snug text-moss-900 sm:text-2xl">{text}</p>
+        <p className="font-display text-[1.3rem] leading-snug text-plum-900 sm:text-2xl">{text}</p>
       </div>
     </div>
   );

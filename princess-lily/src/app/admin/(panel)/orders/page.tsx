@@ -4,8 +4,8 @@ import { formatMinor } from "@/lib/money";
 
 export const metadata = { title: "Замовлення" };
 
-const KIND_STYLE = { pdf: "bg-moss-100 text-moss-900", print: "bg-rose-100 text-[#7a3b33]", mixed: "bg-gold/40 text-[#5b4416]" } as const;
-const PAY_STYLE: Record<string, string> = { paid: "bg-moss-100", pending_verification: "bg-gold/40", failed: "bg-rose-100", cancelled: "bg-black/5" };
+const KIND_STYLE = { pdf: "bg-plum-100 text-plum-900", print: "bg-rose-100 text-[#7a3b33]", mixed: "bg-gold/40 text-[#5b4416]" } as const;
+const PAY_STYLE: Record<string, string> = { paid: "bg-plum-100", pending_verification: "bg-gold/40", failed: "bg-rose-100", cancelled: "bg-black/5" };
 
 function SortLink({ f, col, label }: { f: CrmFilters; col: NonNullable<CrmFilters["sort"]>; label: string }) {
   const active = f.sort === col;
@@ -29,7 +29,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-3xl text-moss-900">Замовлення</h1>
+        <h1 className="text-3xl text-plum-900">Замовлення</h1>
         <div className="flex flex-wrap gap-2">
           <a className="btn btn-ghost btn-sm" href={`/admin/orders-export?format=xlsx${exportQ ? `&${exportQ}` : ""}`}>⬇ Excel (.xlsx)</a>
           <a className="btn btn-ghost btn-sm" href={`/admin/orders-export?format=pdf${exportQ ? `&${exportQ}` : ""}`}>⬇ PDF</a>
@@ -56,7 +56,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
       <div className="hidden overflow-x-auto rounded-2xl border border-black/6 bg-paper lg:block">
         <table className="w-full min-w-[1100px] text-left text-sm">
           <caption className="sr-only">Список замовлень</caption>
-          <thead className="bg-moss-100/60 text-ink">
+          <thead className="bg-plum-100/60 text-ink">
             <tr>
               <th className="p-3">Номер</th>
               <th className="p-3"><SortLink f={f} col="created_at" label="Створено (Київ)" /></th>
@@ -70,7 +70,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className="border-t border-black/5 align-top hover:bg-moss-100/30">
+              <tr key={r.id} className="border-t border-black/5 align-top hover:bg-plum-100/30">
                 <td className="whitespace-nowrap p-3"><Link href={`/admin/orders/${r.id}`} className="font-semibold underline underline-offset-4">{r.number}</Link>
                   <span className={`mt-1 block w-fit rounded-full px-2 py-0.5 text-xs ${KIND_STYLE[r.kind]}`}>{KIND_LABEL[r.kind]}</span></td>
                 <td className="whitespace-nowrap p-3">{kyiv(r.created_at)}<span className="block text-xs text-ink-soft">{ORDER_LABEL[r.order_status ?? "new"]}</span></td>

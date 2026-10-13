@@ -71,7 +71,7 @@ export default function CheckoutForm({ lang, t, npMode, direct }: { lang: "uk" |
     <form ref={formRef} onSubmit={onSubmit} noValidate className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
       <div className="space-y-8">
         <fieldset className="card space-y-5 p-6 sm:p-8">
-          <legend className="float-left mb-2 w-full font-display text-3xl text-moss-900">{t.checkout.contact}</legend>
+          <legend className="float-left mb-2 w-full font-display text-3xl text-plum-900">{t.checkout.contact}</legend>
           <div className="field clear-both"><label htmlFor="email">{t.checkout.email}</label>
             <input id="email" name="email" type="email" autoComplete="email" inputMode="email" required className="input" {...inv("email")} />
             <p className="hint">{t.checkout.emailHint}</p>{fe("email", e.email)}</div>
@@ -105,7 +105,7 @@ export default function CheckoutForm({ lang, t, npMode, direct }: { lang: "uk" |
         </fieldset>
         {ship ? (
           <fieldset className="card space-y-5 p-6 sm:p-8">
-            <legend className="float-left mb-2 w-full font-display text-3xl text-moss-900">{t.checkout.delivery}</legend>
+            <legend className="float-left mb-2 w-full font-display text-3xl text-plum-900">{t.checkout.delivery}</legend>
             <p className="clear-both text-ink-soft">{t.checkout.deliveryNote}</p>
             <NpPicker mode={npMode} t={t.checkout} invalid={fields} />
             <label className="flex min-h-11 items-center gap-3"><input type="checkbox" className="h-5 w-5" checked={otherRecipient} onChange={(ev) => setOtherRecipient(ev.target.checked)} /> {t.checkout.otherRecipient}</label>
@@ -123,8 +123,8 @@ export default function CheckoutForm({ lang, t, npMode, direct }: { lang: "uk" |
       </div>
       <aside className="lg:sticky lg:top-24 lg:self-start">
         <div className="card p-6 sm:p-8">
-          <h2 className="text-3xl text-moss-900">{t.checkout.summary}</h2>
-          {direct && <p className="mt-2 rounded-xl bg-moss-100/70 px-3 py-2 text-sm">{t.checkout.buyNowNote}</p>}
+          <h2 className="text-3xl text-plum-900">{t.checkout.summary}</h2>
+          {direct && <p className="mt-2 rounded-xl bg-plum-100/70 px-3 py-2 text-sm">{t.checkout.buyNowNote}</p>}
           <ul className="mt-4 space-y-3">
             {quote.lines.map((l) => (
               <li key={l.variantId} className="flex justify-between gap-4">

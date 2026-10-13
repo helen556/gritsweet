@@ -6,7 +6,7 @@ export default async function Messages() {
   const rows = await db.selectFrom("contact_messages").selectAll().orderBy("created_at", "desc").limit(200).execute();
   return (
     <div className="space-y-4">
-      <h1 className="text-3xl text-moss-900">Звернення</h1>
+      <h1 className="text-3xl text-plum-900">Звернення</h1>
       {rows.map((m) => (
         <article key={m.id} className={`card p-5 ${m.status === "new" ? "border-gold" : ""}`}>
           <p className="text-sm text-ink-soft">{m.created_at} · {m.site_locale}{m.order_number && ` · замовлення ${m.order_number}`}</p>

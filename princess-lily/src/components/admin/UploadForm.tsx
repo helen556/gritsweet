@@ -23,7 +23,7 @@ export default function UploadForm({ kind, targetId, accept, label, extra }: { e
       <div className="field"><label htmlFor={`f-${kind}-${targetId}`} className="text-sm">{label}</label>
         <input id={`f-${kind}-${targetId}`} type="file" name="file" accept={accept} required className="block min-h-11 text-sm" /></div>
       <button className="btn btn-ghost btn-sm" disabled={busy} aria-busy={busy}>{busy ? "Завантаження…" : "Завантажити"}</button>
-      <span aria-live="polite" className="text-sm">{msg.ok && <span className="text-moss-700">✓ {msg.ok}</span>}{msg.error && <span className="err">{msg.error}</span>}</span>
+      <span aria-live="polite" className="text-sm">{msg.ok && <span className="text-plum-700">✓ {msg.ok}</span>}{msg.error && <span className="err">{msg.error}</span>}</span>
     </form>
   );
 }

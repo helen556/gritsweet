@@ -18,7 +18,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
   return (
     <div className="space-y-4 sm:space-y-6">
       {sp.denied && <p className="card border-rose p-4" role="alert">Цей розділ доступний лише власниці.</p>}
-      <h1 className="text-2xl text-moss-900 sm:text-3xl">Огляд</h1>
+      <h1 className="text-2xl text-plum-900 sm:text-3xl">Огляд</h1>
       <div className="grid gap-3 sm:gap-6 md:grid-cols-2">
         <section className="card p-4 sm:p-5"><h2 className="text-xl sm:text-2xl">Перевірити оплату ({toVerify.length})</h2>
           <ul className="mt-3 space-y-1">{toVerify.map((o) => <li key={o.id}><Link className="underline" href={`/admin/orders/${o.id}`}>{o.number}</Link> — {formatMinor(o.total_minor, "uk")}</li>)}{!toVerify.length && <li className="text-ink-soft">Немає</li>}</ul></section>

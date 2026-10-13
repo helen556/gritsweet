@@ -48,9 +48,9 @@ export default function ReceiptUpload({ token, t, done }: { token: string; t: T;
       <p className="font-semibold">{t.title}</p>
       <p className="mt-1 text-sm text-ink-soft">{t.hint}</p>
       <input ref={input} type="file" name="file" required accept="image/jpeg,image/png,image/webp,application/pdf" aria-label={t.title}
-        className="mt-3 block w-full min-w-0 max-w-full text-sm text-ink-soft file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-full file:border-0 file:bg-moss-100 file:px-4 file:py-2 file:font-semibold file:text-moss-900" />
+        className="mt-3 block w-full min-w-0 max-w-full text-sm text-ink-soft file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-full file:border-0 file:bg-plum-100 file:px-4 file:py-2 file:font-semibold file:text-plum-900" />
       <button className="btn btn-primary btn-sm mt-4" disabled={state === "busy"}>{state === "busy" ? t.busy : t.upload}</button>
-      <p aria-live="polite" className="mt-3 text-sm">{state === "ok" ? <span className="text-moss-700">✓ {t.ok}</span> : state === "err" ? <span className="err">{msg}</span> : null}</p>
+      <p aria-live="polite" className="mt-3 text-sm">{state === "ok" ? <span className="text-plum-700">✓ {t.ok}</span> : state === "err" ? <span className="err">{msg}</span> : null}</p>
     </form>
   );
 }

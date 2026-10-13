@@ -33,10 +33,10 @@ export default async function About({ params }: PageProps<"/[lang]/about">) {
             sizes="96px" className="mt-12 block w-24" imgClassName="aspect-square h-auto w-full rounded-full object-cover ring-4 ring-paper/80" />
         </div>
         <article>
-          <h1 className="text-4xl text-moss-900 sm:text-5xl">{t.author.greeting}</h1>
+          <h1 className="text-4xl text-plum-900 sm:text-5xl">{t.author.greeting}</h1>
           <div className="prose-soft mt-6 text-lg text-ink-soft">{t.author.paragraphs.map((p, i) => <p key={i}>{p}</p>)}</div>
-          <p className="mt-8 font-display text-2xl italic text-moss-900">{t.author.signoff}</p>
-          <p className="font-display text-3xl font-semibold text-moss-900">{t.author.name}</p>
+          <p className="mt-8 font-display text-2xl italic text-plum-900">{t.author.signoff}</p>
+          <p className="font-display text-3xl font-semibold text-plum-900">{t.author.name}</p>
           <p className="text-ink-soft">{t.author.role}</p>
         </article>
       </div>

@@ -47,11 +47,11 @@ export default async function BookPage({ params }: PageProps<"/[lang]/books/[slu
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
-      <Link href={`/${lang}/books`} className="inline-flex min-h-11 items-center text-ink-soft hover:text-moss-900">{t.product.back}</Link>
+      <Link href={`/${lang}/books`} className="inline-flex min-h-11 items-center text-ink-soft hover:text-plum-900">{t.product.back}</Link>
       <ProductBuy lang={lang} t={{ product: productStrings, formats: t.formats, bookLocales: t.bookLocales }}
         covers={p.coverByLocale} comingSoon={{ title: price.text, note: t.product.comingSoonNote }}
         variants={p.variants.map((v) => ({ id: v.id, bookLocale: v.book_locale, format: v.format, priceMinor: v.price_minor, stock: v.stock, sellable: v.sellable, restockNote: v.restock_note }))}>
-        <h1 className="text-4xl text-moss-900 sm:text-5xl" lang={p.translationConfirmed ? undefined : "uk"}>{p.title}</h1>
+        <h1 className="text-4xl text-plum-900 sm:text-5xl" lang={p.translationConfirmed ? undefined : "uk"}>{p.title}</h1>
         {!p.translationConfirmed && t.product.originalTitleNote && <p className="mt-2 text-sm text-ink-soft">{t.product.originalTitleNote}</p>}
         <dl className="mt-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-[1.02rem]">
           {p.age_from != null && p.age_to != null && (<><dt className="text-ink-soft">{t.product.ageLabel}</dt><dd>{t.product.age(p.age_from, p.age_to)}</dd></>)}
@@ -65,7 +65,7 @@ export default async function BookPage({ params }: PageProps<"/[lang]/books/[slu
       </ProductBuy>
       {p.spreads.length > 0 && (
         <section aria-labelledby="inside-h" className="mt-16">
-          <h2 id="inside-h" className="text-3xl text-moss-900 sm:text-4xl" data-reveal="left">{t.home.insideTitle}</h2>
+          <h2 id="inside-h" className="text-3xl text-plum-900 sm:text-4xl" data-reveal="left">{t.home.insideTitle}</h2>
           <Spreads items={p.spreads} hint={t.home.insideHint} close={t.home.close} />
         </section>
       )}

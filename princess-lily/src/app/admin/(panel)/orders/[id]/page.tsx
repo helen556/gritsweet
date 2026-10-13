@@ -36,7 +36,7 @@ export default async function OrderAdmin({ params }: PageProps<"/admin/orders/[i
     <div className="space-y-6">
       <Link href="/admin/orders" className="underline">← Замовлення</Link>
       <section className="card p-5 sm:p-6">
-        <h1 className="text-3xl text-moss-900">{o.number}</h1>
+        <h1 className="text-3xl text-plum-900">{o.number}</h1>
         <dl className="mt-4 grid gap-x-6 gap-y-2 sm:grid-cols-[12rem_1fr]">
           <dt className="text-ink-soft">Створено (Київ)</dt><dd>{kyiv(o.created_at, true)}</dd>
           <dt className="text-ink-soft">Стан замовлення</dt><dd><strong>{ORDER_LABEL[status]}</strong></dd>
@@ -123,7 +123,7 @@ export default async function OrderAdmin({ params }: PageProps<"/admin/orders/[i
         </section>
         <section className="card p-5">
           <h2 className="text-2xl">Сповіщення Telegram</h2>
-          <ul className="mt-2 space-y-1 text-sm">{notes.map((n) => <li key={n.id}>{n.dedupe_key.startsWith("tg:paid") ? "Оплату підтверджено" : "Нове замовлення"}: <strong className={n.status === "sent" ? "text-moss-700" : "text-[#9a2f28]"}>{n.status === "sent" ? "доставлено" : n.status === "not_configured" ? "не налаштовано" : n.status === "failed" ? "помилка" : "у черзі"}</strong>{n.last_error && n.status !== "sent" ? ` — ${n.last_error}` : ""} · спроб: {n.attempts}</li>)}{!notes.length && <li className="text-ink-soft">Немає</li>}</ul>
+          <ul className="mt-2 space-y-1 text-sm">{notes.map((n) => <li key={n.id}>{n.dedupe_key.startsWith("tg:paid") ? "Оплату підтверджено" : "Нове замовлення"}: <strong className={n.status === "sent" ? "text-plum-700" : "text-[#9a2f28]"}>{n.status === "sent" ? "доставлено" : n.status === "not_configured" ? "не налаштовано" : n.status === "failed" ? "помилка" : "у черзі"}</strong>{n.last_error && n.status !== "sent" ? ` — ${n.last_error}` : ""} · спроб: {n.attempts}</li>)}{!notes.length && <li className="text-ink-soft">Немає</li>}</ul>
         </section>
         <section className="card p-5">
           <h2 className="text-2xl">Хронологія</h2>

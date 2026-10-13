@@ -45,14 +45,14 @@ export default function Header({ lang, t }: { lang: "uk" | "en"; t: Pick<Dict, "
   return (
     <header className="sticky top-0 z-40 border-b border-white/40 bg-milk/75 backdrop-blur-md supports-[not(backdrop-filter:blur(1px))]:bg-milk">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:gap-3 sm:px-6">
-        <Link href={`/${lang}`} className="mr-auto flex min-h-11 min-w-0 items-center gap-1.5 font-display text-[1rem] leading-[1.1] sm:gap-2 text-moss-900 sm:text-2xl" aria-label={t.brand.name}>
-          <svg aria-hidden="true" width="26" height="26" viewBox="0 0 48 48" className="shrink-0 max-[379px]:hidden"><path d="M8 34l4-18 12 11 12-11 4 18z" fill="#f1dfb8" stroke="#a9643f" strokeWidth="2" strokeLinejoin="round" /><circle cx="12" cy="13" r="3" fill="#c97b7e" /><circle cx="24" cy="23" r="3" fill="#c97b7e" /><circle cx="36" cy="13" r="3" fill="#c97b7e" /><rect x="8" y="36" width="32" height="4" rx="2" fill="#3f5f47" /></svg>
+        <Link href={`/${lang}`} className="mr-auto flex min-h-11 min-w-0 items-center gap-1.5 font-display text-[1rem] leading-[1.1] sm:gap-2 text-plum-900 sm:text-2xl" aria-label={t.brand.name}>
+          <svg aria-hidden="true" width="26" height="26" viewBox="0 0 48 48" className="shrink-0 max-[379px]:hidden"><path d="M8 34l4-18 12 11 12-11 4 18z" fill="#f8dfe6" stroke="#89566b" strokeWidth="2" strokeLinejoin="round" /><circle cx="12" cy="13" r="3" fill="#dcc08c" /><circle cx="24" cy="23" r="3" fill="#e4a9ba" /><circle cx="36" cy="13" r="3" fill="#dcc08c" /><rect x="8" y="36" width="32" height="4" rx="2" fill="#89566b" /></svg>
           <span className="max-w-[9rem] sm:max-w-none">{t.brand.name}</span>
         </Link>
         <nav aria-label={t.nav.menu} className="hidden items-center gap-1 lg:flex">
           {links.map((l) => (
             <Link key={l.href} href={l.href} aria-current={isActive(l.href) ? "page" : undefined}
-              className="rounded-full px-3 py-2 text-[0.95rem] font-medium text-ink-soft transition-colors hover:bg-moss-100 hover:text-moss-900 aria-[current=page]:text-moss-900 aria-[current=page]:underline aria-[current=page]:decoration-gold aria-[current=page]:underline-offset-8">
+              className="rounded-full px-3 py-2 text-[0.95rem] font-medium text-ink-soft transition-colors hover:bg-plum-100 hover:text-plum-900 aria-[current=page]:text-plum-900 aria-[current=page]:underline aria-[current=page]:decoration-gold aria-[current=page]:underline-offset-8">
               {l.label}
             </Link>
           ))}
@@ -60,7 +60,7 @@ export default function Header({ lang, t }: { lang: "uk" | "en"; t: Pick<Dict, "
         <div className="flex items-center rounded-full border border-black/10 bg-paper/70 p-0.5 text-sm" role="group" aria-label={t.nav.language}>
           {(["uk", "en"] as const).map((l) => (
             <Link key={l} href={switchHref(pathname, search, l)} hrefLang={l} lang={l} aria-current={l === lang ? "true" : undefined}
-              className="grid min-h-10 min-w-10 place-items-center rounded-full px-2 font-semibold uppercase text-ink-soft transition-colors aria-[current=true]:bg-moss-700 aria-[current=true]:text-paper">
+              className="grid min-h-10 min-w-10 place-items-center rounded-full px-2 font-semibold uppercase text-ink-soft transition-colors aria-[current=true]:bg-plum-700 aria-[current=true]:text-paper">
               {l === "uk" ? "UA" : "EN"}
             </Link>
           ))}
@@ -78,7 +78,7 @@ export default function Header({ lang, t }: { lang: "uk" | "en"; t: Pick<Dict, "
       <div id="mobile-nav" ref={panelRef} hidden={!open} className="border-t border-black/5 bg-milk lg:hidden">
         <nav aria-label={t.nav.menu} className="mx-auto flex max-w-6xl flex-col px-4 py-2">
           {links.map((l) => (
-            <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="flex min-h-12 items-center rounded-xl px-3 text-lg font-medium hover:bg-moss-100">{l.label}</Link>
+            <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="flex min-h-12 items-center rounded-xl px-3 text-lg font-medium hover:bg-plum-100">{l.label}</Link>
           ))}
         </nav>
       </div>

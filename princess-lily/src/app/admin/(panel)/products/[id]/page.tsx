@@ -18,7 +18,7 @@ export default async function EditProduct({ params }: PageProps<"/admin/products
     <div className="space-y-8">
       <Link href="/admin/products" className="underline">← Товари</Link>
       <section className="card p-5 sm:p-6">
-        <h1 className="text-3xl text-moss-900">{tr("uk")?.title}</h1>
+        <h1 className="text-3xl text-plum-900">{tr("uk")?.title}</h1>
         <ActionForm action={saveProductAction} submit="Зберегти товар" className="mt-4 space-y-5">
           <input type="hidden" name="id" value={p.id} />
           <div className="grid gap-4 sm:grid-cols-3">
@@ -93,7 +93,7 @@ export default async function EditProduct({ params }: PageProps<"/admin/products
           {p.variants.map((v) => (
             <div key={v.id} className="rounded-2xl border border-black/10 p-4">
               <p className="font-semibold">{v.book_locale === "uk" ? "Українська" : "Англійська"} · {v.format === "pdf" ? "PDF" : "Друк"}
-                <span className={`ml-2 rounded-full px-2 py-0.5 text-sm ${v.sellable ? "bg-moss-100" : "bg-rose-100"}`}>{v.sellable ? "продається" : `не продається: ${REASON[v.reason!]}`}</span></p>
+                <span className={`ml-2 rounded-full px-2 py-0.5 text-sm ${v.sellable ? "bg-plum-100" : "bg-rose-100"}`}>{v.sellable ? "продається" : `не продається: ${REASON[v.reason!]}`}</span></p>
               <ActionForm action={saveVariantAction} submit="Зберегти варіант" className="mt-3 grid gap-3 sm:grid-cols-4">
                 <input type="hidden" name="id" value={v.id} /><input type="hidden" name="product_id" value={p.id} />
                 <div className="field"><label htmlFor={`price-${v.id}`}>Ціна, грн</label><input id={`price-${v.id}`} name="price" inputMode="decimal" defaultValue={minorToInput(v.price_minor)} placeholder="порожньо = немає" className="input" /></div>
@@ -103,7 +103,7 @@ export default async function EditProduct({ params }: PageProps<"/admin/products
               </ActionForm>
               {v.format === "pdf" && (
                 <div className="mt-3 border-t border-black/10 pt-3">
-                  <p className="text-sm">PDF: {v.private_pdf_key ? <span className="font-semibold text-moss-700">завантажено (приватне сховище)</span> : <span className="text-copper">не завантажено</span>}</p>
+                  <p className="text-sm">PDF: {v.private_pdf_key ? <span className="font-semibold text-plum-700">завантажено (приватне сховище)</span> : <span className="text-copper">не завантажено</span>}</p>
                   <UploadForm kind="pdf" targetId={v.id} accept="application/pdf" label="Завантажити PDF (до 100 МБ)" />
                   {v.private_pdf_key && <form action={removePdfAction} className="mt-2"><input type="hidden" name="id" value={v.id} /><button className="btn btn-danger btn-sm">Видалити PDF</button></form>}
                 </div>

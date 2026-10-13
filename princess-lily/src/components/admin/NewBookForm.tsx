@@ -46,8 +46,8 @@ export default function NewBookForm() {
     <form onSubmit={onSubmit} className="mt-3 grid gap-3 sm:max-w-md">
       <div className="field"><label htmlFor="np-title">Назва українською</label><input id="np-title" name="title" required className="input" /></div>
       <div className="field"><label htmlFor="np-title-en">Назва англійською (якщо є)</label><input id="np-title-en" name="title_en" className="input" /></div>
-      <div className="field"><label htmlFor="np-cover-uk">Обкладинка UA (JPG, PNG або WebP)</label><input id="np-cover-uk" name="cover_uk" type="file" accept="image/jpeg,image/png,image/webp" className="block w-full min-w-0 text-sm file:mr-3 file:min-h-10 file:rounded-full file:border-0 file:bg-moss-100 file:px-4 file:font-semibold" /></div>
-      <div className="field"><label htmlFor="np-cover-en">Обкладинка EN (якщо є)</label><input id="np-cover-en" name="cover_en" type="file" accept="image/jpeg,image/png,image/webp" className="block w-full min-w-0 text-sm file:mr-3 file:min-h-10 file:rounded-full file:border-0 file:bg-moss-100 file:px-4 file:font-semibold" /></div>
+      <div className="field"><label htmlFor="np-cover-uk">Обкладинка UA (JPG, PNG або WebP)</label><input id="np-cover-uk" name="cover_uk" type="file" accept="image/jpeg,image/png,image/webp" className="block w-full min-w-0 text-sm file:mr-3 file:min-h-10 file:rounded-full file:border-0 file:bg-plum-100 file:px-4 file:font-semibold" /></div>
+      <div className="field"><label htmlFor="np-cover-en">Обкладинка EN (якщо є)</label><input id="np-cover-en" name="cover_en" type="file" accept="image/jpeg,image/png,image/webp" className="block w-full min-w-0 text-sm file:mr-3 file:min-h-10 file:rounded-full file:border-0 file:bg-plum-100 file:px-4 file:font-semibold" /></div>
       <details className="text-sm"><summary className="cursor-pointer text-ink-soft">Адреса сторінки (необов’язково)</summary>
         <div className="field mt-2"><label htmlFor="np-slug">Латиницею, через дефіс. Порожньо — створиться з назви.</label><input id="np-slug" name="slug" pattern="[a-z0-9-]+" placeholder="lili-..." className="input" /></div>
       </details>

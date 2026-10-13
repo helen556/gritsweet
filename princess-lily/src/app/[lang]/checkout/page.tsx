@@ -21,7 +21,7 @@ export default async function Checkout({ params, searchParams }: PageProps<"/[la
   const t = getDict(lang);
   return (
     <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
-      <h1 className="text-5xl text-moss-900">{t.checkout.title}</h1>
+      <h1 className="text-5xl text-plum-900">{t.checkout.title}</h1>
       <CheckoutForm lang={lang} direct={direct} npMode={novaPoshtaMode()} t={{ checkout: t.checkout, cart: t.cart, formats: t.formats, bookLocales: t.bookLocales }} />
     </div>
   );

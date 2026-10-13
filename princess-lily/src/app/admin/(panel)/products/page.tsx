@@ -11,7 +11,7 @@ export default async function Products() {
     .select(["p.id", "p.slug", "p.status", "p.sort_order", "p.cover_base", "t.title", "t.cover_base as uk_cover"]).orderBy("p.sort_order").execute();
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl text-moss-900 sm:text-3xl">Товари</h1>
+      <h1 className="text-2xl text-plum-900 sm:text-3xl">Товари</h1>
       <ul className="divide-y divide-black/8 rounded-2xl border border-black/6 bg-paper">
         {rows.map((r) => (
           <li key={r.id} className="grid gap-2 p-3 sm:flex sm:flex-wrap sm:items-center sm:gap-3 sm:p-4">

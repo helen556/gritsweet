@@ -21,7 +21,7 @@ export default function ActionForm({
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button className={`btn ${danger ? "btn-danger" : "btn-primary"}`} disabled={pending} aria-busy={pending}>{pending ? "Зачекайте…" : submit}</button>
         <div aria-live="polite" className="text-sm">
-          {state.ok && <p className="font-semibold text-moss-700">✓ {state.ok}</p>}
+          {state.ok && <p className="font-semibold text-plum-700">✓ {state.ok}</p>}
           {state.error && <p className="err" role="alert">{state.error}</p>}
         </div>
       </div>

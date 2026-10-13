@@ -13,7 +13,7 @@ export default async function CartPage({ params }: PageProps<"/[lang]/cart">) {
   const t = getDict(lang);
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-16">
-      <h1 className="text-5xl text-moss-900">{t.cart.title}</h1>
+      <h1 className="text-5xl text-plum-900">{t.cart.title}</h1>
       <CartView lang={lang} t={{ cart: t.cart, formats: t.formats, bookLocales: t.bookLocales }} />
     </div>
   );

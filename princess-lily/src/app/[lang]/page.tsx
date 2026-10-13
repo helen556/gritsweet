@@ -31,7 +31,7 @@ function gridCols(n: number) {
 }
 
 const kicker = "text-sm font-semibold uppercase tracking-[0.18em] text-copper";
-const h2 = "text-4xl text-moss-900 sm:text-5xl";
+const h2 = "text-4xl text-plum-900 sm:text-5xl";
 
 export default async function Home({ params }: PageProps<"/[lang]">) {
   const { lang } = await params;
@@ -93,7 +93,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
                     <svg className="benefit__star" aria-hidden="true" viewBox="0 0 24 24" width="22" height="22">
                       <path d="M12 2.5c.6 4.4 1.7 6.9 3.4 8.1 1.6 1.1 3.6 1.4 6.1 1.5-2.6.2-4.6.6-6.1 1.6-1.7 1.2-2.8 3.7-3.4 7.9-.6-4.2-1.7-6.7-3.4-7.9-1.5-1-3.5-1.4-6.1-1.6 2.5-.1 4.5-.4 6.1-1.5 1.7-1.2 2.8-3.7 3.4-8.1z" />
                     </svg>
-                    <h3 className="text-xl text-moss-900">{b.title}</h3>
+                    <h3 className="text-xl text-plum-900">{b.title}</h3>
                     <p className="mt-1 text-[0.97rem] text-ink-soft">{b.text}</p>
                   </li>
                 ))}
@@ -112,9 +112,9 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
           </div>
           <div className="mx-auto mt-8 grid max-w-6xl items-center gap-10 px-4 sm:mt-12 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-16">
             <div className="lg:order-2">
-              <h3 className="text-3xl text-moss-900 sm:text-4xl" data-reveal="right">{t.home.worldTitle}</h3>
+              <h3 className="text-3xl text-plum-900 sm:text-4xl" data-reveal="right">{t.home.worldTitle}</h3>
               <p className="mt-4 max-w-[52ch] text-lg text-ink-soft" data-reveal="left">{t.home.worldText}</p>
-              <p className="mt-6 border-l-2 border-gold pl-5 font-display text-2xl leading-snug text-moss-900" data-reveal="right">{t.series.closing}</p>
+              <p className="mt-6 border-l-2 border-gold pl-5 font-display text-2xl leading-snug text-plum-900" data-reveal="right">{t.series.closing}</p>
             </div>
             {/* ілюстрація в легкій шавлієвій хмаринці: краї кадру розчиняються в зелений градієнт, без жорстких меж */}
             <figure className="world-cloud relative lg:order-1" data-reveal="left">
@@ -151,7 +151,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
               <div className="prose-soft mt-6 max-w-[62ch] text-ink-soft" data-reveal="left">
                 {t.author.paragraphs.slice(0, 3).map((p, i) => <p key={i}>{p}</p>)}
               </div>
-              <p className="mt-6 font-display text-2xl text-moss-900" data-reveal="right">{t.author.name}</p>
+              <p className="mt-6 font-display text-2xl text-plum-900" data-reveal="right">{t.author.name}</p>
               <Link href={`/${lang}/about`} className="btn btn-ghost mt-6">{t.author.more}</Link>
             </div>
           </div>
@@ -164,15 +164,15 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
             <h2 id="delivery-title" className={h2} data-reveal="left">{t.home.deliveryTitle}</h2>
             <ul className="mt-8 grid gap-5 md:grid-cols-3">
               <li className="surface p-6 sm:p-7" data-reveal="left">
-                <h3 className="text-2xl text-moss-900">{d.sections[0].h}</h3>
+                <h3 className="text-2xl text-plum-900">{d.sections[0].h}</h3>
                 <p className="mt-2 text-ink-soft">{pdfMode === "auto" ? t.faq.pdfAuto : t.faq.pdfManual}</p>
               </li>
               <li className="surface p-6 sm:p-7" data-reveal="up" style={{ ["--reveal-delay" as string]: "90ms" }}>
-                <h3 className="text-2xl text-moss-900">{d.sections[1].h}</h3>
+                <h3 className="text-2xl text-plum-900">{d.sections[1].h}</h3>
                 <p className="mt-2 text-ink-soft">{t.faq.items[8].a[0]} {t.faq.items[8].a[1]}</p>
               </li>
               <li className="surface p-6 sm:p-7" data-reveal="right" style={{ ["--reveal-delay" as string]: "180ms" }}>
-                <h3 className="text-2xl text-moss-900">{d.sections[3].h}</h3>
+                <h3 className="text-2xl text-plum-900">{d.sections[3].h}</h3>
                 <p className="mt-2 text-ink-soft">{payText} {t.faq.items[9].a[2]}</p>
               </li>
             </ul>
