@@ -2,6 +2,31 @@
   "covers": {},
   "spreads": {},
   "hero": {
+    "desktop": {
+      "src": "/media/hero-desktop.mp4",
+      "width": 910,
+      "height": 476,
+      "duration": 7.033333,
+      "sources": [
+        {
+          "src": "/media/hero-desktop.mp4",
+          "type": "video/mp4"
+        },
+        {
+          "src": "/media/hero-desktop.webm",
+          "type": "video/webm"
+        }
+      ],
+      "poster": {
+        "base": "/media/hero-desktop-poster",
+        "width": 910,
+        "height": 476,
+        "widths": [
+          910
+        ]
+      },
+      "first": null
+    },
     "mobile": {
       "src": "/media/hero-mobile.mp4",
       "width": 1214,

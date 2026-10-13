@@ -34,7 +34,9 @@ const LEGACY: HeroVideo = {
 };
 
 export const HERO = {
-  desktop: ex.hero?.desktop ? { ...ex.hero.desktop, type: "video/mp4", focus: "50% 45%", text: "left" as const } : LEGACY,
+  // Комп'ютер (hero-desktop.mp4, 910×476 — надане «Browser hero», знизу обрізано 36 px зі знаком KlingAI):
+  // голови персонажів біля верхнього краю, тож при обрізанні cover зберігаємо верх (20%); текст — ліворуч.
+  desktop: ex.hero?.desktop ? { ...ex.hero.desktop, type: "video/mp4", focus: "50% 20%", text: "left" as const } : LEGACY,
   // Телефон (hero-mobile.mov, 1214×2160): Лілі в центрі, родина йде стежкою; голови у верхній половині кадру,
   // тож назва, вступ і кнопка — внизу, на стежці (text: "bottom"); вузька смужка обрізається порівну з боків.
   mobile: ex.hero?.mobile ? { ...ex.hero.mobile, type: "video/mp4", focus: "50% 30%", text: "bottom" as const } : null,

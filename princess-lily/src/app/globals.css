@@ -229,6 +229,7 @@ details.faq[open] .faq-icon { transform: rotate(45deg); }
   .hero-slogan { font-size: 1rem; margin-top: .3rem; }
   .hero-intro { display: none; }
   .hero-lower { padding: 0 1.3rem; min-width: 0; }
+  .hero-control { left: auto; right: max(1rem, env(safe-area-inset-right)); }
 }
 
 /* Хмаринка: тонкі молочно-перламутрові шари з нерівними розмитими краями (CSS, без растрових файлів) */
