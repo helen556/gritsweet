@@ -92,10 +92,18 @@ type Extra = { covers: Record<string, Partial<Record<Locale, ExtraImg>>>; spread
  *  - книжка-чернетка, яка вперше отримала обкладинку, стає видимою зі статусом «Незабаром»;
  *  - розвороти — лише якщо в книжки ще немає жодного.
  */
+/** Книжка за slug, а для книжок серії — ще й за id (у старих базах адреси могли бути записані інакше). */
+async function findBook<K extends "id" | "status" | "cover_base">(db: Kysely<Database>, slug: string, cols: K[]) {
+  const bySlug = await db.selectFrom("products").select(cols).where("slug", "=", slug).executeTakeFirst();
+  if (bySlug) return bySlug;
+  const id = BOOKS.find((b) => b.slug === slug)?.id;
+  return id ? db.selectFrom("products").select(cols).where("id", "=", id).executeTakeFirst() : undefined;
+}
+
 export async function applyPackagedMedia(db: Kysely<Database>) {
   const ex = extra as unknown as Extra;
   for (const [slug, byLocale] of Object.entries(ex.covers ?? {})) {
-    const p = await db.selectFrom("products").select(["id", "status", "cover_base"]).where("slug", "=", slug).executeTakeFirst();
+    const p = await findBook(db, slug, ["id", "status", "cover_base"]);
     if (!p) { console.warn(`обкладинка для невідомої книжки: ${slug}`); continue; }
     const before = await db.selectFrom("product_translations").select("cover_base").where("product_id", "=", p.id).execute();
     const hadCover = !!p.cover_base || before.some((t) => t.cover_base);
@@ -106,7 +114,7 @@ export async function applyPackagedMedia(db: Kysely<Database>) {
     if (!hadCover && p.status === "draft") await db.updateTable("products").set({ status: "coming_soon" }).where("id", "=", p.id).execute();
   }
   for (const [slug, list] of Object.entries(ex.spreads ?? {})) {
-    const p = await db.selectFrom("products").select("id").where("slug", "=", slug).executeTakeFirst();
+    const p = await findBook(db, slug, ["id"]);
     if (!p) continue;
     const has = await db.selectFrom("product_images").select("id").where("product_id", "=", p.id).executeTakeFirst();
     if (has) continue;

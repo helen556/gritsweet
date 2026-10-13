@@ -262,3 +262,14 @@ describe("catalog: covers, hiding and growth", () => {
     expect(await listPublicSpreads("uk")).toEqual([]);
   });
 });
+
+describe("packaged covers", () => {
+  it("apply by book id when an older database stored a different slug", async () => {
+    const { applyPackagedMedia } = await import("@/db/seed");
+    await db.updateTable("products").set({ slug: "lili-yde-do-likarya" }).where("id", "=", "prd_doctor").execute();
+    await db.updateTable("product_translations").set({ cover_base: null }).where("product_id", "=", "prd_doctor").execute();
+    await applyPackagedMedia(db);
+    const t = await db.selectFrom("product_translations").select(["locale", "cover_base"]).where("product_id", "=", "prd_doctor").orderBy("locale").execute();
+    expect(t).toEqual([{ locale: "en", cover_base: "/media/cover-lili-ide-do-likarya-en" }, { locale: "uk", cover_base: "/media/cover-lili-ide-do-likarya-uk" }]);
+  });
+});
