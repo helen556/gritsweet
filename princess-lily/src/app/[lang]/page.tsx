@@ -116,7 +116,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
               <p className="mt-4 max-w-[52ch] text-lg text-ink-soft" data-reveal="left">{t.home.worldText}</p>
               <p className="mt-6 border-l-2 border-gold pl-5 font-display text-2xl leading-snug text-plum-900" data-reveal="right">{t.series.closing}</p>
             </div>
-            {/* ілюстрація в легкій шавлієвій хмаринці: краї кадру розчиняються в зелений градієнт, без жорстких меж */}
+            {/* ілюстрація в легкій пудрово-рожевій хмаринці: краї кадру розчиняються в м'який рожевий градієнт, без жорстких меж */}
             <figure className="world-cloud relative lg:order-1" data-reveal="left">
               <span className="world-cloud__bg" aria-hidden="true"><i /><i /><i /><i /></span>
               <Picture base="/media/characters-lineup" widths={lu.widths} width={lu.width} height={lu.height} alt={t.series.lineupAlt}
