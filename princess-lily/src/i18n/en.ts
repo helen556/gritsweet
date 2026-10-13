@@ -127,6 +127,9 @@ const en: Dict = {
     pdfQtyNote: "One copy per PDF in an order.",
     unavailable: "Some items are no longer available and were removed from your cart.",
     loading: "Updating cart…",
+    moreTitle: "Maybe one more little book?",
+    moreText: "Lily has other adventures too — pick one more story for cosy evenings together.",
+    moreCta: "Add one more story",
   },
   checkout: {
     title: "Checkout",

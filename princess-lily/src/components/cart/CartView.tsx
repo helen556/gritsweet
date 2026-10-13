@@ -44,10 +44,22 @@ export default function CartView({ lang, t }: { lang: "uk" | "en"; t: Pick<Dict,
               </li>
             ))}
           </ul>
-          <div className="mt-6 flex flex-col items-end gap-2">
-            <p className="text-lg">{t.cart.subtotal}: <strong>{formatMinor(quote!.totalMinor, lang)}</strong></p>
-            {quote!.shippingRequired && <p className="text-sm text-ink-soft">{t.cart.shippingNote}</p>}
-            <Link href={`/${lang}/checkout`} className="btn btn-primary mt-4">{t.cart.checkout}</Link>
+          <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+            {/* «Додати ще»: повернення до списку книжок — з ростом каталогу стане ще доречнішим */}
+            <div className="cart-more relative order-2 overflow-hidden rounded-[1.5rem] p-5 sm:p-6 md:order-1">
+              <span className="cart-more__star" aria-hidden="true" />
+              <p className="font-display text-2xl text-moss-900">{t.cart.moreTitle}</p>
+              <p className="mt-1 max-w-md text-ink-soft">{t.cart.moreText}</p>
+              <Link href={`/${lang}/books`} className="btn cart-more__btn mt-4">
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                {t.cart.moreCta}
+              </Link>
+            </div>
+            <div className="order-1 flex flex-col items-end gap-2 md:order-2">
+              <p className="text-lg">{t.cart.subtotal}: <strong>{formatMinor(quote!.totalMinor, lang)}</strong></p>
+              {quote!.shippingRequired && <p className="text-sm text-ink-soft">{t.cart.shippingNote}</p>}
+              <Link href={`/${lang}/checkout`} className="btn btn-primary mt-4">{t.cart.checkout}</Link>
+            </div>
           </div>
         </>
       )}

@@ -432,3 +432,16 @@ html.js.intro-play .hero-sparkles i:nth-child(5) { animation-delay: 1.55s; }
 .world-title__flourish { display: block; width: min(16rem, 60%); height: 14px; margin: .9rem auto 0;
   background: radial-gradient(closest-side, #e2bd73 0 3px, transparent 4px) center / 14px 14px no-repeat,
     linear-gradient(90deg, transparent, rgba(185, 138, 62, .55) 30%, transparent 46%, transparent 54%, rgba(185, 138, 62, .55) 70%, transparent) center / 100% 1px no-repeat; }
+
+/* Кошик: «Можливо, ще одну книжечку?» — м'яка шавлієва хмаринка з зірочкою */
+.cart-more { background:
+  radial-gradient(ellipse 60% 80% at 100% 0%, rgba(255, 248, 230, .95), rgba(255, 248, 230, 0) 70%),
+  linear-gradient(150deg, rgba(232, 238, 225, .95), rgba(244, 241, 231, .9));
+  border: 1px solid rgba(255, 255, 255, .9); box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 14px 30px -22px rgba(38, 61, 45, .35); }
+.cart-more__star { position: absolute; right: 1.1rem; top: 1rem; width: 26px; height: 26px;
+  background: radial-gradient(closest-side, #fff7e6, rgba(226, 189, 115, .9) 45%, rgba(226, 189, 115, 0));
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); }
+@media (prefers-reduced-motion: no-preference) { .cart-more__star { animation: star-twinkle 3.6s ease-in-out infinite; } }
+.cart-more__btn { gap: .5rem; background: #fffdf7; color: var(--color-moss-900); border: 1px solid rgba(185, 138, 62, .45);
+  box-shadow: 0 8px 18px -12px rgba(38, 61, 45, .45); }
+.cart-more__btn:hover { background: #fff8e8; border-color: rgba(185, 138, 62, .8); }
