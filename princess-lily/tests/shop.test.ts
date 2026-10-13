@@ -324,3 +324,16 @@ describe("PDF without an uploaded file", () => {
     expect(await db.selectFrom("email_deliveries").select("id").where("order_id", "=", o.id).execute()).toHaveLength(0);
   });
 });
+
+describe("PDF delivery channel", () => {
+  it("stores Telegram as the PDF channel (only for orders with a PDF)", async () => {
+    const r = await createOrder(baseCheckout({ pdfChannel: "telegram", telegram: "@lily_reader" }), 25000);
+    if (!r.ok) throw new Error("order not created");
+    const o = await db.selectFrom("orders").select(["pdf_channel", "telegram"]).where("id", "=", r.orderId).executeTakeFirstOrThrow();
+    expect(o).toEqual({ pdf_channel: "telegram", telegram: "@lily_reader" });
+    const r2 = await createOrder(baseCheckout({ lines: [{ variantId: "v_print", quantity: 1 }], phone: "+380501234567", npCity: "Київ", npPoint: "1", pdfChannel: "telegram", telegram: "@x_reader" }), 45050);
+    if (!r2.ok) throw new Error("order not created");
+    const o2 = await db.selectFrom("orders").select(["pdf_channel", "telegram"]).where("id", "=", r2.orderId).executeTakeFirstOrThrow();
+    expect(o2).toEqual({ pdf_channel: null, telegram: null });
+  });
+});

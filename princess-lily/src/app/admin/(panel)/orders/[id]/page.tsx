@@ -50,6 +50,7 @@ export default async function OrderAdmin({ params }: PageProps<"/admin/orders/[i
             {o.payment_checked_by && <span className="block text-sm">Перевірено: {o.payment_checked_by}{o.payment_checked_at ? `, ${kyiv(o.payment_checked_at)}` : ""}</span>}
             {o.provider_receipt_url && <a className="block text-sm underline" href={o.provider_receipt_url} target="_blank" rel="noopener noreferrer">Квитанція провайдера ↗</a>}</dd>
           {digital && (<><dt className="text-ink-soft">Видача PDF</dt><dd>{FS[digital.status] ?? digital.status}</dd></>)}
+          {o.pdf_channel && (<><dt className="text-ink-soft">Куди надіслати PDF</dt><dd>{o.pdf_channel === "telegram" ? <>Telegram: <strong>{o.telegram}</strong></> : <>Email: {o.email}</>}</dd></>)}
           {shipping && (<><dt className="text-ink-soft">Доставка</dt><dd>{FS[shipping.status] ?? shipping.status}{shipping.ttn && ` · ТТН ${shipping.ttn}`}<br /><span className="text-ink-soft">{o.np_city}, {o.np_point}</span></dd></>)}
           {o.customer_note && (<><dt className="text-ink-soft">Коментар</dt><dd className="whitespace-pre-wrap">{o.customer_note}</dd></>)}
         </dl>
@@ -84,7 +85,11 @@ export default async function OrderAdmin({ params }: PageProps<"/admin/orders/[i
           <section className="card p-5">
             <h2 className="text-2xl">Електронна книжка</h2>
             {digital.status === "manual" ? (<>
-              <p className="mt-2 rounded-xl bg-cream px-4 py-3">PDF-файлу цієї книжки ще немає на сайті. Надішліть книжку покупцю на <a className="font-semibold underline" href={`mailto:${o.email}`}>{o.email}</a> зі своєї пошти, а потім натисніть кнопку нижче.</p>
+              <p className="mt-2 rounded-xl bg-cream px-4 py-3">PDF-файлу цієї книжки ще немає на сайті. {o.pdf_channel === "telegram" && o.telegram
+                ? <>Покупець просить надіслати книжку <strong>у Telegram</strong>: {/^@?[A-Za-z]/.test(o.telegram)
+                  ? <a className="font-semibold underline" href={`https://t.me/${o.telegram.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer">@{o.telegram.replace(/^@/, "")}</a>
+                  : <strong>{o.telegram}</strong>}.</>
+                : <>Надішліть книжку покупцю на <a className="font-semibold underline" href={`mailto:${o.email}`}>{o.email}</a> зі своєї пошти.</>} Потім натисніть кнопку нижче.</p>
               <ActionForm action={markPdfSentAction} submit="PDF надіслано" className="mt-3"><input type="hidden" name="id" value={o.id} /></ActionForm>
             </>) : (<>
               <ActionForm action={resendPdfAction} submit="Надіслати лист із PDF повторно" className="mt-3"><input type="hidden" name="id" value={o.id} /></ActionForm>

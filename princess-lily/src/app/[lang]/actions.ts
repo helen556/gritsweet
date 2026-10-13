@@ -38,6 +38,8 @@ const checkoutSchema = z.object({
   npPoint: z.string().trim().max(300).optional().default(""),
   npPointRef: z.string().trim().max(64).optional().default(""),
   note: z.string().trim().max(1000).optional().default(""),
+  pdfChannel: z.enum(["email", "telegram"]).optional().default("email"),
+  telegram: z.string().trim().max(64).optional().default(""),
   website: z.string().max(0).optional().default(""), // honeypot
 });
 export type CheckoutPayload = z.input<typeof checkoutSchema>;
@@ -53,6 +55,9 @@ export async function placeOrder(payload: CheckoutPayload): Promise<CheckoutResu
   if (!(await rateLimit("checkout", 8, 600))) return { ok: false, error: "rate" };
   const phoneOk = /^\+?[\d\s()-]{9,20}$/.test(d.phone);
   const q = await quoteCart(d.lines, d.lang);
+  // PDF у Telegram — потрібен нік (@…) або номер телефону
+  const TG = /^@?[A-Za-z][A-Za-z0-9_]{3,31}$|^\+?[\d\s()-]{9,20}$/;
+  if (q.lines.some((l) => l.format === "pdf") && d.pdfChannel === "telegram" && !TG.test(d.telegram)) return { ok: false, error: "invalid", fields: ["telegram"] };
   if (q.shippingRequired) {
     const recOk = !d.otherRecipient || (d.recipientFirstName && d.recipientLastName && /^\+?[\d\s()-]{9,20}$/.test(d.recipientPhone));
     const missing = [!phoneOk && "phone", !d.npCity && "npCity", !d.npPoint && "npPoint", !recOk && "recipient"].filter(Boolean) as string[];
@@ -63,6 +68,7 @@ export async function placeOrder(payload: CheckoutPayload): Promise<CheckoutResu
     recipient: d.otherRecipient ? { firstName: d.recipientFirstName, lastName: d.recipientLastName, phone: d.recipientPhone } : null,
     npCity: d.npCity || null, npCityRef: d.npCityRef || null, npPoint: d.npPoint || null, npPointRef: d.npPointRef || null,
     note: d.note || null, siteLocale: d.lang, idempotencyKey: d.idempotencyKey,
+    pdfChannel: d.pdfChannel, telegram: d.pdfChannel === "telegram" ? d.telegram : null,
   }, d.expectedTotalMinor);
   if (!r.ok) return { ok: false, error: r.error };
   if (r.duplicate || !r.accessToken) return { ok: false, error: "duplicate" };

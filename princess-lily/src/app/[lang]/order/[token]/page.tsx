@@ -37,7 +37,7 @@ export default async function OrderPage({ params }: PageProps<"/[lang]/order/[to
           </span>
           <h1 id="thanks-h" className="mt-5 text-4xl text-moss-900 sm:text-5xl">{t.order.thanksTitle}</h1>
           <p className="mx-auto mt-4 max-w-xl text-lg">{st === "paid" ? t.order.thanksPaid : t.order.thanksReceived}</p>
-          {st !== "paid" && <p className="mx-auto mt-2 max-w-xl text-ink-soft">{d.shipping ? t.order.thanksNextPrint : t.order.thanksNextPdf}</p>}
+          {st !== "paid" && <p className="mx-auto mt-2 max-w-xl text-ink-soft">{d.shipping ? t.order.thanksNextPrint : o.pdf_channel === "telegram" ? t.order.thanksNextPdfTg : t.order.thanksNextPdf}</p>}
           <p className="mx-auto mt-6 max-w-lg font-display text-xl leading-snug text-moss-900">{t.order.thanksWish}</p>
         </section>
       )}
@@ -47,7 +47,7 @@ export default async function OrderPage({ params }: PageProps<"/[lang]/order/[to
         <dl className="grid gap-4 sm:grid-cols-[12rem_1fr]">
           <dt className="text-ink-soft">{t.order.payment}</dt>
           <dd><span className={`inline-flex rounded-full px-3 py-1 font-semibold ${tone}`}>{t.order.status[st]}</span></dd>
-          {d.digital && (<><dt className="text-ink-soft">{t.order.digital}</dt><dd>{t.order.digitalStatus[d.digital.status] ?? d.digital.status}</dd></>)}
+          {d.digital && (<><dt className="text-ink-soft">{t.order.digital}</dt><dd>{d.digital.status === "manual" ? (o.pdf_channel === "telegram" ? t.order.digitalStatus.manualTelegram : t.order.digitalStatus.manualEmail) : (t.order.digitalStatus[d.digital.status] ?? d.digital.status)}</dd></>)}
           {d.shipping && (<>
             <dt className="text-ink-soft">{t.order.delivery}</dt>
             <dd>{t.order.shippingStatus[d.shipping.status] ?? d.shipping.status}{o.np_city && <span className="block text-sm text-ink-soft">{o.np_city}, {o.np_point}</span>}</dd>

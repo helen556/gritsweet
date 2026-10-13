@@ -14,6 +14,7 @@ type T = Pick<Dict, "checkout" | "cart" | "formats" | "bookLocales">;
 export default function CheckoutForm({ lang, t, npMode, direct }: { lang: "uk" | "en"; t: T; npMode: "api" | "manual"; direct?: CartLine[] | null }) {
   const { quote, cart, lines, ready } = useQuote(lang, direct);
   const [otherRecipient, setOtherRecipient] = useState(false);
+  const [pdfChannel, setPdfChannel] = useState<"email" | "telegram">("email");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<string[]>([]);
@@ -26,6 +27,7 @@ export default function CheckoutForm({ lang, t, npMode, direct }: { lang: "uk" |
     <div className="card mt-8 p-8 text-center"><p className="text-ink-soft">{t.cart.empty}</p><Link href={`/${lang}/books`} className="btn btn-primary mt-6">{t.cart.emptyCta}</Link></div>
   );
   const ship = quote.shippingRequired;
+  const hasPdf = quote.lines.some((l) => l.format === "pdf");
 
   async function onSubmit(ev: React.FormEvent<HTMLFormElement>) {
     ev.preventDefault();
@@ -36,6 +38,7 @@ export default function CheckoutForm({ lang, t, npMode, direct }: { lang: "uk" |
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(get("email").trim())) local.push("email");
     if (!get("firstName").trim()) local.push("firstName");
     if (!get("lastName").trim()) local.push("lastName");
+    if (hasPdf && pdfChannel === "telegram" && !/^@?[A-Za-z][A-Za-z0-9_]{3,31}$|^\+?[\d\s()-]{9,20}$/.test(get("telegram").trim())) local.push("telegram");
     if (ship) {
       if (!/^\+?[\d\s()-]{9,20}$/.test(get("phone").trim())) local.push("phone");
       if (!get("npCity").trim()) local.push("npCity");
@@ -51,6 +54,7 @@ export default function CheckoutForm({ lang, t, npMode, direct }: { lang: "uk" |
       email: get("email"), firstName: get("firstName"), lastName: get("lastName"), phone: get("phone"),
       otherRecipient: ship && otherRecipient, recipientFirstName: get("recipientFirstName"), recipientLastName: get("recipientLastName"), recipientPhone: get("recipientPhone"), npCity: get("npCity"), npCityRef: get("npCityRef"),
       npPoint: get("npPoint"), npPointRef: get("npPointRef"), note: get("note"), website: get("website"),
+      pdfChannel: hasPdf ? pdfChannel : "email", telegram: hasPdf && pdfChannel === "telegram" ? get("telegram") : "",
     }).catch(() => ({ ok: false as const, error: "generic" }));
     // «Купити зараз» не чіпає кошик; оформлення кошика — очищає його
     if (r.ok) { if (!direct) cart.clear(); window.location.assign(r.redirect); return; }
@@ -81,6 +85,21 @@ export default function CheckoutForm({ lang, t, npMode, direct }: { lang: "uk" |
             <div className="field"><label htmlFor="phone">{t.checkout.phone}</label>
               <input id="phone" name="phone" type="tel" autoComplete="tel" inputMode="tel" required className="input" {...inv("phone")} />
               <p className="hint">{t.checkout.phoneHint}</p>{fe("phone", e.phone)}</div>
+          )}
+          {hasPdf && (
+            <fieldset className="clear-both">
+              <legend className="mb-2 font-semibold">{t.checkout.pdfWhere}</legend>
+              <div className="flex flex-wrap gap-2">
+                {(["email", "telegram"] as const).map((c) => (
+                  <label key={c} className="chip"><input className="sr-only" type="radio" name="pdfChannel" value={c} checked={pdfChannel === c} onChange={() => setPdfChannel(c)} />{c === "email" ? t.checkout.pdfByEmail : t.checkout.pdfByTelegram}</label>
+                ))}
+              </div>
+              {pdfChannel === "telegram" && (
+                <div className="field mt-4"><label htmlFor="telegram">{t.checkout.telegram}</label>
+                  <input id="telegram" name="telegram" autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="@" required className="input" {...inv("telegram")} />
+                  <p className="hint">{t.checkout.telegramHint}</p>{fe("telegram", e.telegram)}</div>
+              )}
+            </fieldset>
           )}
           <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="absolute left-[-9999px] h-px w-px opacity-0" />
         </fieldset>

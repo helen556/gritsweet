@@ -88,6 +88,10 @@ export interface OrdersTable {
   email: string;
   name: string;
   phone: string | null;
+  /** Куди надіслати PDF: email або Telegram (null — у замовленні немає PDF) */
+  pdf_channel: "email" | "telegram" | null;
+  /** Telegram покупця (@нік або номер), якщо PDF — у Telegram */
+  telegram: string | null;
   site_locale: Locale;
   payment_status: PaymentStatus;
   payment_mode: string;

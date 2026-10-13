@@ -25,7 +25,7 @@ await p.locator("label.chip", { hasText: "Українська" }).click();
 await p.locator("label.chip", { hasText: "Друкована книга" }).click();
 await p.getByRole("button", { name: "Купити зараз" }).click();
 await p.waitForURL(/checkout/);
-await p.getByLabel("Email").fill("parent@example.com");
+await p.getByLabel("Email", { exact: true }).fill("parent@example.com");
 await p.getByLabel("Ім’я", { exact: true }).fill("Олена");
 await p.getByLabel("Прізвище", { exact: true }).fill("Тестова");
 await p.getByLabel("Телефон").fill("+380 50 123 45 67");
@@ -40,7 +40,7 @@ check("покупець: квитанція → «Дякуємо за покуп
 
 // ---------- Вхід ----------
 await p.goto(`${BASE}/admin/login`);
-await p.getByLabel("Email").fill(EMAIL);
+await p.getByLabel("Email", { exact: true }).fill(EMAIL);
 await p.getByLabel("Пароль").fill(PASS);
 await p.getByRole("button", { name: "Увійти" }).click();
 await p.waitForURL(`${BASE}/admin`, { timeout: 60000 });
@@ -95,9 +95,11 @@ check("експорт PDF", pd.status() === 200 && (await pd.body()).subarray(0,
   await b2.locator("label.chip", { hasText: "Електронна книга (PDF)" }).click();
   await b2.getByRole("button", { name: "Купити зараз" }).click();
   await b2.waitForURL(/checkout/);
-  await b2.getByLabel("Email").fill("pdf-buyer@example.com");
+  await b2.getByLabel("Email", { exact: true }).fill("pdf-buyer@example.com");
   await b2.getByLabel("Ім’я", { exact: true }).fill("Ірина");
   await b2.getByLabel("Прізвище", { exact: true }).fill("Читачка");
+  await b2.locator("label.chip", { hasText: "У Telegram" }).click();
+  await b2.getByLabel("Ваш Telegram").fill("@lily_reader");
   await b2.locator("form button[type=submit], form button:not([type])").last().click();
   await b2.waitForURL(/order\//, { timeout: 30000 });
   await b2.setInputFiles("input[type=file]", "assets-src/covers/lili-ide-do-likarya-uk.png");
@@ -110,7 +112,7 @@ check("експорт PDF", pd.status() === 200 && (await pd.body()).subarray(0,
   await p.getByLabel(/Я звірив\(ла\) суму/).check();
   await p.getByRole("button", { name: "Оплату звірено — підтвердити" }).click();
   await p.getByRole("button", { name: "PDF надіслано" }).waitFor({ timeout: 20000 });
-  check("адмінка: PDF без файлу → підказка надіслати вручну", (await p.locator("main").innerText()).includes("pdf-buyer@example.com"));
+  check("адмінка: PDF без файлу → надіслати вручну в Telegram покупця", (await p.locator("main").innerText()).includes("у Telegram") && (await p.locator("a[href='https://t.me/lily_reader']").count()) > 0);
   await p.getByRole("button", { name: "PDF надіслано" }).click();
   check("позначка «PDF надіслано»", await p.getByText("Позначено: PDF надіслано").waitFor({ timeout: 20000 }).then(() => true, () => false));
 }

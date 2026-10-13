@@ -100,6 +100,7 @@ export async function notifyNewOrder(orderId: string) {
     ...items.map((i) => `• ${escapeHtml(i.title_snapshot)} — ${FORMAT[i.format]}, ${i.book_locale === "uk" ? "укр." : "англ."} × ${i.quantity}`),
     `💳 ${formatMinor(o.total_minor, "uk")}${o.shipping_required ? " + доставка за тарифами НП" : ""}`,
     `📦 ${kind}${o.shipping_required ? ` · НП: ${escapeHtml(o.np_city ?? "")}` : ""}`,
+    ...(o.pdf_channel ? [`📨 PDF: ${o.pdf_channel === "telegram" ? `у Telegram ${escapeHtml(o.telegram ?? "")}` : `на email ${escapeHtml(o.email)}`}`] : []),
     `Оплата: ${o.payment_status === "paid" ? "оплачено" : "очікує оплату (НЕ підтверджено)"}`,
     `🔐 ${appUrl()}/admin/orders/${o.id}`,
   ].join("\n");

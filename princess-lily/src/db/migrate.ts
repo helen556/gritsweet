@@ -264,6 +264,9 @@ export async function migrate(db: Kysely<Database>) {
     .execute();
   await idx("product_images_product", "product_images", ["product_id", "sort_order"]);
 
+  // ---- v6: куди надіслати PDF (email або Telegram) ----
+  await addColumns(db, "orders", [["pdf_channel", "text"], ["telegram", "text"]]);
+
   // ---- v4: запасне приватне сховище файлів у самій БД (квитанції; base64, до ~4 МБ на файл) ----
   await t("private_files")
     .addColumn("key", "text", (c) => c.primaryKey())

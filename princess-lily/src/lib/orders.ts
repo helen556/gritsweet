@@ -15,6 +15,8 @@ export type CheckoutInput = {
   recipient?: { firstName: string; lastName: string; phone: string } | null;
   npCity: string | null; npCityRef: string | null; npPoint: string | null; npPointRef: string | null;
   note: string | null; siteLocale: Locale; idempotencyKey: string;
+  /** Куди надіслати PDF (для замовлень з PDF) */
+  pdfChannel?: "email" | "telegram"; telegram?: string | null;
 };
 export type CreateOrderResult =
   | { ok: true; orderId: string; accessToken: string | null; duplicate: boolean }
@@ -86,10 +88,12 @@ export async function createOrder(input: CheckoutInput, expectedTotalMinor?: num
       id: orderId, number, access_token_hash: sha256(token), idempotency_key: input.idempotencyKey,
       email: input.email, name: `${input.firstName} ${input.lastName}`.trim(), first_name: input.firstName, last_name: input.lastName,
       phone: input.phone, site_locale: input.siteLocale,
+      pdf_channel: q.lines.some((l) => l.format === "pdf") ? (input.pdfChannel ?? "email") : null,
+      telegram: q.lines.some((l) => l.format === "pdf") && input.pdfChannel === "telegram" ? input.telegram?.trim() || null : null,
       recipient_first_name: q.shippingRequired ? input.recipient?.firstName ?? null : null,
       recipient_last_name: q.shippingRequired ? input.recipient?.lastName ?? null : null,
       recipient_phone: q.shippingRequired ? input.recipient?.phone ?? null : null,
-      search_text: [number, input.firstName, input.lastName, input.email, input.phone?.replace(/\D/g, ""), input.recipient?.firstName, input.recipient?.lastName, input.recipient?.phone?.replace(/\D/g, "")]
+      search_text: [number, input.firstName, input.lastName, input.email, input.phone?.replace(/\D/g, ""), input.telegram?.replace(/^@/, ""), input.recipient?.firstName, input.recipient?.lastName, input.recipient?.phone?.replace(/\D/g, "")]
         .filter(Boolean).join(" ").toLowerCase(),
       order_status: "new", payment_method: mode === "manual_link" ? "manual_link" : adapterId,
       payment_status: "pending_payment", payment_mode: mode, payment_provider: adapterId,

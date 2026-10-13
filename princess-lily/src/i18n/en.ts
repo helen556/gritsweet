@@ -92,7 +92,7 @@ const en: Dict = {
       { q: "Will there be more Princess Lily Stories?", a: ["Absolutely! Princess Lily has many more adventures ahead of her.", "Upcoming stories will explore friendship, emotions, independence, and other important moments of growing up.", "Stay tuned for new releases and more heartwarming adventures!"] },
     ],
     pdfAuto: "Once your payment is successful, the PDF file will automatically be sent to your email.",
-    pdfManual: "Once your payment is confirmed, we’ll email you a link to download the PDF.",
+    pdfManual: "Once your payment is confirmed, we’ll send you the PDF by email or on Telegram — whichever you choose at checkout.",
     returnsLink: "For more information, please visit our Returns and Exchanges page.",
   },
   catalog: {
@@ -111,7 +111,7 @@ const en: Dict = {
     comingSoon: "Coming soon",
     comingSoonNote: "This book is being prepared for sale. Price and availability will appear here once everything is ready.",
     descriptionPending: "A description of this book is coming soon.",
-    inStock: "In stock", outOfStock: "Temporarily out of stock", digital: "Digital, delivered by email", pdfHint: "The PDF is easy to read on a phone, tablet or computer. We’ll email you the book once the payment is confirmed.", cardPdf: "PDF", cardPrint: "printed",
+    inStock: "In stock", outOfStock: "Temporarily out of stock", digital: "Digital, delivered by email", pdfHint: "The PDF is easy to read on a phone, tablet or computer. Once the payment is confirmed we’ll send the book by email or on Telegram — whichever you prefer.", cardPdf: "PDF", cardPrint: "printed",
     add: "Add to cart", added: "Added to cart", goCart: "Go to cart", buyNow: "Buy now", inCart: "In cart",
     chooseVariant: "Choose the book language and format",
     originalTitleNote: "Original Ukrainian title. An English edition of this book has not been announced yet.",
@@ -130,7 +130,9 @@ const en: Dict = {
   },
   checkout: {
     title: "Checkout",
-    contact: "Contact details", email: "Email", emailHint: "We’ll send the confirmation here and, for PDFs, the download link.",
+    contact: "Contact details", email: "Email", emailHint: "We’ll send the order confirmation here.",
+    pdfWhere: "Where should we send the PDF?", pdfByEmail: "By email", pdfByTelegram: "On Telegram",
+    telegram: "Your Telegram", telegramHint: "@username or the phone number linked to Telegram.",
     firstName: "First name",
     lastName: "Last name",
     otherRecipient: "The recipient is someone else",
@@ -150,7 +152,7 @@ const en: Dict = {
     submit: "Continue to payment", submitting: "Creating your order…",
     consent: "By continuing you agree to the public offer terms and the privacy policy.",
     errors: {
-      lastName: "Please enter your last name.", recipient: "Please fill in the recipient’s details.",
+      lastName: "Please enter your last name.", recipient: "Please fill in the recipient’s details.", telegram: "Please enter your Telegram @username or phone number.",
       email: "Please enter a valid email.", name: "Please enter your name.", phone: "Please enter a phone number.",
       city: "Please enter a city or town.", point: "Please enter a branch or parcel locker.",
       empty: "Your cart is empty.", unavailable: "Some books are no longer available. Please check your cart.",
@@ -166,7 +168,7 @@ const en: Dict = {
       pending_payment: "Awaiting payment", pending_verification: "Checking your payment", paid: "Paid", failed: "Payment failed", cancelled: "Cancelled",
     },
     digitalStatus: {
-      awaiting_payment: "Will be sent once payment is confirmed", manual: "We’ll email you the book shortly", ready: "Preparing your email", sent: "Download link sent to your email", email_failed: "We couldn’t send the email yet — we’ll retry", email_not_configured: "We’ll send your link shortly",
+      awaiting_payment: "Will be sent once payment is confirmed", manual: "We’ll send you the book shortly", manualEmail: "We’ll email you the book shortly", manualTelegram: "We’ll send you the book on Telegram shortly", ready: "Preparing your email", sent: "Download link sent to your email", email_failed: "We couldn’t send the email yet — we’ll retry", email_not_configured: "We’ll send your link shortly",
     },
     shippingStatus: {
       awaiting_payment: "Ships once payment is confirmed", to_ship: "Preparing for dispatch (1–3 business days)", shipped: "Shipped", delivered: "Delivered", cancelled: "Cancelled",
@@ -183,7 +185,8 @@ const en: Dict = {
     thanksReceived: "We’ve got your receipt. We’ll check the payment and confirm your order.",
     thanksPaid: "Payment confirmed — your order is on its way.",
     thanksNextPrint: "We’ll send the book by Nova Poshta within 1–3 working days after the payment is confirmed. The tracking number will appear on this page.",
-    thanksNextPdf: "We’ll email you the link to the digital book as soon as the payment is confirmed.",
+    thanksNextPdf: "We’ll email you the digital book as soon as the payment is confirmed.",
+    thanksNextPdfTg: "We’ll send you the digital book on Telegram as soon as the payment is confirmed.",
     thanksWish: "May Lily’s stories bring you warm moments together and help your little one with their own small big steps.",
     thanksAddMore: "Add another file",
     providerWaiting: "Waiting for confirmation from the payment provider. The status updates automatically — you can refresh this page.",
