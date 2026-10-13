@@ -7,6 +7,7 @@ import { getSettings } from "@/lib/settings";
 import { formatMinor } from "@/lib/money";
 import CopyAmount from "@/components/CopyAmount";
 import ReceiptUpload from "@/components/ReceiptUpload";
+import { db } from "@/db";
 
 export const metadata: Metadata = { robots: { index: false, follow: false }, referrer: "no-referrer" };
 
@@ -22,10 +23,25 @@ export default async function OrderPage({ params }: PageProps<"/[lang]/order/[to
   const st = o.payment_status;
   const tone = st === "paid" ? "bg-moss-100 text-moss-900" : st === "failed" || st === "cancelled" ? "bg-rose-100 text-[#7d2d2a]" : "bg-cream text-ink";
   const note = lang === "uk" ? s.payment_link_note_uk : s.payment_link_note_en;
+  const receipts = Number((await db.selectFrom("receipts").select(({ fn }) => fn.countAll<number>().as("n")).where("order_id", "=", o.id).executeTakeFirst())?.n ?? 0);
+  // Фінальний екран: квитанцію отримано (ручна оплата) або оплату вже підтверджено
+  const thanks = st === "paid" || (o.payment_mode === "manual_link" && st === "pending_verification" && receipts > 0);
+  const receiptT = { title: t.order.receiptTitle, hint: t.order.receiptHint, upload: t.order.receiptUpload, ok: t.order.receiptOk, err: t.order.receiptErr, errSize: t.order.receiptErrSize, errType: t.order.receiptErrType, busy: t.order.receiptBusy };
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
-      <h1 className="text-5xl text-moss-900">{t.order.title} {o.number}</h1>
+      {thanks && (
+        <section className="thanks card relative mb-8 overflow-hidden p-7 text-center sm:p-10" aria-labelledby="thanks-h">
+          <span className="thanks__badge mx-auto grid h-20 w-20 place-items-center rounded-full" aria-hidden="true">
+            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.2 4.2L19 7" /></svg>
+          </span>
+          <h1 id="thanks-h" className="mt-5 text-4xl text-moss-900 sm:text-5xl">{t.order.thanksTitle}</h1>
+          <p className="mx-auto mt-4 max-w-xl text-lg">{st === "paid" ? t.order.thanksPaid : t.order.thanksReceived}</p>
+          {st !== "paid" && <p className="mx-auto mt-2 max-w-xl text-ink-soft">{d.shipping ? t.order.thanksNextPrint : t.order.thanksNextPdf}</p>}
+          <p className="mx-auto mt-6 max-w-lg font-display text-xl leading-snug text-moss-900">{t.order.thanksWish}</p>
+        </section>
+      )}
+      {thanks ? <h2 className="text-3xl text-moss-900">{t.order.title} {o.number}</h2> : <h1 className="text-5xl text-moss-900">{t.order.title} {o.number}</h1>}
       <p className="mt-2 text-sm text-ink-soft">{t.order.keepLink}</p>
       <div className="card mt-8 p-6 sm:p-8" aria-live="polite">
         <dl className="grid gap-4 sm:grid-cols-[12rem_1fr]">
@@ -54,9 +70,14 @@ export default async function OrderPage({ params }: PageProps<"/[lang]/order/[to
             </div>
           </div>
         )}
-        {st === "pending_verification" && o.payment_mode === "manual_link" && <p className="mt-6 text-ink-soft">{t.order.claimNote}</p>}
-        {o.payment_mode === "manual_link" && (st === "pending_payment" || st === "pending_verification") && (
-          <ReceiptUpload token={token} done={st === "pending_verification"} t={{ title: t.order.receiptTitle, hint: t.order.receiptHint, upload: t.order.receiptUpload, ok: t.order.receiptOk, err: t.order.receiptErr, errSize: t.order.receiptErrSize, errType: t.order.receiptErrType, busy: t.order.receiptBusy }} />
+        {o.payment_mode === "manual_link" && !thanks && (st === "pending_payment" || st === "pending_verification") && (
+          <ReceiptUpload token={token} done={false} t={receiptT} />
+        )}
+        {o.payment_mode === "manual_link" && thanks && st === "pending_verification" && (
+          <details className="mt-6 text-sm">
+            <summary className="cursor-pointer text-ink-soft underline decoration-gold underline-offset-4">{t.order.thanksAddMore}</summary>
+            <ReceiptUpload token={token} done={false} t={receiptT} />
+          </details>
         )}
         {st === "pending_payment" && o.payment_mode === "provider" && (
           <div className="mt-6"><p className="text-ink-soft">{t.order.providerWaiting}</p>

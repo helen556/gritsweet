@@ -389,3 +389,15 @@ html.js.intro-play .hero-sparkles i:nth-child(5) { animation-delay: 1.55s; }
 .soon-art__spark:nth-of-type(1) { left: 14%; top: 16%; }
 .soon-art__spark:nth-of-type(2) { right: 13%; top: 26%; width: 10px; height: 10px; }
 .soon-art__spark:nth-of-type(3) { right: 22%; bottom: 14%; width: 12px; height: 12px; }
+
+/* Фінальний екран замовлення: «Дякуємо за покупку!» */
+.thanks { background:
+  radial-gradient(ellipse 70% 60% at 50% 0%, rgba(214, 228, 204, .75), rgba(214, 228, 204, 0) 70%),
+  linear-gradient(170deg, rgba(255, 254, 250, .95), rgba(250, 246, 236, .85)); }
+.thanks__badge { color: var(--color-moss-900);
+  background: radial-gradient(circle at 35% 30%, #fffdf6, #dfe9d6 70%);
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, .8), 0 0 0 7px rgba(211, 169, 92, .45), 0 18px 30px -18px rgba(38, 61, 45, .5); }
+@media (prefers-reduced-motion: no-preference) {
+  .thanks__badge { animation: thanks-pop .6s var(--ease-soft) both; }
+  @keyframes thanks-pop { from { transform: scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
+}
