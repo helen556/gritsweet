@@ -36,7 +36,7 @@ const en: Dict = {
   },
   home: {
     catalogTitle: "The books", catalogLead: "Every book comes in Ukrainian and English, as a digital (PDF) or printed edition.",
-    worldKicker: "Lily’s world", worldTitle: "Meet Lily",
+    worldKicker: "Lily’s world", worldTitle: "Meet Lily!", worldText: "A little princess who is growing, exploring the world, asking endless questions, and learning how to handle new experiences.",
     insideTitle: "Inside the book", insideHint: "Tap to enlarge", close: "Close",
     deliveryTitle: "Delivery & payment", deliveryMore: "More about delivery and payment", booksKicker: "About the books", soonCard: "New stories are coming soon", booksPhotoAlt: "Princess Lily Stories books on a wooden table",
   },

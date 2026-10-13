@@ -414,3 +414,21 @@ html.js.intro-play .hero-sparkles i:nth-child(5) { animation-delay: 1.55s; }
   .hero:not(.hero--playing-by-user) .hero-video { opacity: 0; }
   .hero:not(.hero--playing-by-user) .hero-still { opacity: 1; }
 }
+
+/* Пункти «Без страху та примусу…»: мальована зірочка, що м'яко з'являється й час від часу мерехтить */
+.benefit { position: relative; padding-left: 2.1rem; }
+.benefit__star { position: absolute; left: 0; top: .15rem; fill: #e2bd73; stroke: #b98a3e; stroke-width: .8; stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px rgba(226, 189, 115, .55)); transform-origin: 50% 50%; }
+@media (prefers-reduced-motion: no-preference) {
+  .benefit__star { animation: star-twinkle 3.6s ease-in-out var(--twinkle-delay, 0s) infinite; }
+  html.reveal-ready .benefit:not(.is-in) .benefit__star { transform: scale(.2) rotate(-40deg); opacity: 0; }
+  .benefit.is-in .benefit__star { transition: transform .7s cubic-bezier(.34, 1.56, .64, 1) .15s, opacity .5s ease .15s; }
+  @keyframes star-twinkle { 0%, 100% { transform: scale(1) rotate(0); filter: drop-shadow(0 0 4px rgba(226, 189, 115, .45)); }
+    50% { transform: scale(1.14) rotate(12deg); filter: drop-shadow(0 0 10px rgba(226, 189, 115, .85)); } }
+}
+
+/* «Світ Лілі» — великий заголовок розділу по центру, з тонким золотим розчерком */
+.world-title { font-family: var(--font-display); color: var(--color-moss-900); font-size: clamp(2.8rem, 9vw, 5.4rem); line-height: 1; letter-spacing: -.01em; }
+.world-title__flourish { display: block; width: min(16rem, 60%); height: 14px; margin: .9rem auto 0;
+  background: radial-gradient(closest-side, #e2bd73 0 3px, transparent 4px) center / 14px 14px no-repeat,
+    linear-gradient(90deg, transparent, rgba(185, 138, 62, .55) 30%, transparent 46%, transparent 54%, rgba(185, 138, 62, .55) 70%, transparent) center / 100% 1px no-repeat; }

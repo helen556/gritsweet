@@ -89,7 +89,10 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
               </div>
               <ul className="mt-8 grid gap-x-6 gap-y-5 sm:grid-cols-2">
                 {t.benefits.items.map((b, i) => (
-                  <li key={b.title} data-reveal={i % 2 ? "right" : "left"} style={{ ["--reveal-delay" as string]: `${i * 70}ms` }}>
+                  <li key={b.title} className="benefit" data-reveal={i % 2 ? "right" : "left"} style={{ ["--reveal-delay" as string]: `${i * 70}ms`, ["--twinkle-delay" as string]: `${i * 0.7}s` }}>
+                    <svg className="benefit__star" aria-hidden="true" viewBox="0 0 24 24" width="22" height="22">
+                      <path d="M12 2.5c.6 4.4 1.7 6.9 3.4 8.1 1.6 1.1 3.6 1.4 6.1 1.5-2.6.2-4.6.6-6.1 1.6-1.7 1.2-2.8 3.7-3.4 7.9-.6-4.2-1.7-6.7-3.4-7.9-1.5-1-3.5-1.4-6.1-1.6 2.5-.1 4.5-.4 6.1-1.5 1.7-1.2 2.8-3.7 3.4-8.1z" />
+                    </svg>
                     <h3 className="text-xl text-moss-900">{b.title}</h3>
                     <p className="mt-1 text-[0.97rem] text-ink-soft">{b.text}</p>
                   </li>
@@ -102,11 +105,15 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
         {/* 5. Світ Лілі: наявні ілюстрації, мінімум тексту */}
         <section aria-labelledby="world-title" className="relative isolate py-16 sm:py-24">
           <Decor items={DECOR.world} />
-          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-16">
+          {/* великий заголовок розділу по центру */}
+          <div className="mx-auto max-w-6xl px-4 text-center sm:px-6">
+            <h2 id="world-title" className="world-title" data-reveal="up">{t.home.worldKicker}</h2>
+            <span className="world-title__flourish" aria-hidden="true" data-reveal="soft" />
+          </div>
+          <div className="mx-auto mt-8 grid max-w-6xl items-center gap-10 px-4 sm:mt-12 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-16">
             <div className="lg:order-2">
-              <p className={kicker} data-reveal="right">{t.home.worldKicker}</p>
-              <h2 id="world-title" className={`mt-3 ${h2}`} data-reveal="right">{t.home.worldTitle}</h2>
-              <p className="mt-5 max-w-[52ch] text-lg text-ink-soft" data-reveal="left">{t.series.paragraphs[1]}</p>
+              <h3 className="text-3xl text-moss-900 sm:text-4xl" data-reveal="right">{t.home.worldTitle}</h3>
+              <p className="mt-4 max-w-[52ch] text-lg text-ink-soft" data-reveal="left">{t.home.worldText}</p>
               <p className="mt-6 border-l-2 border-gold pl-5 font-display text-2xl leading-snug text-moss-900" data-reveal="right">{t.series.closing}</p>
             </div>
             {/* ілюстрація в легкій шавлієвій хмаринці: краї кадру розчиняються в зелений градієнт, без жорстких меж */}
