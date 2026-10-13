@@ -436,11 +436,6 @@ html.js.intro-play .hero-sparkles i:nth-child(5) { animation-delay: 1.55s; }
 .hero-still { opacity: 0; pointer-events: none; transition: opacity .4s ease; }
 .hero--still .hero-still { opacity: 1; }
 .hero--still .hero-video { opacity: 0; }
-/* вимкнений рух: до гідратації відео не показується (JS його одразу зупинить), видно кадр із персонажами */
-@media (prefers-reduced-motion: reduce) {
-  .hero:not(.hero--playing-by-user) .hero-video { opacity: 0; }
-  .hero:not(.hero--playing-by-user) .hero-still { opacity: 1; }
-}
 
 /* Пункти «Без страху та примусу…»: мальована зірочка, що м'яко з'являється й час від часу мерехтить */
 .benefit { position: relative; padding-left: 2.1rem; }

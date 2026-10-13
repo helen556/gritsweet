@@ -18,13 +18,13 @@ const sourcesOf = (v: HeroVideo) => v.sources ?? [{ src: v.src, type: v.type }];
  *   до гідратації); браузер сам обирає джерело за <source media>: телефонне відео або для комп'ютера.
  * - Під відео — його ж перший кадр, тож поява відео непомітна (жодного «картинка → стрибок → відео»).
  * - Повтор: кінець м'яко розчиняється в перший кадр і ролик починається знову.
- * - reduced-motion / Save-Data / заблокований автозапуск — відео зупиняється, показується кадр із персонажами й кнопка «Відтворити».
+ * - Відео завжди стартує саме; якщо браузер заблокував автозапуск (напр. енергозбереження iOS) — запускається з першим дотиком/прокруткою.
+ *   Кнопка пауза/відтворення лишається для тих, хто хоче зупинити рух.
  */
 export default function Hero({ t, ctaHref }: { t: T; ctaHref: string }) {
   const wrap = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<State>("playing");
   const [seam, setSeam] = useState(false);
-  const [userPlayed, setUserPlayed] = useState(false);
   const D = HERO.desktop, M = HERO.mobile;
   const firstD = D.first ?? D.poster, firstM = M ? (M.first ?? M.poster) : null;
 
@@ -46,9 +46,6 @@ export default function Hero({ t, ctaHref }: { t: T; ctaHref: string }) {
     const v = vid();
     if (!v) return;
     v.muted = true;
-    const n = navigator as Navigator & { connection?: { saveData?: boolean } };
-    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches || n.connection?.saveData;
-    if (calm) { v.pause(); v.currentTime = 0; setState("paused"); return; } // eslint-disable-line react-hooks/set-state-in-effect
     const onPlaying = () => { setState("playing"); setSeam(false); };
     const onTime = () => { if (v.duration && v.duration - v.currentTime < HERO.seamMs / 1000) setSeam(true); };
     const onEnded = () => { v.currentTime = 0; v.play().catch(() => setState("blocked")); };
@@ -57,8 +54,13 @@ export default function Hero({ t, ctaHref }: { t: T; ctaHref: string }) {
     v.addEventListener("timeupdate", onTime);
     v.addEventListener("ended", onEnded);
     v.querySelector("source:last-of-type")?.addEventListener("error", onError);
-    // автозапуск міг не спрацювати (режим енергозбереження iOS тощо) — пробуємо ще раз, інакше показуємо кнопку
-    if (v.paused) v.play().catch(() => setState("blocked"));
+    // автозапуск міг не спрацювати (режим енергозбереження iOS тощо) — пробуємо ще раз і з першою взаємодією користувача
+    const kick = () => { if (v.paused && v.dataset.userPause !== "1") v.play().then(() => setState("playing")).catch(() => setState("blocked")); };
+    const KICK = ["pointerdown", "touchstart", "scroll", "keydown"] as const;
+    KICK.forEach((e) => window.addEventListener(e, kick, { passive: true }));
+    const onVis = () => { if (document.visibilityState === "visible") kick(); };
+    document.addEventListener("visibilitychange", onVis);
+    kick();
     // поворот екрана: інше відео (телефон ↔ комп'ютер)
     const mq = M ? window.matchMedia(MOBILE_QUERY) : null;
     const onMq = () => { v.load(); v.play().catch(() => setState("blocked")); };
@@ -66,16 +68,18 @@ export default function Hero({ t, ctaHref }: { t: T; ctaHref: string }) {
     return () => {
       v.removeEventListener("playing", onPlaying); v.removeEventListener("timeupdate", onTime); v.removeEventListener("ended", onEnded);
       mq?.removeEventListener("change", onMq);
+      KICK.forEach((e) => window.removeEventListener(e, kick));
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, [M]);
 
-  const play = () => { const v = vid(); if (!v) return; v.muted = true; setUserPlayed(true); v.play().then(() => setState("playing")).catch(() => setState("blocked")); };
-  const pause = () => { vid()?.pause(); setState("paused"); };
+  const play = () => { const v = vid(); if (!v) return; v.muted = true; v.dataset.userPause = ""; v.play().then(() => setState("playing")).catch(() => setState("blocked")); };
+  const pause = () => { const v = vid(); if (v) { v.dataset.userPause = "1"; v.pause(); } setState("paused"); };
   const control = state === "playing" ? { label: t.pause, icon: <path d="M8 6v12M16 6v12" /> } : { label: t.play, icon: <path d="M8 5l11 7-11 7V5Z" /> };
   const showStill = state !== "playing";
 
   return (
-    <section className={`hero relative isolate -mt-16 overflow-hidden bg-plum-100 ${M ? "hero--dual" : ""} ${HERO.legacyWebm ? "hero--legacy" : ""} ${showStill ? "hero--still" : ""} ${seam ? "hero--seam" : ""} ${userPlayed && state === "playing" ? "hero--playing-by-user" : ""}`} aria-labelledby="hero-title"
+    <section className={`hero relative isolate -mt-16 overflow-hidden bg-plum-100 ${M ? "hero--dual" : ""} ${HERO.legacyWebm ? "hero--legacy" : ""} ${showStill ? "hero--still" : ""} ${seam ? "hero--seam" : ""}`} aria-labelledby="hero-title"
       style={{ ["--focus-d" as string]: D.focus, ["--focus-m" as string]: M?.focus ?? D.focus }}>
       <div className="hero-backdrop" aria-hidden="true" />
       <div className="hero-stage hero-media">

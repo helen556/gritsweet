@@ -211,8 +211,8 @@ const rm = await browser.newContext({ viewport: { width: 1280, height: 800 }, re
 const rp = await rm.newPage();
 await rp.goto(`${BASE}/uk`);
 await rp.waitForTimeout(1500);
-const st = await rp.evaluate(() => ({ playing: (() => { const v = document.querySelector("video"); return v && !v.paused; })(), canvases: [...document.querySelectorAll("canvas")].filter((c) => getComputedStyle(c).display !== "none").length, btn: !!document.querySelector('button[aria-label="Відтворити"]') }));
-check("reduced-motion: відео не стартує, без пилу/сліду, є кнопка відтворення", !st.playing && st.canvases === 0 && st.btn, JSON.stringify(st));
+const st = await rp.evaluate(() => ({ playing: (() => { const v = document.querySelector("video"); return v && !v.paused; })(), canvases: [...document.querySelectorAll("canvas")].filter((c) => getComputedStyle(c).display !== "none").length, btn: !!document.querySelector('button[aria-label="Пауза"]') }));
+check("reduced-motion: відео все одно грає саме, без пилу/сліду, є кнопка паузи", st.playing && st.canvases === 0 && st.btn, JSON.stringify(st));
 await rp.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
 await rp.waitForTimeout(300);
 const rmHidden = await rp.evaluate(() => [...document.querySelectorAll("[data-reveal]")].filter((e) => getComputedStyle(e).opacity !== "1" || getComputedStyle(e).transform !== "none").length);
