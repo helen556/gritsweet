@@ -4,7 +4,7 @@ import { getDict, hasLocale } from "@/i18n";
 import { notFound } from "next/navigation";
 import Hero from "@/components/Hero";
 import Picture from "@/components/Picture";
-import ProductCard from "@/components/ProductCard";
+import ProductCard, { ComingSoonCard } from "@/components/ProductCard";
 import Faq from "@/components/Faq";
 import Decor, { DECOR } from "@/components/Decor";
 import Spreads from "@/components/Spreads";
@@ -58,12 +58,13 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
             <div className="mx-auto max-w-6xl px-4 sm:px-6">
               <h2 id="catalog-title" className={h2} data-reveal="left">{t.home.catalogTitle}</h2>
               <p className="mt-3 max-w-2xl text-lg text-ink-soft" data-reveal="right">{t.home.catalogLead}</p>
-              <ul className={`mx-auto mt-10 grid gap-5 sm:gap-6 ${gridCols(products.length)}`}>
+              <ul className={`mx-auto mt-10 grid gap-5 sm:gap-6 ${gridCols(products.length + 1)}`}>
                 {products.map((p, i) => (
                   <li key={p.id} data-reveal="up" style={{ ["--reveal-delay" as string]: `${(i % 3) * 90}ms` }}>
                     <ProductCard p={p} lang={lang} t={t} />
                   </li>
                 ))}
+                <li data-reveal="up" style={{ ["--reveal-delay" as string]: `${(products.length % 3) * 90}ms` }}><ComingSoonCard text={t.home.soonCard} /></li>
               </ul>
             </div>
           </section>

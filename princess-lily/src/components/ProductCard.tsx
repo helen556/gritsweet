@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Picture from "./Picture";
+import manifest from "@/lib/media-manifest.json";
 import type { CatalogProduct } from "@/lib/catalog";
 import type { Dict } from "@/i18n";
 import { formatMinor } from "@/lib/money";
@@ -41,5 +42,25 @@ export default function ProductCard({ p, lang, t, headingLevel = "h3" }: { p: Ca
         <p className={`mt-auto pt-1 text-lg font-semibold ${price.soon ? "text-copper" : "text-ink"}`}>{price.text}</p>
       </div>
     </article>
+  );
+}
+
+/** Картка-заглушка в кінці каталогу: «Незабаром з’являться нові історії» (без посилання, не товар). */
+export function ComingSoonCard({ text }: { text: string }) {
+  const lp = manifest["lily-portrait"];
+  return (
+    <div className="book-card book-card--soon relative grid h-full grid-cols-[42%_1fr] items-center gap-4 sm:flex sm:flex-col sm:items-stretch sm:gap-0">
+      <div className="book-card__cover relative sm:px-6 sm:pt-6">
+        <div className="soon-art relative mx-auto grid aspect-square w-full place-items-center rounded-[1.1rem]">
+          <Picture base="/media/lily-portrait" widths={lp.widths} width={lp.width} height={lp.height} alt=""
+            sizes="(min-width: 1024px) 220px, (min-width: 640px) 28vw, 30vw" className="block w-[68%]"
+            imgClassName="aspect-square h-auto w-full rounded-full object-cover [mask-image:radial-gradient(closest-side,#000_74%,transparent)]" />
+          <span className="soon-art__spark" aria-hidden="true" /><span className="soon-art__spark" aria-hidden="true" /><span className="soon-art__spark" aria-hidden="true" />
+        </div>
+      </div>
+      <div className="flex min-w-0 flex-col justify-center py-2 pr-1 sm:flex-1 sm:p-6">
+        <p className="font-display text-[1.3rem] leading-snug text-moss-900 sm:text-2xl">{text}</p>
+      </div>
+    </div>
   );
 }

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDict, hasLocale } from "@/i18n";
 import { listPublicProducts } from "@/lib/catalog";
-import ProductCard from "@/components/ProductCard";
+import ProductCard, { ComingSoonCard } from "@/components/ProductCard";
 import { pageMeta } from "@/lib/seo";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]/books">): Promise<Metadata> {
@@ -56,8 +56,9 @@ export default async function Books({ params, searchParams }: PageProps<"/[lang]
       )}
       <div aria-live="polite">
         {products.length ? (
-          <ul className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className={`mt-10 grid gap-6 sm:grid-cols-2 ${products.length + 1 === 4 ? "xl:grid-cols-4" : "lg:grid-cols-3"}`}>
             {products.map((p) => <li key={p.id}><ProductCard p={p} lang={lang} t={t} headingLevel="h2" /></li>)}
+            <li><ComingSoonCard text={t.home.soonCard} /></li>
           </ul>
         ) : <p className="mt-10 text-ink-soft">{t.catalog.empty}</p>}
       </div>
