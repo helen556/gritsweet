@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "@fontsource-variable/manrope/wght.css";
-@import "@fontsource-variable/cormorant/wght.css";
+@import "@fontsource/kurale/400.css";
 
 /* Палітра: теплий молочний фон, природні зелені, спокійний темний текст, стримані рожеві/мідні акценти з ілюстрацій */
 @theme {
@@ -19,7 +19,7 @@
   --color-copper: #94532f;
   --color-gold: #d8bb84;
   --font-sans: "Manrope Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Cormorant Variable", Georgia, "Times New Roman", serif;
+  --font-display: "Kurale", Georgia, "Times New Roman", serif;
   --ease-soft: cubic-bezier(.22,.8,.28,1);
 }
 
@@ -34,7 +34,9 @@ body {
   text-rendering: optimizeLegibility;
   overflow-x: clip;
 }
-h1, h2, h3, .font-display { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.005em; line-height: 1.12; }
+h1, h2, h3, .font-display { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.01em; line-height: 1.12; font-synthesis: none; }
+/* у Kurale немає курсиву — не імітуємо його браузером */
+.font-display.italic, .italic.font-display { font-style: normal; }
 ::selection { background: var(--color-rose-100); }
 
 :focus-visible { outline: 3px solid var(--color-moss-700); outline-offset: 3px; border-radius: 6px; }
@@ -100,8 +102,16 @@ h1, h2, h3, .font-display { font-family: var(--font-display); font-weight: 600; 
 }
 
 /* Поява секцій: один раз, fade + 12px */
-html.js [data-reveal] { opacity: 0; transform: translate3d(0, 12px, 0); transition: opacity 450ms var(--ease-soft), transform 450ms var(--ease-soft); }
-html.js [data-reveal].is-in { opacity: 1; transform: none; }
+/* Поява при вході у viewport: невеликий зсув + прозорість, ~0.6 с, один раз. Лише коли JS запустився. */
+html.reveal-ready [data-reveal] { opacity: 0; transform: translate3d(0, 14px, 0); transition: opacity 620ms var(--ease-soft), transform 720ms var(--ease-soft); transition-delay: var(--reveal-delay, 0ms); will-change: opacity, transform; }
+html.reveal-ready [data-reveal="left"] { transform: translate3d(-34px, 0, 0); }
+html.reveal-ready [data-reveal="right"] { transform: translate3d(34px, 0, 0); }
+html.reveal-ready [data-reveal="soft"] { transform: none; }
+html.reveal-ready [data-reveal].is-in { opacity: 1; transform: none; will-change: auto; }
+@media (max-width: 639px) {
+  html.reveal-ready [data-reveal="left"] { transform: translate3d(-18px, 0, 0); }
+  html.reveal-ready [data-reveal="right"] { transform: translate3d(18px, 0, 0); }
+}
 
 details.faq > summary { list-style: none; cursor: pointer; }
 details.faq > summary::-webkit-details-marker { display: none; }
@@ -112,7 +122,7 @@ details.faq[open] .faq-icon { transform: rotate(45deg); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 80ms !important; scroll-behavior: auto !important; }
-  html.js [data-reveal] { opacity: 1; transform: none; }
+  html.reveal-ready [data-reveal] { opacity: 1 !important; transform: none !important; }
   .btn:hover { transform: none; }
   .btn::after { display: none; }
   [data-parallax] { transform: none !important; }
@@ -129,34 +139,80 @@ details.faq[open] .faq-icon { transform: rotate(45deg); }
 }
 
 /* ================= Повноекранний hero ================= */
+/* Висота видимого екрана: 100vh → 100svh (стабільно на телефоні) → 100dvh (динамічна панель браузера, де підтримується) */
 .hero { height: 100vh; height: 100svh; min-height: 20rem; }
+@supports (height: 100dvh) { .hero { height: 100dvh; } }
 .hero-stage { position: absolute; inset: 0; }
-/* Відео ніде не обрізається (герої, рука й знак Kling завжди в кадрі); порожні поля заповнює розмитий постер.
-   Ширше за 16:9 (широкі монітори, телефон landscape): відео на всю висоту під header, праворуч. */
-.hero-fit { object-fit: cover; object-position: 50% 50%; }
+.hero-fit { object-fit: cover; object-position: var(--focus, 50% 50%); }
 .hero-backdrop { position: absolute; inset: 0;
   background: linear-gradient(rgba(250, 246, 238, .3), rgba(250, 246, 238, .3)), url(/media/hero-start-blur.webp) center / cover no-repeat; }
+.hero--dual .hero-backdrop { display: none; }
+/* Нові відео (комп'ютер/телефон): заповнюють увесь екран, кадрування — object-position з src/content/hero.ts */
+.hero--dual .hero-poster { object-position: var(--focus-d); }
+@media (max-aspect-ratio: 4/5) { .hero--dual .hero-poster { object-position: var(--focus-m); } }
+
+/* Запасний режим (старий горизонтальний ролик): відео ніде не обрізається; порожні поля — розмитий постер */
 @media (min-aspect-ratio: 16/9) {
-  .hero-stage { inset: 4rem 0 0 auto; height: calc(100% - 4rem); width: auto; aspect-ratio: 16 / 9;
+  .hero--legacy .hero-stage { inset: 4rem 0 0 auto; height: calc(100% - 4rem); width: auto; aspect-ratio: 16 / 9;
     -webkit-mask-image: linear-gradient(to right, transparent 0, #000 9%); mask-image: linear-gradient(to right, transparent 0, #000 9%); }
 }
+@media (min-aspect-ratio: 4/5) and (max-aspect-ratio: 16/9) {
+  .hero--legacy .hero-stage { inset: auto 0 0 0; aspect-ratio: 16 / 9;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 7%); mask-image: linear-gradient(to bottom, transparent 0, #000 7%); }
+}
+@media (max-aspect-ratio: 4/5) {
+  .hero--legacy .hero-stage { inset: auto 0; top: 33%; aspect-ratio: 16 / 9;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 97%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 97%, transparent 100%); }
+  .hero--legacy .hero-fit { object-fit: contain; }
+}
+
 .hero-scrim {
   position: absolute; inset: 0; pointer-events: none;
   background:
-    radial-gradient(ellipse 48% 58% at 16% 36%, rgba(250, 246, 238, .42), rgba(250, 246, 238, 0) 70%),
-    linear-gradient(to bottom, rgba(250, 246, 238, .35), rgba(250, 246, 238, 0) 18%);
+    radial-gradient(ellipse 50% 62% at 16% 40%, rgba(250, 246, 238, .40), rgba(250, 246, 238, 0) 70%),
+    linear-gradient(to bottom, rgba(250, 246, 238, .32), rgba(250, 246, 238, 0) 16%),
+    linear-gradient(to top, rgba(38, 61, 45, .18), rgba(38, 61, 45, 0) 22%);
 }
+
+/* Текст: назва на хмаринці, короткий вступ і кнопка — збоку від персонажів */
 .hero-copy {
   position: absolute; inset: 0; z-index: 25; pointer-events: none;
-  display: flex; flex-direction: column; align-items: flex-start; gap: 1.4rem;
-  padding: calc(4rem + 9vh) 5vw 0 max(3.5vw, env(safe-area-inset-left));
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between;
+  padding: calc(4rem + 8vh) 5vw calc(2.5rem + env(safe-area-inset-bottom)) max(3.5vw, env(safe-area-inset-left));
 }
 .hero-copy > * { pointer-events: auto; }
-.hero-cloud-wrap { position: relative; width: min(26vw, 25rem); min-width: 17rem; padding: 2rem 2.2rem 1.8rem; }
-.hero-title { position: relative; font-size: clamp(2.3rem, 3.6vw, 3.9rem); color: var(--color-moss-900); line-height: 1.04; text-wrap: balance; }
-.hero-slogan { position: relative; margin-top: .9rem; font-family: var(--font-display); font-style: italic; font-size: clamp(1.2rem, 1.5vw, 1.6rem); color: #3d3a33; line-height: 1.25; }
-.hero-cta { margin-left: 2.4rem; }
+.hero-copy--right { align-items: flex-end; text-align: right; }
+.hero-copy--center { align-items: center; text-align: center; }
+.hero-cloud-wrap { position: relative; width: min(30vw, 27rem); min-width: 17rem; padding: 2rem 2.2rem 1.8rem; }
+.hero-title { position: relative; font-size: clamp(2.3rem, 3.9vw, 4.2rem); color: var(--color-moss-900); line-height: 1.04; text-wrap: balance; }
+.hero-slogan { position: relative; margin-top: .8rem; font-family: var(--font-display); font-size: clamp(1.15rem, 1.5vw, 1.55rem); color: #3d3a33; line-height: 1.25; }
+.hero-lower { display: flex; flex-direction: column; align-items: inherit; gap: .9rem; max-width: min(30vw, 26rem); min-width: 17rem; padding: 0 2.2rem; }
+.hero-copy--center .hero-lower { align-items: center; }
+.hero-intro { font-size: 1rem; line-height: 1.5; color: #2a2924; text-wrap: pretty;
+  background: rgba(250, 246, 238, .62); border-radius: 1rem; padding: .55rem .85rem; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.hero-cta { margin: 0; }
 .hero-control { position: absolute; z-index: 30; left: max(1rem, env(safe-area-inset-left)); bottom: calc(1rem + env(safe-area-inset-bottom)); }
+
+/* Телефон / вертикальні екрани: назва зверху, вступ і кнопка внизу; персонажі між ними */
+@media (max-aspect-ratio: 4/5) {
+  .hero-copy { align-items: center; text-align: center; padding: calc(4rem + 1.5svh) 1rem calc(1.25rem + env(safe-area-inset-bottom)); }
+  .hero-cloud-wrap { width: 100%; max-width: 26rem; min-width: 0; padding: 1rem 1.25rem .9rem; }
+  .hero-title { font-size: clamp(2rem, 9vw, 2.9rem); }
+  .hero-slogan { font-size: clamp(1.05rem, 4.4vw, 1.3rem); margin-top: .45rem; }
+  .hero-lower { align-items: center; max-width: 24rem; min-width: 0; padding: 0; margin-bottom: 3.2rem; }
+  .hero-intro { font-size: .95rem; }
+  .hero-control { bottom: calc(1.25rem + env(safe-area-inset-bottom)); }
+}
+/* Низькі landscape-екрани телефонів */
+@media (max-height: 520px) and (min-aspect-ratio: 4/5) {
+  .hero-copy { padding-top: 4.4rem; padding-bottom: 1rem; }
+  .hero-cloud-wrap { padding: .8rem 1.3rem .7rem; min-width: 13rem; width: min(30vw, 17rem); }
+  .hero-title { font-size: clamp(1.7rem, 4vw, 2.3rem); }
+  .hero-slogan { font-size: 1rem; margin-top: .3rem; }
+  .hero-intro { display: none; }
+  .hero-lower { padding: 0 1.3rem; min-width: 0; }
+}
 
 /* Хмаринка: тонкі молочно-перламутрові шари з нерівними розмитими краями (CSS, без растрових файлів) */
 .hero-cloud { position: absolute; inset: -12% -16% -20% -14%; pointer-events: none; filter: blur(5px); }
@@ -192,46 +248,13 @@ details.faq[open] .faq-icon { transform: rotate(45deg); }
 html.js.intro-play .hero-cloud { animation: cloud-in 700ms .7s var(--ease-soft) both, cloud-float 7s 1.4s ease-in-out infinite alternate; }
 html.js.intro-play .hero-title { animation: hero-in 650ms .95s var(--ease-soft) both; }
 html.js.intro-play .hero-slogan { animation: hero-in 600ms 1.2s var(--ease-soft) both; }
-html.js.intro-play .hero-cta { animation: hero-in 600ms 1.35s var(--ease-soft) both; }
+html.js.intro-play .hero-lower { animation: hero-in 600ms 1.35s var(--ease-soft) both; }
 html.js.intro-play .hero-sparkles i { animation: twinkle-once 1.1s var(--ease-soft) both; }
 html.js.intro-play .hero-sparkles i:nth-child(1) { animation-delay: 1.15s; }
 html.js.intro-play .hero-sparkles i:nth-child(2) { animation-delay: 1.3s; }
 html.js.intro-play .hero-sparkles i:nth-child(3) { animation-delay: 1.45s; }
 html.js.intro-play .hero-sparkles i:nth-child(4) { animation-delay: 1.25s; }
 html.js.intro-play .hero-sparkles i:nth-child(5) { animation-delay: 1.55s; }
-
-/* Від 4:5 до 16:9 (типові ноутбуки, планшети landscape): відео на всю ширину БЕЗ обрізання,
-   прив'язане до низу; вузька смуга зверху (під header) — розмитий фон. Родина й рука лишаються на своїх місцях. */
-@media (min-aspect-ratio: 4/5) and (max-aspect-ratio: 16/9) {
-  .hero-stage { inset: auto 0 0 0; aspect-ratio: 16 / 9;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 7%); mask-image: linear-gradient(to bottom, transparent 0, #000 7%); }
-  .hero-fit { object-position: 50% 50%; }
-}
-
-/* Вертикальні екрани: розмитий фон + чітке відео без обрізання; назва зверху, CTA знизу */
-@media (max-aspect-ratio: 4/5) {
-  /* (фон уже розмитий при збірці — без CSS-filter на весь екран) */
-  .hero-stage { inset: auto 0; top: 33%; aspect-ratio: 16 / 9;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 97%, transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 97%, transparent 100%); }
-  .hero-fit { object-fit: contain; object-position: 50% 50%; }
-  .hero-scrim { background: linear-gradient(to bottom, rgba(250, 246, 238, .25), rgba(250, 246, 238, 0) 30%); }
-  .hero-copy { display: grid; grid-template-rows: auto 1fr auto; justify-items: center; text-align: center; gap: 0;
-    padding: calc(4rem + 1.5svh) 1rem calc(1.25rem + env(safe-area-inset-bottom)); }
-  .hero-cloud-wrap { width: 100%; max-width: 26rem; min-width: 0; padding: 1rem 1.25rem .9rem; }
-  .hero-title { font-size: clamp(2rem, 9vw, 2.9rem); }
-  .hero-slogan { font-size: clamp(1.1rem, 4.6vw, 1.35rem); margin-top: .5rem; }
-  .hero-cta { grid-row: 3; margin: 0 0 max(4.2rem, 17svh); }
-  .hero-control { bottom: calc(1.25rem + env(safe-area-inset-bottom)); }
-}
-/* Низькі landscape-екрани телефонів */
-@media (max-height: 520px) and (min-aspect-ratio: 4/5) {
-  .hero-copy { padding-top: 4.5rem; gap: .8rem; }
-  .hero-cloud-wrap { padding: 1rem 1.4rem .9rem; min-width: 13rem; width: min(30vw, 17rem); }
-  .hero-title { font-size: clamp(1.8rem, 4.2vw, 2.4rem); }
-  .hero-slogan { font-size: 1.05rem; margin-top: .35rem; }
-  .hero-cta { margin-left: 1.4rem; }
-}
 
 /* ================= Атмосферний фон і поверхні ================= */
 .home-flow { position: relative; isolation: isolate; overflow-x: clip; }
@@ -276,3 +299,44 @@ html.js.intro-play .hero-sparkles i:nth-child(5) { animation-delay: 1.55s; }
 .author-frame { position: relative; }
 .author-frame::before { content: ""; position: absolute; inset: -14px 14px 14px -14px; border: 1px solid rgba(169, 120, 70, .35); border-radius: 999px 999px 2rem 2rem; pointer-events: none; }
 .author-frame img { border-radius: 999px 999px 2rem 2rem; box-shadow: 0 30px 60px -36px rgba(38, 61, 45, .55); }
+@keyframes cover-in { from { opacity: 0; transform: scale(.985); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .animate-\[cover-in_\.45s_var\(--ease-soft\)_both\] { animation: none !important; } }
+.home-flow > .ambient-glow { z-index: -1; }
+
+/* ================= Картка книжки ================= */
+@layer components {
+  .book-card {
+    border-radius: 1.6rem; padding: .75rem;
+    background: linear-gradient(165deg, rgba(255, 254, 250, .92), rgba(255, 251, 243, .74));
+    border: 1px solid rgba(255, 255, 255, .9);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 12px 26px -18px rgba(38, 61, 45, .22), 0 34px 60px -44px rgba(38, 61, 45, .3);
+    transition: box-shadow .4s var(--ease-soft), transform .4s var(--ease-soft);
+  }
+  @media (min-width: 640px) { .book-card { padding: 0; } }
+  @media (hover: hover) { .book-card:hover { box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 18px 34px -18px rgba(38, 61, 45, .28), 0 44px 70px -44px rgba(38, 61, 45, .36); } }
+  .book-card:has(a:focus-visible) { outline: 3px solid var(--color-moss-700); outline-offset: 3px; }
+}
+
+/* ================= Атмосферний блок «книжки на столі» =================
+   Комп'ютер: текст ліворуч, фото праворуч у фоні; краї фото розчиняються в молочне тло масками
+   (ліворуч — довгий перехід, зверху/знизу — короткий). Без рамки, без розмиття самих книжок.
+   Телефон: текст зверху, фото під ним із м'яким переходом зверху та знизу. */
+.books-atmo { padding-block: 4rem; }
+.books-atmo__photo { position: relative; margin-top: 2rem; aspect-ratio: 4 / 3; order: 2;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 18%, #000 80%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 18%, #000 80%, transparent 100%); }
+.books-atmo--photo { display: flex; flex-direction: column; padding-bottom: 1rem; }
+.books-atmo--photo .books-atmo__text { order: 1; width: 100%; }
+@media (min-width: 1024px) {
+  .books-atmo { padding-block: 7rem; }
+  .books-atmo--photo { display: block; min-height: 40rem; padding-block: 8rem; }
+  .books-atmo__photo { position: absolute; inset: 0 0 0 auto; width: 62%; margin: 0; aspect-ratio: auto; z-index: -1;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, rgba(0,0,0,.55) 22%, #000 46%), linear-gradient(180deg, transparent 0, #000 16%, #000 84%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image: linear-gradient(90deg, transparent 0, rgba(0,0,0,.55) 22%, #000 46%), linear-gradient(180deg, transparent 0, #000 16%, #000 84%, transparent 100%);
+    mask-composite: intersect; }
+  /* молочна підкладка під текстом, щоб він лишався читабельним над фото */
+  .books-atmo--photo .books-atmo__text > div { position: relative; }
+  .books-atmo--photo .books-atmo__text > div::before { content: ""; position: absolute; inset: -3rem -4rem; z-index: -1; pointer-events: none;
+    background: radial-gradient(closest-side, rgba(250, 246, 238, .92), rgba(250, 246, 238, .7) 60%, rgba(250, 246, 238, 0)); }
+}

@@ -36,9 +36,11 @@ export async function quoteCart(input: CartLineInput[], locale: Locale): Promise
     if (!s.ok) { unavailable.push(id); continue; }
     const qty = clampQty(r.format, merged.get(id)!, r.stock);
     const tr = trs.find((t) => t.product_id === r.product_id && t.locale === locale) ?? trs.find((t) => t.product_id === r.product_id);
+    // обкладинка саме обраної мовної версії книжки
+    const bookTr = trs.find((t) => t.product_id === r.product_id && t.locale === r.book_locale);
     lines.push({
       variantId: r.id, productId: r.product_id, slug: r.slug, title: tr?.title ?? r.slug, bookLocale: r.book_locale, format: r.format,
-      coverBase: r.cover_base, unitPriceMinor: r.price_minor!, quantity: qty, lineTotalMinor: mulMinor(r.price_minor!, qty),
+      coverBase: bookTr?.cover_base ?? r.cover_base, unitPriceMinor: r.price_minor!, quantity: qty, lineTotalMinor: mulMinor(r.price_minor!, qty),
       maxQty: r.format === "pdf" ? 1 : Math.min(10, r.stock ?? 0),
     });
   }

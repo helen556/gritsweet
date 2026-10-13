@@ -8,6 +8,7 @@ import { privateStorage } from "@/lib/storage";
 import { randomBytes } from "node:crypto";
 import { setSetting } from "@/lib/settings";
 import { saveReceipt } from "@/lib/receipts";
+import { newId } from "@/lib/ids";
 
 const MAX_PDF = 100 * 1024 * 1024, MAX_IMG = 10 * 1024 * 1024;
 const COVER_WIDTHS = [360, 640, 960, 1254];
@@ -45,23 +46,48 @@ export async function POST(req: Request) {
     return Response.json({ ok: true });
   }
   if (kind === "cover") {
-    if (buf.length > MAX_IMG) return err("Зображення до 10 МБ");
+    // id = товар; locale = "" (загальна обкладинка) або "uk"/"en" (обкладинка мовної версії)
+    const locale = String(fd.get("locale") ?? "");
+    if (locale && locale !== "uk" && locale !== "en") return err("Невірна мова");
     const p = await db.selectFrom("products").select("id").where("id", "=", id).executeTakeFirst();
     if (!p) return err("Товар не знайдено");
-    let meta: Metadata;
-    try { meta = await sharp(buf).metadata(); } catch { return err("Непідтримуваний формат зображення"); }
-    if (!meta.width || !meta.height || !["jpeg", "png", "webp"].includes(meta.format ?? "")) return err("Лише JPG, PNG або WebP");
-    const dir = path.resolve(process.env.UPLOADS_DIR ?? "storage/uploads", "covers");
-    await fs.mkdir(dir, { recursive: true });
-    const base = `${p.id.toLowerCase().replace(/[^a-z0-9_-]/g, "")}-${Date.now().toString(36)}`;
-    const widths = COVER_WIDTHS.filter((w) => w <= meta.width!);
-    if (!widths.length) widths.push(meta.width);
-    for (const w of widths) {
-      await sharp(buf).rotate().resize({ width: w }).avif({ quality: 55 }).toFile(path.join(dir, `${base}-${w}.avif`));
-      await sharp(buf).rotate().resize({ width: w }).webp({ quality: 78 }).toFile(path.join(dir, `${base}-${w}.webp`));
+    const img = await storeImage(buf, `${p.id}${locale ? `-${locale}` : ""}`, COVER_WIDTHS);
+    if ("error" in img) return err(img.error);
+    if (locale) {
+      const t = await db.selectFrom("product_translations").select("locale").where("product_id", "=", p.id).where("locale", "=", locale as "uk" | "en").executeTakeFirst();
+      if (!t) return err("Спершу збережіть назву цією мовою");
+      await db.updateTable("product_translations").set({ cover_base: img.base, cover_widths: JSON.stringify(img.widths), cover_width: img.width, cover_height: img.height })
+        .where("product_id", "=", p.id).where("locale", "=", locale as "uk" | "en").execute();
+    } else {
+      await db.updateTable("products").set({ cover_base: img.base, cover_widths: JSON.stringify(img.widths), cover_width: img.width, cover_height: img.height, updated_at: new Date().toISOString() }).where("id", "=", p.id).execute();
     }
-    await db.updateTable("products").set({ cover_base: `/uploads/covers/${base}`, cover_widths: JSON.stringify(widths), cover_width: meta.width, cover_height: meta.height, updated_at: new Date().toISOString() }).where("id", "=", p.id).execute();
-    await audit(admin, "product.cover_upload", "product", p.id);
+    await audit(admin, "product.cover_upload", "product", p.id, { locale: locale || "all" });
+    return Response.json({ ok: true });
+  }
+  if (kind === "spread") {
+    // Справжній розворот книжки (для «Книжка зсередини»); locale порожній — для обох мов
+    const locale = String(fd.get("locale") ?? "");
+    const p = await db.selectFrom("products").select("id").where("id", "=", id).executeTakeFirst();
+    if (!p) return err("Товар не знайдено");
+    const img = await storeImage(buf, `${p.id}-spread`, [640, 1280, 1920]);
+    if ("error" in img) return err(img.error);
+    const n = await db.selectFrom("product_images").select(({ fn }) => fn.countAll<number>().as("n")).where("product_id", "=", p.id).executeTakeFirst();
+    await db.insertInto("product_images").values({
+      id: newId("img"), product_id: p.id, kind: "spread", locale: locale === "uk" || locale === "en" ? locale : null,
+      base: img.base, widths: JSON.stringify(img.widths), width: img.width, height: img.height,
+      alt_uk: String(fd.get("alt_uk") ?? "").slice(0, 200), alt_en: String(fd.get("alt_en") ?? "").slice(0, 200),
+      sort_order: Number(n?.n ?? 0) + 1, created_at: new Date().toISOString(),
+    }).execute();
+    await audit(admin, "product.spread_upload", "product", p.id);
+    return Response.json({ ok: true });
+  }
+  if (kind === "books_photo") {
+    // Фото книжок (атмосферний блок на головній) — лише власниця
+    if (admin.role !== "owner") return err("Лише власниця", 403);
+    const img = await storeImage(buf, "books-photo", [640, 1024, 1600, 2200]);
+    if ("error" in img) return err(img.error);
+    await setSetting("books_photo", JSON.stringify(img));
+    await audit(admin, "settings.books_photo_upload", "settings");
     return Response.json({ ok: true });
   }
   if (kind === "receipt") {
@@ -75,24 +101,31 @@ export async function POST(req: Request) {
   if (kind === "author") {
     // Необов'язкове фото авторки (authorPhoto): лише власниця; перекодування без метаданих
     if (admin.role !== "owner") return err("Лише власниця може змінювати фото авторки", 403);
-    if (buf.length > MAX_IMG) return err("Зображення до 10 МБ");
-    let meta: Metadata;
-    try { meta = await sharp(buf).rotate().metadata(); } catch { return err("Непідтримуваний формат зображення"); }
-    if (!meta.width || !meta.height || !["jpeg", "png", "webp"].includes(meta.format ?? "")) return err("Лише JPG, PNG або WebP");
-    const dir = path.resolve(process.env.UPLOADS_DIR ?? "storage/uploads", "covers");
-    await fs.mkdir(dir, { recursive: true });
-    const base = `author-${Date.now().toString(36)}`;
-    const rotated = await sharp(buf).rotate().toBuffer({ resolveWithObject: true });
-    const W = rotated.info.width, H = rotated.info.height;
-    const widths = [480, 800, 1200].filter((w) => w <= W);
-    if (!widths.length) widths.push(W);
-    for (const w of widths) {
-      await sharp(rotated.data).resize({ width: w }).avif({ quality: 60 }).toFile(path.join(dir, `${base}-${w}.avif`));
-      await sharp(rotated.data).resize({ width: w }).webp({ quality: 80 }).toFile(path.join(dir, `${base}-${w}.webp`));
-    }
-    await setSetting("author_photo", JSON.stringify({ base: `/uploads/covers/${base}`, widths, width: W, height: H }));
+    const img = await storeImage(buf, "author", [480, 800, 1200]);
+    if ("error" in img) return err(img.error);
+    await setSetting("author_photo", JSON.stringify(img));
     await audit(admin, "settings.author_photo_upload", "settings");
     return Response.json({ ok: true });
   }
   return err("Невідомий тип");
+}
+
+/** Перекодування зображення (JPG/PNG/WebP, до 10 МБ) в AVIF+WebP кількох ширин без метаданих; поворот за EXIF. */
+async function storeImage(buf: Buffer, name: string, targetWidths: number[]): Promise<{ base: string; widths: number[]; width: number; height: number } | { error: string }> {
+  if (buf.length > MAX_IMG) return { error: "Зображення до 10 МБ" };
+  let meta: Metadata;
+  try { meta = await sharp(buf).metadata(); } catch { return { error: "Непідтримуваний формат зображення" }; }
+  if (!meta.width || !meta.height || !["jpeg", "png", "webp"].includes(meta.format ?? "")) return { error: "Лише JPG, PNG або WebP" };
+  const rotated = await sharp(buf).rotate().toBuffer({ resolveWithObject: true });
+  const W = rotated.info.width, H = rotated.info.height;
+  const dir = path.resolve(process.env.UPLOADS_DIR ?? "storage/uploads", "covers");
+  await fs.mkdir(dir, { recursive: true });
+  const base = `${name.toLowerCase().replace(/[^a-z0-9_-]/g, "")}-${Date.now().toString(36)}`;
+  const widths = targetWidths.filter((w) => w <= W);
+  if (!widths.length) widths.push(W);
+  for (const w of widths) {
+    await sharp(rotated.data).resize({ width: w }).avif({ quality: 60 }).toFile(path.join(dir, `${base}-${w}.avif`));
+    await sharp(rotated.data).resize({ width: w }).webp({ quality: 82 }).toFile(path.join(dir, `${base}-${w}.webp`));
+  }
+  return { base: `/uploads/covers/${base}`, widths, width: W, height: H };
 }

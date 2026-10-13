@@ -246,6 +246,24 @@ export async function migrate(db: Kysely<Database>) {
     .addColumn("created_at", "text", (c) => c.notNull())
     .execute();
 
+  // ---- v3: обкладинка для кожної мовної версії, розвороти/зображення книжок ----
+  await addColumns(db, "product_translations", [["cover_base", "text"], ["cover_widths", "text"], ["cover_width", "integer"], ["cover_height", "integer"]]);
+  await t("product_images")
+    .addColumn("id", "text", (c) => c.primaryKey())
+    .addColumn("product_id", "text", (c) => c.notNull().references("products.id").onDelete("cascade"))
+    .addColumn("kind", "text", (c) => c.notNull()) // spread — справжній розворот книжки
+    .addColumn("locale", "text") // null — для обох мов
+    .addColumn("base", "text", (c) => c.notNull())
+    .addColumn("widths", "text", (c) => c.notNull())
+    .addColumn("width", "integer", (c) => c.notNull())
+    .addColumn("height", "integer", (c) => c.notNull())
+    .addColumn("alt_uk", "text", (c) => c.notNull().defaultTo(""))
+    .addColumn("alt_en", "text", (c) => c.notNull().defaultTo(""))
+    .addColumn("sort_order", "integer", (c) => c.notNull().defaultTo(0))
+    .addColumn("created_at", "text", (c) => c.notNull())
+    .execute();
+  await idx("product_images_product", "product_images", ["product_id", "sort_order"]);
+
   await t("rate_limits")
     .addColumn("key", "text", (c) => c.primaryKey())
     .addColumn("count", "integer", (c) => c.notNull())

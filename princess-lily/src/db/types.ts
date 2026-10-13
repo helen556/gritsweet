@@ -45,6 +45,25 @@ export interface ProductTranslationsTable {
   cover_alt: string;
   /** 1 — переклад погоджено; 0 — показуємо з позначкою «переклад готується». */
   is_confirmed: Generated<number>;
+  /** Обкладинка саме цієї мовної версії (null — загальна обкладинка товару). */
+  cover_base: string | null;
+  cover_widths: string | null;
+  cover_width: number | null;
+  cover_height: number | null;
+}
+export interface ProductImagesTable {
+  id: string;
+  product_id: string;
+  kind: "spread";
+  locale: Locale | null;
+  base: string;
+  widths: string;
+  width: number;
+  height: number;
+  alt_uk: Generated<string>;
+  alt_en: Generated<string>;
+  sort_order: Generated<number>;
+  created_at: string;
 }
 export interface ProductVariantsTable {
   id: string;
@@ -233,6 +252,7 @@ export interface Database {
   order_events: OrderEventsTable;
   receipts: ReceiptsTable;
   notifications: NotificationsTable;
+  product_images: ProductImagesTable;
 }
 
 export type Product = Selectable<ProductsTable>;

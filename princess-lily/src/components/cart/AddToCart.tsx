@@ -14,7 +14,7 @@ type V = { id: string; bookLocale: "uk" | "en"; format: "pdf" | "print"; priceMi
  * до вибору валідного варіанта покупка неактивна; 4) «Купити зараз» — оформлення лише цієї книжки, кошик не змінюється;
  * 5) «Додати в кошик» — з підтвердженням і кількістю в кошику. Ціна тут лише для показу; сума рахується на сервері.
  */
-export default function AddToCart({ lang, t, variants }: { lang: "uk" | "en"; t: { product: Omit<Dict["product"], "age">; formats: Dict["formats"]; bookLocales: Dict["bookLocales"] }; variants: V[] }) {
+export default function AddToCart({ lang, t, variants, onLocaleChange }: { lang: "uk" | "en"; t: { product: Omit<Dict["product"], "age">; formats: Dict["formats"]; bookLocales: Dict["bookLocales"] }; variants: V[]; onLocaleChange?: (l: "uk" | "en") => void }) {
   const cart = useCart();
   const router = useRouter();
   const available = variants.filter((v) => v.sellable);
@@ -30,7 +30,7 @@ export default function AddToCart({ lang, t, variants }: { lang: "uk" | "en"; t:
   const inCart = sel ? cart.lines.find((l) => l.variantId === sel.id)?.quantity ?? 0 : 0;
 
   const chooseLang = (l: V["bookLocale"]) => {
-    setBl(l); setAdded(false); setQty(1);
+    setBl(l); setAdded(false); setQty(1); onLocaleChange?.(l);
     const f = formatsFor(l);
     setFmt(f.length === 1 ? f[0] : f.includes(fmt as V["format"]) ? fmt : null);
   };
@@ -41,7 +41,7 @@ export default function AddToCart({ lang, t, variants }: { lang: "uk" | "en"; t:
         <legend className="mb-2 font-semibold">{t.product.languageLabel}</legend>
         <div className="flex flex-wrap gap-2">
           {langs.map((l) => (
-            <label key={l} className="chip"><input className="sr-only" type="radio" name="bl" value={l} checked={bl === l} onChange={() => chooseLang(l)} />{t.bookLocales[l]}</label>
+            <label key={l} className="chip"><input className="sr-only" type="radio" name="bl" value={l} checked={bl === l} onChange={() => chooseLang(l)} /><strong>{l === "uk" ? "UA" : "EN"}</strong><span className="opacity-80">{t.bookLocales[l]}</span></label>
           ))}
         </div>
       </fieldset>

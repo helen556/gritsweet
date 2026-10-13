@@ -12,6 +12,7 @@ const F: [string, string, string?][] = [
   ["payment_link_url", "Платіжне посилання (manual-link), https://… — сума в URL не дописується"], ["payment_link_note_uk", "Підказка до оплати (укр.)", "area"], ["payment_link_note_en", "Підказка до оплати (англ.)", "area"],
   ["seller_details_uk", "Реквізити продавця (укр., для оферти)", "area"], ["seller_details_en", "Реквізити продавця (англ.)", "area"],
   ["author_photo", "author_photo: порожньо — фото з пакета; none — без фото"],
+  ["books_photo", "books_photo: заповнюється завантаженням нижче; none — сховати блок"],
 ];
 
 export default async function Settings() {
@@ -42,6 +43,11 @@ export default async function Settings() {
               {t ? <textarea id={k} name={k} rows={3} defaultValue={s[k as keyof typeof s]} className="input" /> : <input id={k} name={k} defaultValue={s[k as keyof typeof s]} className="input" />}</div>
           ))}
         </ActionForm>
+      </section>
+      <section className="card p-5 sm:p-6">
+        <h2 className="text-2xl">Фото книжок для головної (атмосферний блок)</h2>
+        <p className="mt-1 text-sm text-ink-soft">Зараз: {s.books_photo === "none" ? "приховано" : s.books_photo ? "завантажено" : "немає — блок не показується"}. Поле <code>books_photo</code> у формі вище: <code>none</code> — сховати.</p>
+        <UploadForm kind="books_photo" targetId="books" accept="image/jpeg,image/png,image/webp" label="Завантажити фото книжок на дерев’яному столі (JPG/PNG/WebP, до 10 МБ)" />
       </section>
       <section className="card p-5 sm:p-6">
         <h2 className="text-2xl">Фото авторки (необов’язково)</h2>

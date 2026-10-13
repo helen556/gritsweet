@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 /** Завантаження обкладинки / приватного PDF через захищений ендпоінт /api/admin/upload. */
-export default function UploadForm({ kind, targetId, accept, label }: { kind: "cover" | "pdf" | "author" | "receipt"; targetId: string; accept: string; label: string }) {
+export default function UploadForm({ kind, targetId, accept, label, extra }: { extra?: Record<string, string>; kind: "cover" | "pdf" | "author" | "receipt" | "spread" | "books_photo"; targetId: string; accept: string; label: string }) {
   const [msg, setMsg] = useState<{ ok?: string; error?: string }>({});
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -19,6 +19,7 @@ export default function UploadForm({ kind, targetId, accept, label }: { kind: "c
   return (
     <form onSubmit={onSubmit} className="mt-3 flex flex-wrap items-end gap-3">
       <input type="hidden" name="kind" value={kind} /><input type="hidden" name="id" value={targetId} />
+      {extra && Object.entries(extra).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
       <div className="field"><label htmlFor={`f-${kind}-${targetId}`} className="text-sm">{label}</label>
         <input id={`f-${kind}-${targetId}`} type="file" name="file" accept={accept} required className="block min-h-11 text-sm" /></div>
       <button className="btn btn-ghost btn-sm" disabled={busy} aria-busy={busy}>{busy ? "Завантаження…" : "Завантажити"}</button>

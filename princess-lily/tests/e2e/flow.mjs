@@ -158,6 +158,36 @@ await page.goto(`${BASE}/uk/no-such-page`);
 await page.screenshot({ path: path.join(OUT, "404.png") });
 await ctx.close();
 
+// ---------- Головна: структура, ширини, без JS ----------
+for (const [w, h] of [[360, 780], [390, 844], [768, 1024], [1440, 900]]) {
+  const c = await browser.newContext({ viewport: { width: w, height: h }, isMobile: w < 768, hasTouch: w < 768 });
+  const hp = await c.newPage();
+  await hp.goto(`${BASE}/uk`);
+  const info = await hp.evaluate(() => {
+    const hero = document.querySelector(".hero");
+    const next = hero?.nextElementSibling?.querySelector("section");
+    const cta = [...document.querySelectorAll(".hero a")].find((a) => a.textContent.trim() === "Обрати книжку");
+    const r = hero?.getBoundingClientRect();
+    return { ov: document.documentElement.scrollWidth - window.innerWidth, heroH: Math.round(r?.height ?? 0), firstId: next?.id, cta: cta?.getAttribute("href"),
+      cards: document.querySelectorAll("#catalog .book-card").length, soon: [...document.querySelectorAll("#catalog .book-card")].some((c) => !c.querySelector("img")) };
+  });
+  check(`${w}px: головна без горизонтального скролу, hero на весь екран, каталог одразу після hero`, info.ov <= 0 && info.heroH >= h - 2 && info.firstId === "catalog" && info.cta === "#catalog" && info.cards > 0 && !info.soon, JSON.stringify(info));
+  await hp.screenshot({ path: path.join(OUT, `home-${w}.png`) });
+  await hp.evaluate(() => window.scrollTo(0, document.querySelector("#catalog").offsetTop - 60));
+  await hp.waitForTimeout(900);
+  await hp.screenshot({ path: path.join(OUT, `home-${w}-catalog.png`) });
+  await hp.screenshot({ path: path.join(OUT, `home-${w}-full.png`), fullPage: true });
+  await c.close();
+}
+{
+  const nj = await browser.newContext({ viewport: { width: 1280, height: 860 }, javaScriptEnabled: false });
+  const np = await nj.newPage();
+  await np.goto(`${BASE}/uk`);
+  const hidden = await np.evaluate(() => [...document.querySelectorAll("main h2, main h3, main p")].filter((e) => getComputedStyle(e).opacity === "0" || getComputedStyle(e).visibility === "hidden").length);
+  check("без JS: увесь текст головної видимий", hidden === 0, `hidden=${hidden}`);
+  await nj.close();
+}
+
 // ---------- Мобільний ----------
 const m = await browser.newContext({ viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
 const mp = await m.newPage();
@@ -182,6 +212,10 @@ await rp.goto(`${BASE}/uk`);
 await rp.waitForTimeout(1500);
 const st = await rp.evaluate(() => ({ playing: (() => { const v = document.querySelector("video"); return v && !v.paused; })(), canvases: [...document.querySelectorAll("canvas")].filter((c) => getComputedStyle(c).display !== "none").length, btn: !!document.querySelector('button[aria-label="Відтворити"]') }));
 check("reduced-motion: відео не стартує, без пилу/сліду, є кнопка відтворення", !st.playing && st.canvases === 0 && st.btn, JSON.stringify(st));
+await rp.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
+await rp.waitForTimeout(300);
+const rmHidden = await rp.evaluate(() => [...document.querySelectorAll("[data-reveal]")].filter((e) => getComputedStyle(e).opacity !== "1" || getComputedStyle(e).transform !== "none").length);
+check("reduced-motion: появи без зсуву, усе видно одразу", rmHidden === 0, `notShown=${rmHidden}`);
 await rm.close();
 
 await browser.close();

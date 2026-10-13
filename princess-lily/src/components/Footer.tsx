@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Dict } from "@/i18n";
+import ContactDetails from "./ContactDetails";
 
 export default function Footer({ lang, t }: { lang: "uk" | "en"; t: Dict }) {
   const f = t.footer.links;
@@ -9,6 +10,7 @@ export default function Footer({ lang, t }: { lang: "uk" | "en"; t: Dict }) {
         <div>
           <p className="font-display text-2xl font-semibold text-moss-900">{t.brand.name}</p>
           <p className="mt-1 text-ink-soft">{t.brand.slogan}</p>
+          <ContactDetails lang={lang} t={t} compact />
         </div>
         <nav aria-label="Footer">
           <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">

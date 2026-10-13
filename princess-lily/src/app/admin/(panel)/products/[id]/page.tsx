@@ -4,7 +4,7 @@ import { getProductForAdmin } from "@/lib/catalog";
 import { minorToInput } from "@/lib/money";
 import ActionForm from "@/components/admin/ActionForm";
 import UploadForm from "@/components/admin/UploadForm";
-import { saveProductAction, saveVariantAction, removePdfAction } from "../../../actions";
+import { saveProductAction, saveVariantAction, removePdfAction, deleteImageAction } from "../../../actions";
 
 export const metadata = { title: "Редагування товару" };
 const REASON: Record<string, string> = { not_published: "товар не опубліковано", inactive: "варіант вимкнено", no_price: "немає ціни", no_file: "не завантажено PDF", out_of_stock: "немає залишку" };
@@ -49,12 +49,41 @@ export default async function EditProduct({ params }: PageProps<"/admin/products
       </section>
 
       <section className="card p-5 sm:p-6">
-        <h2 className="text-2xl">Обкладинка</h2>
-        {p.cover_base && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={`${p.cover_base}-${p.widths[0]}.webp`} alt="" className="mt-3 h-40 w-40 rounded-xl bg-cream object-contain" />
-        )}
-        <UploadForm kind="cover" targetId={p.id} accept="image/jpeg,image/png,image/webp" label="Завантажити нову обкладинку (JPG/PNG/WebP, до 10 МБ)" />
+        <h2 className="text-2xl">Обкладинки мовних версій</h2>
+        <p className="mt-1 text-sm text-ink-soft">Для кожної мови — своя обкладинка (UA і EN). Якщо для мови немає окремої, показується загальна. Назву на обкладинці не обрізаємо.</p>
+        <div className="mt-4 grid gap-6 sm:grid-cols-3">
+          {([["", "Загальна"], ["uk", "Українська версія"], ["en", "Англійська версія"]] as const).map(([loc, label]) => {
+            const c = loc ? p.translations.find((t) => t.locale === loc) : null;
+            const base = loc ? c?.cover_base : p.cover_base;
+            const w = loc ? JSON.parse(c?.cover_widths ?? "[]")[0] : p.widths[0];
+            return (
+              <div key={loc || "all"} className="rounded-2xl border border-black/10 p-3">
+                <p className="font-semibold">{label}</p>
+                {base && w ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={`${base}-${w}.webp`} alt="" className="mt-2 aspect-square w-full rounded-xl bg-cream object-contain" />
+                ) : <p className="mt-2 grid aspect-square place-items-center rounded-xl bg-cream text-sm text-ink-soft">немає</p>}
+                <UploadForm kind="cover" targetId={p.id} extra={{ locale: loc }} accept="image/jpeg,image/png,image/webp" label="JPG/PNG/WebP, до 10 МБ" />
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="card p-5 sm:p-6">
+        <h2 className="text-2xl">Книжка зсередини (справжні розвороти)</h2>
+        <p className="mt-1 text-sm text-ink-soft">Блок на сайті з’являється лише тоді, коли тут є хоча б один розворот. Не завантажуйте макети чи згенеровані картинки.</p>
+        <ul className="mt-3 grid gap-3 sm:grid-cols-3">
+          {p.images.map((im) => (
+            <li key={im.id} className="rounded-xl border border-black/10 p-2 text-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`${im.base}-${JSON.parse(im.widths)[0]}.webp`} alt="" className="aspect-[3/2] w-full rounded-lg bg-cream object-contain" />
+              <p className="mt-1 text-ink-soft">{im.locale ? (im.locale === "uk" ? "UA" : "EN") : "UA+EN"} · {im.alt_uk || "без підпису"}</p>
+              <form action={deleteImageAction}><input type="hidden" name="id" value={im.id} /><button className="btn btn-danger btn-sm mt-1">Видалити</button></form>
+            </li>
+          ))}
+        </ul>
+        <UploadForm kind="spread" targetId={p.id} accept="image/jpeg,image/png,image/webp" label="Додати розворот (для обох мов)" />
       </section>
 
       <section className="card p-5 sm:p-6">

@@ -9,9 +9,10 @@ const en: Dict = {
     homeDescription: "Illustrated children's books for ages 2–6 about the small but meaningful moments of growing up. Digital (PDF) and printed editions.",
   },
   brand: { name: "Princess Lily Stories", slogan: "Little Stories, Big Steps" },
-  nav: { home: "Home", books: "Books", about: "About the author", faq: "FAQ", contacts: "Contact", cart: "Cart", menu: "Menu", close: "Close", skip: "Skip to content", language: "Site language" },
+  nav: { home: "Home", books: "Books", about: "About the author", delivery: "Delivery & payment", faq: "FAQ", contacts: "Contact", cart: "Cart", menu: "Menu", close: "Close", skip: "Skip to content", language: "Site language" },
   hero: {
-    cta: "Browse books",
+    cta: "Choose a book",
+    intro: "Illustrated books for children aged 2–6 about the small but meaningful moments of growing up.",
     secondary: "About the series",
     pause: "Pause", play: "Play", replay: "Watch again",
     videoLabel: "Video: Lily and Bublik the puppy invite you into the garden, then the whole family walks down the garden path",
@@ -32,6 +33,12 @@ const en: Dict = {
     ],
     closing: "Because what seems like a small thing to a grown-up can be a giant step for a child.",
     lineupAlt: "Lily, her mom, her dad and Bublik the puppy",
+  },
+  home: {
+    catalogTitle: "The books", catalogLead: "Every book comes in Ukrainian and English, as a digital (PDF) or printed edition.",
+    worldKicker: "Lily’s world", worldTitle: "Meet Lily",
+    insideTitle: "Inside the book", insideHint: "Tap to enlarge", close: "Close",
+    deliveryTitle: "Delivery & payment", deliveryMore: "More about delivery and payment", booksKicker: "About the books", booksPhotoAlt: "Princess Lily Stories books on a wooden table",
   },
   benefits: {
     title: "Why these stories",

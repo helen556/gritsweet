@@ -30,7 +30,15 @@ export async function createProductAction(_: ActionState, fd: FormData): Promise
   if (await db.selectFrom("products").select("id").where("slug", "=", slug).executeTakeFirst()) return { error: "Така адреса вже існує" };
   const id = newId("prd");
   await db.insertInto("products").values({ id, slug, status: "draft", age_from: 2, age_to: 6, cover_base: null, cover_widths: "[]", cover_width: null, cover_height: null, pages: null, size_label: null, binding_label: null }).execute();
-  await db.insertInto("product_translations").values({ product_id: id, locale: "uk", title, description: "", cover_alt: "", is_confirmed: 1 }).execute();
+  await db.insertInto("product_translations").values([
+    { product_id: id, locale: "uk", title, description: "", cover_alt: "", is_confirmed: 1 },
+    { product_id: id, locale: "en", title: str(fd, "title_en", 200) || title, description: "", cover_alt: "", is_confirmed: str(fd, "title_en", 200) ? 1 : 0 },
+  ]).execute();
+  // чотири варіанти (UA/EN × PDF/друк) — неактивні, без ціни, доки власниця їх не заповнить
+  for (const book_locale of ["uk", "en"] as const) for (const format of ["pdf", "print"] as const)
+    await db.insertInto("product_variants").values({ id: newId("var"), product_id: id, book_locale, format, price_minor: null, stock: null, private_pdf_key: null, is_active: 0, restock_note: null }).execute();
+  const max = await db.selectFrom("products").select(({ fn }) => fn.max<number>("sort_order").as("m")).executeTakeFirst();
+  await db.updateTable("products").set({ sort_order: Number(max?.m ?? 0) + 1 }).where("id", "=", id).execute();
   await audit(admin, "product.create", "product", id, { slug });
   redirect(`/admin/products/${id}`);
 }
@@ -256,4 +264,32 @@ export async function retryNotificationsAction(): Promise<ActionState> {
   await audit(admin, "notifications.retry", "notifications", undefined, { count: r.length });
   revalidatePath("/admin");
   return r.length ? { ok: `Оброблено: ${r.join(", ")}` } : { ok: "Немає сповіщень для повтору" };
+}
+
+/** Видалення розвороту книжки. */
+export async function deleteImageAction(fd: FormData) {
+  const admin = await requireAdmin();
+  const id = str(fd, "id", 64);
+  const im = await db.selectFrom("product_images").select(["id", "product_id"]).where("id", "=", id).executeTakeFirst();
+  if (!im) return;
+  await db.deleteFrom("product_images").where("id", "=", id).execute();
+  await audit(admin, "product.spread_delete", "product", im.product_id, { image: id });
+  revalidatePath(`/admin/products/${im.product_id}`);
+}
+
+/** Швидка зміна статусу й порядку зі списку товарів. */
+export async function quickProductAction(fd: FormData) {
+  const admin = await requireAdmin();
+  const id = str(fd, "id", 64);
+  const status = z.enum(["draft", "coming_soon", "published"]).safeParse(str(fd, "status"));
+  const order = intOrNull(str(fd, "sort_order", 6));
+  const p = await db.selectFrom("products").select(["status", "sort_order"]).where("id", "=", id).executeTakeFirst();
+  if (!p) return;
+  const set: { status?: "draft" | "coming_soon" | "published"; sort_order?: number; updated_at: string } = { updated_at: now() };
+  if (status.success) set.status = status.data;
+  if (order !== null && !Number.isNaN(order)) set.sort_order = order;
+  await db.updateTable("products").set(set).where("id", "=", id).execute();
+  await audit(admin, "product.quick_update", "product", id, { from: p.status, to: set.status ?? p.status, sort: set.sort_order ?? p.sort_order });
+  revalidatePath("/admin/products");
+  revalidatePath("/", "layout");
 }

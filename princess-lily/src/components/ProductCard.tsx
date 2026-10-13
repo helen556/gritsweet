@@ -12,29 +12,33 @@ export function priceLabel(p: CatalogProduct, lang: "uk" | "en", t: Dict) {
   return { text: `${all ? "" : lang === "uk" ? "від " : "from "}${formatMinor(min, lang)}`, soon: false };
 }
 
+/**
+ * Картка книжки. Телефон: горизонтальна (обкладинка ~42% ширини, назва поруч) — усі книжки на сторінці, читабельно.
+ * ≥ 640 px: вертикальна. Обкладинка — для мови сайту (або загальна), повністю (object-contain).
+ */
 export default function ProductCard({ p, lang, t, headingLevel = "h3" }: { p: CatalogProduct; lang: "uk" | "en"; t: Dict; headingLevel?: "h2" | "h3" }) {
   const H = headingLevel;
   const price = priceLabel(p, lang, t);
-  const langs = [...new Set(p.variants.map((v) => v.book_locale))];
-  const formats = [...new Set(p.variants.map((v) => v.format))];
+  const shown = p.variants.some((v) => v.sellable) ? p.variants.filter((v) => v.sellable) : p.variants;
+  const langs = [...new Set(shown.map((v) => v.book_locale))];
+  const formats = [...new Set(shown.map((v) => v.format))];
+  const c = p.cover!;
   return (
-    <article className="card group relative flex h-full flex-col overflow-hidden transition-[transform,box-shadow] duration-300 ease-[var(--ease-soft)] hover:-translate-y-1 hover:shadow-[0_26px_50px_-30px_rgba(38,61,45,.55)]">
-      <div className="bg-cream/70 p-5 sm:p-6">
-        {p.cover_base && (
-          <Picture base={p.cover_base} widths={p.widths} width={p.cover_width ?? 1} height={p.cover_height ?? 1} alt={p.coverAlt}
-            sizes="(min-width: 1024px) 360px, (min-width: 640px) 45vw, 90vw" imgClassName="mx-auto aspect-square w-full rounded-xl object-contain shadow-[0_14px_30px_-18px_rgba(0,0,0,.45)]" />
-        )}
+    <article className="book-card group relative grid h-full grid-cols-[42%_1fr] items-center gap-4 sm:flex sm:flex-col sm:items-stretch sm:gap-0">
+      <div className="book-card__cover relative sm:px-6 sm:pt-6">
+        <Picture base={c.base} widths={c.widths} width={c.width} height={c.height} alt={c.alt || p.coverAlt}
+          sizes="(min-width: 1024px) 360px, (min-width: 640px) 44vw, 42vw"
+          imgClassName="mx-auto aspect-square h-auto w-full rounded-[1.1rem] object-contain shadow-[0_18px_34px_-22px_rgba(38,61,45,.55)] transition-transform duration-500 ease-[var(--ease-soft)] group-hover:-translate-y-1" />
       </div>
-      <div className="flex flex-1 flex-col gap-3 p-5 sm:p-6">
-        <H className="text-2xl text-moss-900">
-          <Link href={`/${lang}/books/${p.slug}`} className="after:absolute after:inset-0 after:content-['']" lang={p.translationConfirmed ? undefined : "uk"}>{p.title}</Link>
+      <div className="flex min-w-0 flex-col gap-2 py-2 pr-1 sm:flex-1 sm:gap-3 sm:p-6">
+        <H className="text-[1.3rem] leading-snug text-moss-900 sm:text-2xl">
+          <Link href={`/${lang}/books/${p.slug}`} className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none" lang={p.translationConfirmed ? undefined : "uk"}>{p.title}</Link>
         </H>
-        <ul className="flex flex-wrap gap-2 text-sm text-ink-soft">
-          {p.age_from != null && p.age_to != null && <li className="rounded-full bg-moss-100 px-3 py-1">{t.product.age(p.age_from, p.age_to)}</li>}
-          {langs.map((l) => <li key={l} className="rounded-full bg-moss-100 px-3 py-1">{t.bookLocales[l]}</li>)}
-          {formats.map((f) => <li key={f} className="rounded-full bg-rose-100/80 px-3 py-1">{t.formats[f]}</li>)}
+        <ul className="flex flex-wrap gap-1.5 text-[0.82rem] text-ink-soft sm:gap-2 sm:text-sm">
+          {langs.map((l) => <li key={l} className="rounded-full bg-moss-100/80 px-2.5 py-0.5">{l === "uk" ? "UA" : "EN"}</li>)}
+          {formats.map((f) => <li key={f} className="rounded-full bg-rose-100/70 px-2.5 py-0.5">{f === "pdf" ? "PDF" : t.formats.print}</li>)}
         </ul>
-        <p className={`mt-auto pt-2 text-lg font-semibold ${price.soon ? "text-copper" : "text-ink"}`}>{price.text}</p>
+        <p className={`mt-auto pt-1 text-lg font-semibold ${price.soon ? "text-copper" : "text-ink"}`}>{price.text}</p>
       </div>
     </article>
   );

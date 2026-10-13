@@ -37,17 +37,17 @@ export default function Header({ lang, t }: { lang: "uk" | "en"; t: Pick<Dict, "
   const links = [
     { href: `/${lang}/books`, label: t.nav.books },
     { href: `/${lang}/about`, label: t.nav.about },
-    { href: `/${lang}#faq`, label: t.nav.faq },
-    { href: `/${lang}/contacts`, label: t.nav.contacts },
+    { href: `/${lang}/delivery`, label: t.nav.delivery },
   ];
   const search = sp.toString();
   const isActive = (href: string) => !href.includes("#") && pathname.startsWith(href);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-black/5 bg-milk/80 backdrop-blur-md supports-[not(backdrop-filter:blur(1px))]:bg-milk">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
-        <Link href={`/${lang}`} className="mr-auto flex min-h-11 items-center font-display text-xl font-semibold text-moss-900 sm:text-2xl">
-          {t.brand.name}
+    <header className="sticky top-0 z-40 border-b border-white/40 bg-milk/75 backdrop-blur-md supports-[not(backdrop-filter:blur(1px))]:bg-milk">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:gap-3 sm:px-6">
+        <Link href={`/${lang}`} className="mr-auto flex min-h-11 min-w-0 items-center gap-1.5 font-display text-[1rem] leading-[1.1] sm:gap-2 text-moss-900 sm:text-2xl" aria-label={t.brand.name}>
+          <svg aria-hidden="true" width="26" height="26" viewBox="0 0 48 48" className="shrink-0 max-[379px]:hidden"><path d="M8 34l4-18 12 11 12-11 4 18z" fill="#f1dfb8" stroke="#a9643f" strokeWidth="2" strokeLinejoin="round" /><circle cx="12" cy="13" r="3" fill="#c97b7e" /><circle cx="24" cy="23" r="3" fill="#c97b7e" /><circle cx="36" cy="13" r="3" fill="#c97b7e" /><rect x="8" y="36" width="32" height="4" rx="2" fill="#3f5f47" /></svg>
+          <span className="max-w-[9rem] sm:max-w-none">{t.brand.name}</span>
         </Link>
         <nav aria-label={t.nav.menu} className="hidden items-center gap-1 md:flex">
           {links.map((l) => (

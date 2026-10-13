@@ -29,11 +29,15 @@ describe("money", () => {
 describe("catalog rules", () => {
   it("seeded draft book is not purchasable (no price) — shows Coming soon", async () => {
     const v = await db.selectFrom("product_variants").selectAll().where("product_id", "=", "prd_bublik").execute();
-    expect(v.length).toBe(2);
-    expect(v.every((x) => x.price_minor === null && x.book_locale === "uk")).toBe(true);
+    // три книжки × (UA/EN × PDF/друк); ціни не надані — нічого не продається
+    expect(v.length).toBe(4);
+    expect(v.every((x) => x.price_minor === null && x.is_active === 0)).toBe(true);
+    expect(new Set(v.map((x) => x.book_locale))).toEqual(new Set(["uk", "en"]));
     const q = await quoteCart(v.map((x) => ({ variantId: x.id, quantity: 1 })), "uk");
     expect(q.lines).toHaveLength(0);
-    expect(q.unavailable).toHaveLength(2);
+    expect(q.unavailable).toHaveLength(4);
+    const books = await db.selectFrom("products").select(["slug", "status"]).where("id", "in", ["prd_bublik", "prd_doctor", "prd_potty"]).orderBy("sort_order").execute();
+    expect(books.map((b) => b.slug)).toEqual(["lili-ide-do-likarya", "lili-yak-ya-navchylasya-sydity-na-horshchyk", "yak-lili-vchyla-bublyka"]);
   });
   it("zero price or missing PDF file is never sellable", () => {
     const base = { productStatus: "published" as const, isActive: 1, stock: 5, privatePdfKey: "pdf/a.pdf" };
@@ -224,5 +228,34 @@ describe("stock", () => {
     expect(v.stock).toBe(1);
     const f = await db.selectFrom("fulfillments").select("status").where("order_id", "=", r.orderId).executeTakeFirstOrThrow();
     expect(f.status).toBe("to_ship");
+  });
+});
+
+describe("catalog: covers, hiding and growth", () => {
+  const cover = (base: string) => ({ cover_base: base, cover_widths: "[480]", cover_width: 1000, cover_height: 1000 });
+  it("coverless book is hidden from the storefront; per-language cover follows the site/book language", async () => {
+    const { listPublicProducts, getPublicProduct } = await import("@/lib/catalog");
+    expect((await listPublicProducts("uk")).some((p) => p.id === "prd_test")).toBe(false);
+    expect(await getPublicProduct("test-book", "uk")).toBeNull();
+    await db.updateTable("product_translations").set(cover("/media/covers/test-uk")).where("product_id", "=", "prd_test").where("locale", "=", "uk").execute();
+    await db.insertInto("product_translations").values({ product_id: "prd_test", locale: "en", title: "[TEST] Test book", description: "", cover_alt: "", is_confirmed: 1, ...cover("/media/covers/test-en") }).execute();
+    const uk = (await listPublicProducts("uk")).find((p) => p.id === "prd_test")!;
+    const en = (await listPublicProducts("en")).find((p) => p.id === "prd_test")!;
+    expect(uk.cover!.base).toBe("/media/covers/test-uk");
+    expect(en.cover!.base).toBe("/media/covers/test-en");
+    expect(uk.coverByLocale.en!.base).toBe("/media/covers/test-en");
+  });
+  it("a 4th (and 5th) book appears in display order without any 3-book limit", async () => {
+    const { listPublicProducts } = await import("@/lib/catalog");
+    for (const [i, slug] of ["book-four", "book-five"].entries()) {
+      await db.insertInto("products").values({ id: `prd_${slug}`, slug, status: "published", age_from: 2, age_to: 6, sort_order: 100 + i, cover_base: "/media/x", cover_widths: "[480]", cover_width: 900, cover_height: 900, pages: null, size_label: null, binding_label: null }).execute();
+      await db.insertInto("product_translations").values({ product_id: `prd_${slug}`, locale: "uk", title: `[TEST] ${slug}`, description: "", cover_alt: "", is_confirmed: 1 }).execute();
+    }
+    const list = await listPublicProducts("uk");
+    expect(list.map((p) => p.slug).slice(-2)).toEqual(["book-four", "book-five"]);
+  });
+  it("spreads block is empty without real spreads", async () => {
+    const { listPublicSpreads } = await import("@/lib/catalog");
+    expect(await listPublicSpreads("uk")).toEqual([]);
   });
 });
