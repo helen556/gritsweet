@@ -32,14 +32,17 @@ function local(): PrivateStorage {
 
 function supabase(): PrivateStorage {
   const url = process.env.SUPABASE_URL!.replace(/\/$/, "");
-  const keyH = { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, apikey: process.env.SUPABASE_SERVICE_ROLE_KEY! };
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!.trim();
+  // Новий формат ключів Supabase (sb_secret_…) — не JWT: передається лише в заголовку apikey.
+  // Старий service_role JWT (три частини через крапку) — ще й як Bearer.
+  const keyH: Record<string, string> = key.split(".").length === 3 ? { Authorization: `Bearer ${key}`, apikey: key } : { apikey: key };
   const bucket = process.env.SUPABASE_PRIVATE_BUCKET ?? "private-books";
   const obj = (key: string) => { assertKey(key); return `${url}/storage/v1/object/${bucket}/${key}`; };
   return {
     kind: "supabase",
     async put(key, data, contentType) {
       const r = await fetch(obj(key), { method: "POST", headers: { ...keyH, "content-type": contentType, "x-upsert": "true" }, body: new Uint8Array(data) });
-      if (!r.ok) throw new Error(`Supabase upload: ${r.status}`);
+      if (!r.ok) throw new Error(`Supabase upload: ${r.status} ${(await r.text().catch(() => "")).slice(0, 200)}`);
     },
     async get(key) {
       const r = await fetch(obj(key), { headers: keyH });

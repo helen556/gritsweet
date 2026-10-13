@@ -273,3 +273,24 @@ describe("packaged covers", () => {
     expect(t).toEqual([{ locale: "en", cover_base: "/media/cover-lili-ide-do-likarya-en" }, { locale: "uk", cover_base: "/media/cover-lili-ide-do-likarya-uk" }]);
   });
 });
+
+describe("Supabase storage auth headers", () => {
+  it("new sb_secret_ keys go only in apikey; legacy JWT keys also as Bearer", async () => {
+    const { privateStorage } = await import("@/lib/storage");
+    const seen: Record<string, string>[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init: RequestInit) => { seen.push(init.headers as Record<string, string>); return new Response("{}", { status: 200 }); }));
+    Object.assign(process.env, { PRIVATE_STORAGE: "supabase", SUPABASE_URL: "https://x.supabase.co" });
+    try {
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_abc";
+      await privateStorage().put("receipts/ord_a/rcp_b.png", Buffer.from("x"), "image/png");
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "aaa.bbb.ccc";
+      await privateStorage().put("receipts/ord_a/rcp_c.png", Buffer.from("x"), "image/png");
+    } finally {
+      vi.unstubAllGlobals();
+      delete process.env.PRIVATE_STORAGE; delete process.env.SUPABASE_URL; delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    }
+    expect(seen[0].apikey).toBe("sb_secret_abc");
+    expect(seen[0].Authorization).toBeUndefined();
+    expect(seen[1].Authorization).toBe("Bearer aaa.bbb.ccc");
+  });
+});
