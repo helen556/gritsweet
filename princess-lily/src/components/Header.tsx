@@ -49,7 +49,7 @@ export default function Header({ lang, t }: { lang: "uk" | "en"; t: Pick<Dict, "
           <svg aria-hidden="true" width="26" height="26" viewBox="0 0 48 48" className="shrink-0 max-[379px]:hidden"><path d="M8 34l4-18 12 11 12-11 4 18z" fill="#f1dfb8" stroke="#a9643f" strokeWidth="2" strokeLinejoin="round" /><circle cx="12" cy="13" r="3" fill="#c97b7e" /><circle cx="24" cy="23" r="3" fill="#c97b7e" /><circle cx="36" cy="13" r="3" fill="#c97b7e" /><rect x="8" y="36" width="32" height="4" rx="2" fill="#3f5f47" /></svg>
           <span className="max-w-[9rem] sm:max-w-none">{t.brand.name}</span>
         </Link>
-        <nav aria-label={t.nav.menu} className="hidden items-center gap-1 md:flex">
+        <nav aria-label={t.nav.menu} className="hidden items-center gap-1 lg:flex">
           {links.map((l) => (
             <Link key={l.href} href={l.href} aria-current={isActive(l.href) ? "page" : undefined}
               className="rounded-full px-3 py-2 text-[0.95rem] font-medium text-ink-soft transition-colors hover:bg-moss-100 hover:text-moss-900 aria-[current=page]:text-moss-900 aria-[current=page]:underline aria-[current=page]:decoration-gold aria-[current=page]:underline-offset-8">
@@ -70,12 +70,12 @@ export default function Header({ lang, t }: { lang: "uk" | "en"; t: Pick<Dict, "
           <span className="hidden sm:inline">{t.nav.cart}</span>
           {ready && count > 0 && <span className="grid h-6 min-w-6 place-items-center rounded-full bg-rose px-1.5 text-xs font-bold text-paper">{count}</span>}
         </Link>
-        <button ref={btnRef} type="button" className="btn btn-ghost btn-sm !px-3 md:hidden" aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen((o) => !o)}>
+        <button ref={btnRef} type="button" className="btn btn-ghost btn-sm !px-3 lg:hidden" aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen((o) => !o)}>
           <span className="sr-only">{open ? t.nav.close : t.nav.menu}</span>
           <svg aria-hidden="true" className="shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">{open ? <path d="M6 6l12 12M18 6 6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}</svg>
         </button>
       </div>
-      <div id="mobile-nav" ref={panelRef} hidden={!open} className="border-t border-black/5 bg-milk md:hidden">
+      <div id="mobile-nav" ref={panelRef} hidden={!open} className="border-t border-black/5 bg-milk lg:hidden">
         <nav aria-label={t.nav.menu} className="mx-auto flex max-w-6xl flex-col px-4 py-2">
           {links.map((l) => (
             <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="flex min-h-12 items-center rounded-xl px-3 text-lg font-medium hover:bg-moss-100">{l.label}</Link>

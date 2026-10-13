@@ -9,3 +9,7 @@ next-env.d.ts
 test-results/
 playwright-report/
 .vercel
+
+# оригінали відео hero (великі; згенеровані файли — у public/media)
+/assets-src/hero-*.mov
+/assets-src/hero-*.mp4

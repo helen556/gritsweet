@@ -65,7 +65,7 @@ const slugOk = (s: string) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s);
  * Необов'язкові матеріали (додаються, коли надані):
  *  - assets-src/covers/<slug>-uk.jpg, <slug>-en.jpg — обкладинки мовних версій (підв'язуються до книжок у db:setup)
  *  - assets-src/spreads/<slug>-01.jpg (… -02, або <slug>-01-uk.jpg) — СПРАВЖНІ розвороти для «Книжка зсередини»
- *  - assets-src/hero-desktop.mp4, assets-src/hero-mobile.mp4 — відео першого екрана; копіюються БЕЗ перекодування
+ *  - assets-src/hero-desktop.(mp4|mov), assets-src/hero-mobile.(mp4|mov) — відео першого екрана (див. heroVideo)
  */
 async function extras() {
   const covers: Record<string, Partial<Record<"uk" | "en", { base: string } & Img>>> = {};
@@ -84,22 +84,57 @@ async function extras() {
     const name = `spread-${m[1]}-${m[2]}${m[3] ? `-${m[3]}` : ""}`;
     (spreads[m[1]] ??= []).push({ base: `/media/${name}`, locale: (m[3] as "uk" | "en") ?? null, ...(await img(path.join(sdir, f), name, [640, 1280, 1920], 84)) });
   }
-  const hero: Record<string, { src: string; width: number; height: number; duration: number; poster: Img & { base: string } }> = {};
+  const prev = (() => { try { return JSON.parse(fs.readFileSync(path.resolve("src/lib/media-extra.json"), "utf8")).hero ?? {}; } catch { return {}; } })();
+  const cfg = (() => { try { return JSON.parse(fs.readFileSync(path.join(SRC, "hero.json"), "utf8")) as Record<string, { posterAt?: number }>; } catch { return {}; } })();
+  const hero: Record<string, HeroOut> = {};
   for (const kind of ["desktop", "mobile"] as const) {
-    const f = path.join(SRC, `hero-${kind}.mp4`);
-    if (!fs.existsSync(f)) continue;
-    const out = path.join(OUT, `hero-${kind}.mp4`);
-    fs.copyFileSync(f, out); // без перекодування й погіршення якості
-    const probe = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,duration:format=duration", "-of", "json", f]).toString());
-    const st = probe.streams[0];
-    // перший кадр у повній якості — заставка на час завантаження / без автозапуску
-    const png = path.join(OUT, `.hero-${kind}-first.png`);
-    execFileSync("ffmpeg", ["-v", "error", "-y", "-i", f, "-frames:v", "1", png]);
-    const poster = { base: `/media/hero-${kind}-poster`, ...(await img(png, `hero-${kind}-poster`, kind === "mobile" ? [540, 828, 1080] : [960, 1440, 1920, 2560], 86)) };
-    fs.rmSync(png);
-    hero[kind] = { src: `/media/hero-${kind}.mp4`, width: st.width, height: st.height, duration: Number(st.duration ?? probe.format.duration), poster };
-    console.log(`hero-${kind}: ${st.width}×${st.height}, ${hero[kind].duration.toFixed(2)} с (скопійовано без змін)`);
+    const f = ["mp4", "mov", "m4v"].map((e) => path.join(SRC, `hero-${kind}.${e}`)).find((x) => fs.existsSync(x));
+    if (!f) {
+      // оригінали відео не зберігаються в git — лишаємо вже згенеровані файли, якщо вони є
+      if (prev[kind] && fs.existsSync(path.join(OUT, path.basename(prev[kind].src)))) hero[kind] = prev[kind];
+      continue;
+    }
+    hero[kind] = await heroVideo(f, kind, cfg[kind]?.posterAt ?? 0);
   }
   return { covers, spreads, hero };
 }
+type HeroOut = { src: string; width: number; height: number; duration: number; sources: { src: string; type: string }[];
+  poster: Img & { base: string }; first: (Img & { base: string }) | null };
+
+/**
+ * Відео першого екрана: оригінал лише перепаковується в MP4 (-c copy, faststart) — БЕЗ перекодування й втрати якості.
+ * Якщо оригінал не H.264 (напр. HEVC з iPhone), додаються сумісні копії для браузерів без цього кодека:
+ * H.264 (CRF 17, та сама роздільність і частота кадрів) і VP9 WebM. Браузер бере перше джерело, яке підтримує, тож
+ * Safari/iOS і більшість Android отримують оригінал.
+ * Заставка — кадр posterAt (assets-src/hero.json), окремо зберігається перший кадр для м'якого стику повтору.
+ */
+async function heroVideo(f: string, kind: "desktop" | "mobile", posterAt: number): Promise<HeroOut> {
+  const probe = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,width,height,duration:format=duration", "-of", "json", f]).toString());
+  const st = probe.streams[0];
+  const codec: string = st.codec_name;
+  const name = `hero-${kind}`;
+  const out = path.join(OUT, `${name}.mp4`);
+  execFileSync("ffmpeg", ["-v", "error", "-y", "-i", f, "-map", "0:v:0", "-c", "copy", ...(codec === "hevc" ? ["-tag:v", "hvc1"] : []), "-movflags", "+faststart", out]);
+  const sources = [{ src: `/media/${name}.mp4`, type: codec === "hevc" ? 'video/mp4; codecs="hvc1"' : "video/mp4" }];
+  if (codec !== "h264") {
+    execFileSync("ffmpeg", ["-v", "error", "-y", "-i", f, "-map", "0:v:0", "-c:v", "libx264", "-preset", "slow", "-crf", "17", "-pix_fmt", "yuv420p", "-movflags", "+faststart", path.join(OUT, `${name}-h264.mp4`)]);
+    sources.push({ src: `/media/${name}-h264.mp4`, type: "video/mp4" });
+  }
+  execFileSync("ffmpeg", ["-v", "error", "-y", "-i", f, "-map", "0:v:0", "-c:v", "libvpx-vp9", "-crf", "24", "-b:v", "0", "-row-mt", "1", "-deadline", "good", "-cpu-used", "2", "-pix_fmt", "yuv420p", path.join(OUT, `${name}.webm`)]);
+  sources.push({ src: `/media/${name}.webm`, type: "video/webm" });
+  const widths = kind === "mobile" ? [540, 828, 1080] : [960, 1440, 1920, 2560];
+  const still = async (at: number, base: string) => {
+    const png = path.join(OUT, `.${base}.png`);
+    execFileSync("ffmpeg", ["-v", "error", "-y", "-ss", String(at), "-i", f, "-frames:v", "1", png]);
+    const r = { base: `/media/${base}`, ...(await img(png, base, widths, 86)) };
+    fs.rmSync(png);
+    return r;
+  };
+  const poster = await still(posterAt, `${name}-poster`);
+  const first = posterAt > 0 ? await still(0, `${name}-first`) : null;
+  const duration = Number(st.duration ?? probe.format.duration);
+  console.log(`${name}: ${codec} ${st.width}×${st.height}, ${duration.toFixed(2)} с — оригінал без перекодування + ${sources.length - 1} сумісн. копії`);
+  return { src: sources[0].src, width: st.width, height: st.height, duration, sources, poster, first };
+}
+
 main();

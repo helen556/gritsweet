@@ -28,6 +28,7 @@ export default function Hero({ t, ctaHref }: { t: T; ctaHref: string }) {
   preload(`${D.poster.base}-${D.poster.widths[Math.min(1, D.poster.widths.length - 1)]}.avif`, { as: "image", type: "image/avif", fetchPriority: "high", imageSrcSet: srcset(D.poster, "avif"), imageSizes: "100vw", media: M ? "not all and " + MOBILE_QUERY : undefined });
   if (M) preload(`${M.poster.base}-${M.poster.widths[0]}.avif`, { as: "image", type: "image/avif", fetchPriority: "high", imageSrcSet: srcset(M.poster, "avif"), imageSizes: "100vw", media: MOBILE_QUERY });
 
+  const firstSet = (f: NonNullable<HeroVideo["first"]>, ext: string) => srcset(f, ext);
   const pick = () => (M && window.matchMedia(MOBILE_QUERY).matches ? M : D);
 
   useEffect(() => {
@@ -78,7 +79,7 @@ export default function Hero({ t, ctaHref }: { t: T; ctaHref: string }) {
 
   const cur = video ?? D;
   return (
-    <section className={`hero relative isolate -mt-16 overflow-hidden bg-moss-100 ${M ? "hero--dual" : "hero--legacy"}`} aria-labelledby="hero-title"
+    <section className={`hero relative isolate -mt-16 overflow-hidden bg-moss-100 ${M ? "hero--dual" : ""} ${HERO.legacyWebm ? "hero--legacy" : ""}`} aria-labelledby="hero-title"
       style={{ ["--focus" as string]: cur.focus, ["--focus-d" as string]: D.focus, ["--focus-m" as string]: M?.focus ?? D.focus }}>
       <div className="hero-backdrop" aria-hidden="true" />
       <div className="hero-stage hero-media">
@@ -91,19 +92,28 @@ export default function Hero({ t, ctaHref }: { t: T; ctaHref: string }) {
           <img src={`${D.poster.base}-${D.poster.widths[Math.min(1, D.poster.widths.length - 1)]}.webp`} alt={t.posterAlt}
             width={D.poster.width} height={D.poster.height} fetchPriority="high" loading="eager" decoding="sync" className="hero-fit hero-poster h-full w-full" />
         </picture>
+        {/* перший кадр ролика під відео — у нього м'яко розчиняється кінець перед повтором (лише коли заставка — інший кадр) */}
+        {shown && video?.first && (
+          <picture className="absolute inset-0">
+            <source type="image/avif" srcSet={firstSet(video.first, "avif")} sizes="100vw" />
+            <img src={`${video.first.base}-${video.first.widths[0]}.webp`} srcSet={firstSet(video.first, "webp")} sizes="100vw" alt="" width={video.first.width} height={video.first.height} className="hero-fit h-full w-full" />
+          </picture>
+        )}
         <video
           ref={vref} muted playsInline autoPlay={false} preload="none" disablePictureInPicture aria-label={t.videoLabel}
           className={`hero-fit absolute inset-0 h-full w-full transition-opacity ${seam ? "duration-500" : "duration-700"} ${shown && !seam ? "opacity-100" : "opacity-0"}`}
           onPlaying={onPlaying} onTimeUpdate={onTime} onEnded={onEnded}
         >
           {video && video === D && HERO.legacyWebm && <source src={HERO.legacyWebm} type="video/webm" />}
-          {video && <source src={video.src} type={video.type} onError={() => { setShown(false); setState("blocked"); }} />}
+          {video && (video.sources ?? [{ src: video.src, type: video.type }]).map((s, i, all) => (
+            <source key={s.src} src={s.src} type={s.type} onError={i === all.length - 1 ? () => { setShown(false); setState("blocked"); } : undefined} />
+          ))}
         </video>
       </div>
       <div className="hero-scrim" aria-hidden="true" />
       <StardustIntro />
 
-      <div className={`hero-copy hero-copy--${cur.text}`}>
+      <div className={`hero-copy hero-copy--${D.text}${M ? ` hero-copy--m-${M.text}` : ""}`}>
         <div className="hero-cloud-wrap">
           <div className="hero-cloud" aria-hidden="true"><span /><span /><span /></div>
           <div className="hero-sparkles" aria-hidden="true"><i /><i /><i /><i /><i /></div>

@@ -146,7 +146,8 @@ details.faq[open] .faq-icon { transform: rotate(45deg); }
 .hero-fit { object-fit: cover; object-position: var(--focus, 50% 50%); }
 .hero-backdrop { position: absolute; inset: 0;
   background: linear-gradient(rgba(250, 246, 238, .3), rgba(250, 246, 238, .3)), url(/media/hero-start-blur.webp) center / cover no-repeat; }
-.hero--dual .hero-backdrop { display: none; }
+.hero--dual:not(.hero--legacy) .hero-backdrop { display: none; }
+@media (max-aspect-ratio: 4/5) { .hero--dual .hero-backdrop { display: none; } }
 /* Нові відео (комп'ютер/телефон): заповнюють увесь екран, кадрування — object-position з src/content/hero.ts */
 .hero--dual .hero-poster { object-position: var(--focus-d); }
 @media (max-aspect-ratio: 4/5) { .hero--dual .hero-poster { object-position: var(--focus-m); } }
@@ -161,10 +162,10 @@ details.faq[open] .faq-icon { transform: rotate(45deg); }
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 7%); mask-image: linear-gradient(to bottom, transparent 0, #000 7%); }
 }
 @media (max-aspect-ratio: 4/5) {
-  .hero--legacy .hero-stage { inset: auto 0; top: 33%; aspect-ratio: 16 / 9;
+  .hero--legacy:not(.hero--dual) .hero-stage { inset: auto 0; top: 33%; aspect-ratio: 16 / 9;
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 97%, transparent 100%);
     mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 97%, transparent 100%); }
-  .hero--legacy .hero-fit { object-fit: contain; }
+  .hero--legacy:not(.hero--dual) .hero-fit { object-fit: contain; }
 }
 
 .hero-scrim {
@@ -203,6 +204,22 @@ details.faq[open] .faq-icon { transform: rotate(45deg); }
   .hero-lower { align-items: center; max-width: 24rem; min-width: 0; padding: 0; margin-bottom: 3.2rem; }
   .hero-intro { font-size: .95rem; }
   .hero-control { bottom: calc(1.25rem + env(safe-area-inset-bottom)); }
+}
+/* Телефонне відео, де голови персонажів у верхній частині кадру: увесь текст — компактно внизу, на стежці */
+@media (max-aspect-ratio: 4/5) {
+  .hero-copy--m-bottom { justify-content: flex-end; gap: .55rem; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+  .hero-copy--m-bottom .hero-cloud-wrap { padding: .65rem 1rem .55rem; max-width: 22rem; }
+  .hero-copy--m-bottom .hero-cloud { inset: -18% -8% -22% -8%; }
+  .hero-copy--m-bottom .hero-title { font-size: clamp(1.8rem, 8vw, 2.5rem); }
+  .hero-copy--m-bottom .hero-slogan { font-size: clamp(1rem, 4.1vw, 1.2rem); margin-top: .3rem; }
+  .hero-copy--m-bottom .hero-lower { margin-bottom: 0; gap: .7rem; max-width: 21rem; }
+  .hero-copy--m-bottom .hero-intro { font-size: .9rem; line-height: 1.45; }
+}
+@media (max-aspect-ratio: 4/5) and (min-width: 600px) {
+  .hero-copy--m-bottom { padding-bottom: calc(1.6rem + env(safe-area-inset-bottom)); }
+  .hero-copy--m-bottom .hero-cloud-wrap { max-width: 34rem; }
+  .hero-copy--m-bottom .hero-title { font-size: 2.7rem; }
+  .hero-copy--m-bottom .hero-lower { max-width: 26rem; }
 }
 /* Низькі landscape-екрани телефонів */
 @media (max-height: 520px) and (min-aspect-ratio: 4/5) {

@@ -1,1 +1,46 @@
-{ "covers": {}, "spreads": {}, "hero": {} }
+{
+  "covers": {},
+  "spreads": {},
+  "hero": {
+    "mobile": {
+      "src": "/media/hero-mobile.mp4",
+      "width": 1214,
+      "height": 2160,
+      "duration": 7.041667,
+      "sources": [
+        {
+          "src": "/media/hero-mobile.mp4",
+          "type": "video/mp4; codecs=\"hvc1\""
+        },
+        {
+          "src": "/media/hero-mobile-h264.mp4",
+          "type": "video/mp4"
+        },
+        {
+          "src": "/media/hero-mobile.webm",
+          "type": "video/webm"
+        }
+      ],
+      "poster": {
+        "base": "/media/hero-mobile-poster",
+        "width": 1214,
+        "height": 2160,
+        "widths": [
+          540,
+          828,
+          1080
+        ]
+      },
+      "first": {
+        "base": "/media/hero-mobile-first",
+        "width": 1214,
+        "height": 2160,
+        "widths": [
+          540,
+          828,
+          1080
+        ]
+      }
+    }
+  }
+}
