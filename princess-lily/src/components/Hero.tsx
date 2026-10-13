@@ -5,110 +5,97 @@ import StardustIntro from "./effects/StardustIntro";
 import { HERO, MOBILE_QUERY, type HeroVideo } from "@/content/hero";
 
 type T = { title: string; slogan: string; intro: string; cta: string; pause: string; play: string; videoLabel: string; posterAlt: string };
-type State = "idle" | "playing" | "paused" | "blocked";
+type State = "playing" | "paused" | "blocked";
+type Still = HeroVideo["poster"];
 
-const srcset = (p: HeroVideo["poster"], ext: string) => p.widths.map((w) => `${p.base}-${w}.${ext} ${w}w`).join(", ");
+const srcset = (p: Still, ext: string) => p.widths.map((w) => `${p.base}-${w}.${ext} ${w}w`).join(", ");
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+const sourcesOf = (v: HeroVideo) => v.sources ?? [{ src: v.src, type: v.type }];
 
 /**
- * Повноекранний перший екран із двома відео: комп'ютер / телефон (див. src/content/hero.ts).
- * - Завантажується лише відео, що відповідає екрану (рішення до встановлення src).
- * - muted + autoplay + playsInline; повтор із м'яким розчиненням у перший кадр (без різкого стрибка).
- * - Заставка — перший кадр відповідного відео (<picture> з media, браузер бере лише одну).
- * - reduced-motion / Save-Data — заставка без автозапуску й кнопка «Відтворити»; помилка/блок автозапуску — те саме.
+ * Повноекранний перший екран: відео стартує одразу, ще до завантаження JS.
+ * - <video> вставляється готовим HTML (muted + autoplay + playsinline як атрибути — інакше iOS не запускає автовідтворення
+ *   до гідратації); браузер сам обирає джерело за <source media>: телефонне відео або для комп'ютера.
+ * - Під відео — його ж перший кадр, тож поява відео непомітна (жодного «картинка → стрибок → відео»).
+ * - Повтор: кінець м'яко розчиняється в перший кадр і ролик починається знову.
+ * - reduced-motion / Save-Data / заблокований автозапуск — відео зупиняється, показується кадр із персонажами й кнопка «Відтворити».
  */
 export default function Hero({ t, ctaHref }: { t: T; ctaHref: string }) {
-  const vref = useRef<HTMLVideoElement>(null);
-  const [state, setState] = useState<State>("idle");
-  const [shown, setShown] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const [state, setState] = useState<State>("playing");
   const [seam, setSeam] = useState(false);
-  const [video, setVideo] = useState<HeroVideo | null>(null);
+  const [userPlayed, setUserPlayed] = useState(false);
   const D = HERO.desktop, M = HERO.mobile;
+  const firstD = D.first ?? D.poster, firstM = M ? (M.first ?? M.poster) : null;
 
-  // LCP: заставка з найвищим пріоритетом (для телефона — своя)
-  preload(`${D.poster.base}-${D.poster.widths[Math.min(1, D.poster.widths.length - 1)]}.avif`, { as: "image", type: "image/avif", fetchPriority: "high", imageSrcSet: srcset(D.poster, "avif"), imageSizes: "100vw", media: M ? "not all and " + MOBILE_QUERY : undefined });
-  if (M) preload(`${M.poster.base}-${M.poster.widths[0]}.avif`, { as: "image", type: "image/avif", fetchPriority: "high", imageSrcSet: srcset(M.poster, "avif"), imageSizes: "100vw", media: MOBILE_QUERY });
+  // LCP: перший кадр відповідного відео — з найвищим пріоритетом
+  preload(`${firstD.base}-${firstD.widths[Math.min(1, firstD.widths.length - 1)]}.avif`, { as: "image", type: "image/avif", fetchPriority: "high", imageSrcSet: srcset(firstD, "avif"), imageSizes: "100vw", media: firstM ? "not all and " + MOBILE_QUERY : undefined });
+  if (firstM) preload(`${firstM.base}-${firstM.widths[0]}.avif`, { as: "image", type: "image/avif", fetchPriority: "high", imageSrcSet: srcset(firstM, "avif"), imageSizes: "100vw", media: MOBILE_QUERY });
 
-  const firstSet = (f: NonNullable<HeroVideo["first"]>, ext: string) => srcset(f, ext);
-  const pick = () => (M && window.matchMedia(MOBILE_QUERY).matches ? M : D);
+  const sources = [
+    ...(M ? sourcesOf(M).map((s) => ({ ...s, media: MOBILE_QUERY })) : []),
+    ...(HERO.legacyWebm ? [{ src: HERO.legacyWebm, type: "video/webm" }] : []),
+    ...sourcesOf(D),
+  ] as { src: string; type: string; media?: string }[];
+  const videoHtml = `<video class="hero-fit hero-video" muted autoplay playsinline preload="auto" disablepictureinpicture aria-label="${esc(t.videoLabel)}">${
+    sources.map((s) => `<source src="${esc(s.src)}" type="${esc(s.type)}"${s.media ? ` media="${esc(s.media)}"` : ""}>`).join("")}</video>`;
+
+  const vid = () => wrap.current?.querySelector("video") ?? null;
 
   useEffect(() => {
+    const v = vid();
+    if (!v) return;
+    v.muted = true;
     const n = navigator as Navigator & { connection?: { saveData?: boolean } };
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || n.connection?.saveData) { setState("paused"); return; } // eslint-disable-line react-hooks/set-state-in-effect
-    setVideo(pick());
-    // поворот екрана / зміна розміру — інше відео, лише якщо справді змінився тип
-    if (!M) return;
-    const mq = window.matchMedia(MOBILE_QUERY);
-    const onChange = () => { setShown(false); setVideo(mq.matches ? M : D); };
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches || n.connection?.saveData;
+    if (calm) { v.pause(); v.currentTime = 0; setState("paused"); return; } // eslint-disable-line react-hooks/set-state-in-effect
+    const onPlaying = () => { setState("playing"); setSeam(false); };
+    const onTime = () => { if (v.duration && v.duration - v.currentTime < HERO.seamMs / 1000) setSeam(true); };
+    const onEnded = () => { v.currentTime = 0; v.play().catch(() => setState("blocked")); };
+    const onError = () => setState("blocked");
+    v.addEventListener("playing", onPlaying);
+    v.addEventListener("timeupdate", onTime);
+    v.addEventListener("ended", onEnded);
+    v.querySelector("source:last-of-type")?.addEventListener("error", onError);
+    // автозапуск міг не спрацювати (режим енергозбереження iOS тощо) — пробуємо ще раз, інакше показуємо кнопку
+    if (v.paused) v.play().catch(() => setState("blocked"));
+    // поворот екрана: інше відео (телефон ↔ комп'ютер)
+    const mq = M ? window.matchMedia(MOBILE_QUERY) : null;
+    const onMq = () => { v.load(); v.play().catch(() => setState("blocked")); };
+    mq?.addEventListener("change", onMq);
+    return () => {
+      v.removeEventListener("playing", onPlaying); v.removeEventListener("timeupdate", onTime); v.removeEventListener("ended", onEnded);
+      mq?.removeEventListener("change", onMq);
+    };
+  }, [M]);
 
-  useEffect(() => {
-    const v = vref.current;
-    if (!v || !video) return;
-    v.muted = true;
-    v.load();
-    const p = v.play();
-    if (p) p.then(() => setState("playing")).catch(() => setState("blocked"));
-  }, [video]);
+  const play = () => { const v = vid(); if (!v) return; v.muted = true; setUserPlayed(true); v.play().then(() => setState("playing")).catch(() => setState("blocked")); };
+  const pause = () => { vid()?.pause(); setState("paused"); };
+  const control = state === "playing" ? { label: t.pause, icon: <path d="M8 6v12M16 6v12" /> } : { label: t.play, icon: <path d="M8 5l11 7-11 7V5Z" /> };
+  const showStill = state !== "playing";
 
-  // М'який стик перед повтором: за ~0.5 с до кінця відео розчиняється в заставку (перший кадр), потім — з початку
-  const onTime = () => {
-    const v = vref.current;
-    if (!v || !v.duration || seam) return;
-    if (v.duration - v.currentTime < HERO.seamMs / 1000) setSeam(true);
-  };
-  const onEnded = () => {
-    const v = vref.current!;
-    v.currentTime = 0;
-    v.play().catch(() => setState("blocked"));
-  };
-  const onPlaying = () => { setShown(true); setState("playing"); if (seam) window.setTimeout(() => setSeam(false), 60); };
-
-  const play = () => {
-    if (!video) { setVideo(pick()); return; }
-    const v = vref.current!;
-    v.muted = true;
-    v.play().then(() => setState("playing")).catch(() => setState("blocked"));
-  };
-  const pause = () => { vref.current?.pause(); setState("paused"); };
-  const control = state === "playing"
-    ? { label: t.pause, icon: <path d="M8 6v12M16 6v12" /> }
-    : state === "idle" ? null : { label: t.play, icon: <path d="M8 5l11 7-11 7V5Z" /> };
-
-  const cur = video ?? D;
   return (
-    <section className={`hero relative isolate -mt-16 overflow-hidden bg-moss-100 ${M ? "hero--dual" : ""} ${HERO.legacyWebm ? "hero--legacy" : ""}`} aria-labelledby="hero-title"
-      style={{ ["--focus" as string]: cur.focus, ["--focus-d" as string]: D.focus, ["--focus-m" as string]: M?.focus ?? D.focus }}>
+    <section className={`hero relative isolate -mt-16 overflow-hidden bg-moss-100 ${M ? "hero--dual" : ""} ${HERO.legacyWebm ? "hero--legacy" : ""} ${showStill ? "hero--still" : ""} ${seam ? "hero--seam" : ""} ${userPlayed && state === "playing" ? "hero--playing-by-user" : ""}`} aria-labelledby="hero-title"
+      style={{ ["--focus-d" as string]: D.focus, ["--focus-m" as string]: M?.focus ?? D.focus }}>
       <div className="hero-backdrop" aria-hidden="true" />
       <div className="hero-stage hero-media">
+        {/* перший кадр відео: видно до першого кадру відтворення і під час м'якого стику повтору */}
         <picture className="absolute inset-0">
+          {firstM && <source media={MOBILE_QUERY} type="image/avif" srcSet={srcset(firstM, "avif")} sizes="100vw" />}
+          {firstM && <source media={MOBILE_QUERY} type="image/webp" srcSet={srcset(firstM, "webp")} sizes="100vw" />}
+          <source type="image/avif" srcSet={srcset(firstD, "avif")} sizes="100vw" />
+          <source type="image/webp" srcSet={srcset(firstD, "webp")} sizes="100vw" />
+          <img src={`${firstD.base}-${firstD.widths[Math.min(1, firstD.widths.length - 1)]}.webp`} alt={t.posterAlt}
+            width={firstD.width} height={firstD.height} fetchPriority="high" loading="eager" decoding="sync" className="hero-fit hero-poster h-full w-full" />
+        </picture>
+        <div ref={wrap} className="absolute inset-0" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: videoHtml }} />
+        {/* кадр із персонажами — коли відео на паузі / вимкнений рух / автозапуск заблоковано */}
+        <picture className="hero-still absolute inset-0">
           {M && <source media={MOBILE_QUERY} type="image/avif" srcSet={srcset(M.poster, "avif")} sizes="100vw" />}
           {M && <source media={MOBILE_QUERY} type="image/webp" srcSet={srcset(M.poster, "webp")} sizes="100vw" />}
           <source type="image/avif" srcSet={srcset(D.poster, "avif")} sizes="100vw" />
-          <source type="image/webp" srcSet={srcset(D.poster, "webp")} sizes="100vw" />
-          { }
-          <img src={`${D.poster.base}-${D.poster.widths[Math.min(1, D.poster.widths.length - 1)]}.webp`} alt={t.posterAlt}
-            width={D.poster.width} height={D.poster.height} fetchPriority="high" loading="eager" decoding="sync" className="hero-fit hero-poster h-full w-full" />
+          <img src={`${D.poster.base}-${D.poster.widths[0]}.webp`} alt="" loading="lazy" className="hero-fit hero-poster h-full w-full" />
         </picture>
-        {/* перший кадр ролика під відео — у нього м'яко розчиняється кінець перед повтором (лише коли заставка — інший кадр) */}
-        {shown && video?.first && (
-          <picture className="absolute inset-0">
-            <source type="image/avif" srcSet={firstSet(video.first, "avif")} sizes="100vw" />
-            <img src={`${video.first.base}-${video.first.widths[0]}.webp`} srcSet={firstSet(video.first, "webp")} sizes="100vw" alt="" width={video.first.width} height={video.first.height} className="hero-fit h-full w-full" />
-          </picture>
-        )}
-        <video
-          ref={vref} muted playsInline autoPlay={false} preload="none" disablePictureInPicture aria-label={t.videoLabel}
-          className={`hero-fit absolute inset-0 h-full w-full transition-opacity ${seam ? "duration-500" : "duration-700"} ${shown && !seam ? "opacity-100" : "opacity-0"}`}
-          onPlaying={onPlaying} onTimeUpdate={onTime} onEnded={onEnded}
-        >
-          {video && video === D && HERO.legacyWebm && <source src={HERO.legacyWebm} type="video/webm" />}
-          {video && (video.sources ?? [{ src: video.src, type: video.type }]).map((s, i, all) => (
-            <source key={s.src} src={s.src} type={s.type} onError={i === all.length - 1 ? () => { setShown(false); setState("blocked"); } : undefined} />
-          ))}
-        </video>
       </div>
       <div className="hero-scrim" aria-hidden="true" />
       <StardustIntro />
@@ -126,11 +113,9 @@ export default function Hero({ t, ctaHref }: { t: T; ctaHref: string }) {
         </div>
       </div>
 
-      {control && (
-        <button type="button" onClick={() => (state === "playing" ? pause() : play())} className="btn btn-ghost btn-sm hero-control !min-h-11 !min-w-11 !p-0" aria-label={control.label} title={control.label}>
-          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{control.icon}</svg>
-        </button>
-      )}
+      <button type="button" onClick={() => (state === "playing" ? pause() : play())} className="btn btn-ghost btn-sm hero-control !min-h-11 !min-w-11 !p-0" aria-label={control.label} title={control.label}>
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{control.icon}</svg>
+      </button>
     </section>
   );
 }

@@ -401,3 +401,16 @@ html.js.intro-play .hero-sparkles i:nth-child(5) { animation-delay: 1.55s; }
   .thanks__badge { animation: thanks-pop .6s var(--ease-soft) both; }
   @keyframes thanks-pop { from { transform: scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
 }
+
+/* Відео першого екрана: видно одразу (під ним — його ж перший кадр); м'який стик повтору; кадр-заставка лише в стані паузи */
+.hero-video { position: absolute; inset: 0; width: 100%; height: 100%; object-position: var(--focus-d); transition: opacity .5s ease; }
+@media (max-aspect-ratio: 4/5) { .hero--dual .hero-video { object-position: var(--focus-m); } }
+.hero--seam .hero-video { opacity: 0; }
+.hero-still { opacity: 0; pointer-events: none; transition: opacity .4s ease; }
+.hero--still .hero-still { opacity: 1; }
+.hero--still .hero-video { opacity: 0; }
+/* вимкнений рух: до гідратації відео не показується (JS його одразу зупинить), видно кадр із персонажами */
+@media (prefers-reduced-motion: reduce) {
+  .hero:not(.hero--playing-by-user) .hero-video { opacity: 0; }
+  .hero:not(.hero--playing-by-user) .hero-still { opacity: 1; }
+}
