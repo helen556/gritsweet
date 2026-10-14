@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { db } from "@/db";
+import { db, normalizePgUrl } from "@/db";
 import { resetDb, baseCheckout } from "./helpers";
 import { quoteCart } from "@/lib/quote";
 import { createOrder, customerClaimsPaid, effectivePaymentMode } from "@/lib/orders";
@@ -335,5 +335,14 @@ describe("PDF delivery channel", () => {
     if (!r2.ok) throw new Error("order not created");
     const o2 = await db.selectFrom("orders").select(["pdf_channel", "telegram"]).where("id", "=", r2.orderId).executeTakeFirstOrThrow();
     expect(o2).toEqual({ pdf_channel: null, telegram: null });
+  });
+});
+
+describe("підключення до бази", () => {
+  it("пулер Supabase переводиться з session (5432) на transaction (6543), sslmode прибирається", () => {
+    expect(normalizePgUrl("postgres://postgres.abc:p%40ss@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require"))
+      .toBe("postgres://postgres.abc:p%40ss@aws-1-eu-west-1.pooler.supabase.com:6543/postgres");
+    expect(normalizePgUrl("postgres://u:p@aws-1-eu-west-1.pooler.supabase.com:6543/postgres")).toContain(":6543/");
+    expect(normalizePgUrl("postgres://postgres:pg@localhost:5432/pl")).toBe("postgres://postgres:pg@localhost:5432/pl");
   });
 });

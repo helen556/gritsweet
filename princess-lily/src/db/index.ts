@@ -19,9 +19,18 @@ function sslOption(url: string) {
   if (mode === "no-verify") return { rejectUnauthorized: false };
   return { rejectUnauthorized: true };
 }
-/** sslmode у рядку підключення перекриває налаштування ssl у pg — прибираємо його, керуємо через DATABASE_SSL. */
-function stripSslMode(url: string) {
-  try { const u = new URL(url); u.searchParams.delete("sslmode"); return u.toString(); } catch { return url; }
+/**
+ * sslmode у рядку підключення перекриває налаштування ssl у pg — прибираємо його, керуємо через DATABASE_SSL.
+ * Пулер Supabase на порту 5432 працює в session-режимі (не більше 15 клієнтів на весь сайт) — на Vercel кожен
+ * екземпляр функції тримає свої з'єднання, і ліміт швидко вичерпується. Переводимо на transaction-режим (6543).
+ */
+export function normalizePgUrl(url: string) {
+  try {
+    const u = new URL(url);
+    u.searchParams.delete("sslmode");
+    if (u.hostname.endsWith(".pooler.supabase.com") && (u.port === "5432" || u.port === "")) u.port = "6543";
+    return u.toString();
+  } catch { return url; }
 }
 
 function createDb(): Kysely<Database> {
@@ -31,7 +40,7 @@ function createDb(): Kysely<Database> {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { Pool } = require("pg");
     // Короткий idle-таймаут: між візитами функцію «заморожують», і старе з'єднання з пулером рветься.
-    const pool = new Pool({ connectionString: stripSslMode(url), max: 3, ssl: sslOption(url), idleTimeoutMillis: 5000, connectionTimeoutMillis: 10000, keepAlive: true });
+    const pool = new Pool({ connectionString: normalizePgUrl(url), max: 2, ssl: sslOption(url), idleTimeoutMillis: 5000, connectionTimeoutMillis: 10000, keepAlive: true });
     // Обірване простоююче з'єднання не повинно валити весь процес — пул просто відкине його.
     pool.on("error", (e: Error) => console.error("[db] idle client error:", e.message));
     // На Vercel: функція не «засинає», доки пул не прибере простоюючі з'єднання.
