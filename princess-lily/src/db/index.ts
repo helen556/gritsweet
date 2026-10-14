@@ -30,11 +30,16 @@ function createDb(): Kysely<Database> {
   if (url.startsWith("postgres")) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { Pool } = require("pg");
-    return new Kysely<Database>({
-      dialect: new PostgresDialect({
-        pool: new Pool({ connectionString: stripSslMode(url), max: 3, ssl: sslOption(url) }),
-      }),
-    });
+    // Короткий idle-таймаут: між візитами функцію «заморожують», і старе з'єднання з пулером рветься.
+    const pool = new Pool({ connectionString: stripSslMode(url), max: 3, ssl: sslOption(url), idleTimeoutMillis: 5000, connectionTimeoutMillis: 10000, keepAlive: true });
+    // Обірване простоююче з'єднання не повинно валити весь процес — пул просто відкине його.
+    pool.on("error", (e: Error) => console.error("[db] idle client error:", e.message));
+    // На Vercel: функція не «засинає», доки пул не прибере простоюючі з'єднання.
+    if (process.env.VERCEL) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("@vercel/functions").attachDatabasePool(pool);
+    }
+    return new Kysely<Database>({ dialect: new PostgresDialect({ pool }) });
   }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const BetterSqlite3 = require("better-sqlite3");
