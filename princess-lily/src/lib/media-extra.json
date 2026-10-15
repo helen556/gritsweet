@@ -1,5 +1,29 @@
 {
   "covers": {
+    "komplekt-5-knyzhok": {
+      "en": {
+        "base": "/media/cover-komplekt-5-knyzhok-en",
+        "width": 1254,
+        "height": 1254,
+        "widths": [
+          360,
+          640,
+          960,
+          1254
+        ]
+      },
+      "uk": {
+        "base": "/media/cover-komplekt-5-knyzhok-uk",
+        "width": 1254,
+        "height": 1254,
+        "widths": [
+          360,
+          640,
+          960,
+          1254
+        ]
+      }
+    },
     "lili-ide-do-likarya": {
       "en": {
         "base": "/media/cover-lili-ide-do-likarya-en",
@@ -14,6 +38,54 @@
       },
       "uk": {
         "base": "/media/cover-lili-ide-do-likarya-uk",
+        "width": 1254,
+        "height": 1254,
+        "widths": [
+          360,
+          640,
+          960,
+          1254
+        ]
+      }
+    },
+    "lili-ta-kazka-pro-son": {
+      "en": {
+        "base": "/media/cover-lili-ta-kazka-pro-son-en",
+        "width": 1254,
+        "height": 1254,
+        "widths": [
+          360,
+          640,
+          960,
+          1254
+        ]
+      },
+      "uk": {
+        "base": "/media/cover-lili-ta-kazka-pro-son-uk",
+        "width": 1254,
+        "height": 1254,
+        "widths": [
+          360,
+          640,
+          960,
+          1254
+        ]
+      }
+    },
+    "lili-vchytsya-druzhyty": {
+      "en": {
+        "base": "/media/cover-lili-vchytsya-druzhyty-en",
+        "width": 1254,
+        "height": 1254,
+        "widths": [
+          360,
+          640,
+          960,
+          1254
+        ]
+      },
+      "uk": {
+        "base": "/media/cover-lili-vchytsya-druzhyty-uk",
         "width": 1254,
         "height": 1254,
         "widths": [

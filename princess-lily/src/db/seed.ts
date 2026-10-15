@@ -20,10 +20,13 @@ type BookSeed = {
   id: string; slug: string; sort: number;
   ukTitle: string; ukAlt: string; enTitle: string; enAlt: string;
   cover?: { base: string; key: keyof typeof manifest } | null;
+  /** Ціни в копійках, якщо відрізняються від типових (комплект). */
+  pricePdf?: number; pricePrint?: number;
+  ukDesc?: string; enDesc?: string;
 };
 
 /**
- * Три книжки серії, кожна у двох мовних версіях (UA/EN) і двох форматах (PDF/друк).
+ * Книжки серії та комплект, кожна у двох мовних версіях (UA/EN) і двох форматах (PDF/друк).
  * Назви — точно як на наданих обкладинках. Ціни від власниці (13.10.2026): друкована 399 грн, PDF 299 грн, в наявності.
  * PDF продається лише після завантаження файлу в адмінці (без файлу покупець нічого б не отримав).
  * Залишок друку 100 — стартове значення, власниця змінює його в адмінці.
@@ -48,6 +51,24 @@ const BOOKS: BookSeed[] = [
     enTitle: "How Lily Helped Spotty Get His Nails Trimmed", enAlt: "Cover of “Princess Lily Stories: How Lily Helped Spotty Get His Nails Trimmed”: Lily, Mum, Dad and the puppy on the porch",
     cover: { base: "/media/cover-bublik", key: "cover-bublik" },
   },
+  {
+    id: "prd_friend", slug: "lili-vchytsya-druzhyty", sort: 4,
+    ukTitle: "Лілі вчиться дружити", ukAlt: "Обкладинка книжки «Історії принцеси Лілі. Лілі вчиться дружити»: Лілі із зайчиком грається з друзями на дитячому майданчику",
+    enTitle: "Lily Learns to Be a Friend", enAlt: "Cover of “Princess Lily’s Lily Learns to Be a Friend”: Lily with her bunny playing with friends at the playground",
+  },
+  {
+    id: "prd_sleep", slug: "lili-ta-kazka-pro-son", sort: 5,
+    ukTitle: "Лілі та казка про сон", ukAlt: "Обкладинка книжки «Історії принцеси Лілі. Лілі та казка про сон»: мама читає Лілі казку перед сном",
+    enTitle: "Lily and the Bedtime Story", enAlt: "Cover of “Princess Lily Stories: Lily and the Bedtime Story”: Mum reads Lily a bedtime story",
+  },
+  // Комплект — окремий товар (ціни від власниці 15.10.2026): PDF 1395 грн, друкований 1895 грн
+  {
+    id: "prd_set5", slug: "komplekt-5-knyzhok", sort: 6, pricePdf: 139500, pricePrint: 189500,
+    ukTitle: "Комплект із 5 книжок «Історії принцеси Лілі»", ukAlt: "Комплект із п’яти книжок «Історії принцеси Лілі»: обкладинки всіх книжок серії",
+    enTitle: "Princess Lily Stories: 5-Book Set", enAlt: "Princess Lily Stories 5-book set: covers of all five books in the series",
+    ukDesc: "Усі п’ять книжок серії в одному комплекті:\n\n• Лілі йде до лікаря\n\n• Лілі: як я навчилася сидіти на горщик\n\n• Як Лілі вчила Бублика стригти кігтики\n\n• Лілі вчиться дружити\n\n• Лілі та казка про сон",
+    enDesc: "All five books of the series in one set:\n\n• Princess Lily Goes to the Doctor\n\n• How I Learned to Sit on the Potty\n\n• How Lily Helped Spotty Get His Nails Trimmed\n\n• Lily Learns to Be a Friend\n\n• Lily and the Bedtime Story",
+  },
 ];
 
 export async function seed(db: Kysely<Database>) {
@@ -69,15 +90,15 @@ async function seedBooks(db: Kysely<Database>) {
         pages: null, size_label: null, binding_label: null, sort_order: b.sort,
       }).execute();
       await db.insertInto("product_translations").values([
-        { product_id: b.id, locale: "uk", is_confirmed: 1, title: b.ukTitle, description: "", cover_alt: b.ukAlt, cover_base: null, cover_widths: null, cover_width: null, cover_height: null },
-        { product_id: b.id, locale: "en", is_confirmed: 1, title: b.enTitle, description: "", cover_alt: b.enAlt, cover_base: null, cover_widths: null, cover_width: null, cover_height: null },
+        { product_id: b.id, locale: "uk", is_confirmed: 1, title: b.ukTitle, description: b.ukDesc ?? "", cover_alt: b.ukAlt, cover_base: null, cover_widths: null, cover_width: null, cover_height: null },
+        { product_id: b.id, locale: "en", is_confirmed: 1, title: b.enTitle, description: b.enDesc ?? "", cover_alt: b.enAlt, cover_base: null, cover_widths: null, cover_width: null, cover_height: null },
       ]).execute();
     }
     for (const locale of ["uk", "en"] as Locale[]) for (const format of ["pdf", "print"] as BookFormat[]) {
       const has = await db.selectFrom("product_variants").select("id").where("product_id", "=", pid).where("book_locale", "=", locale).where("format", "=", format).executeTakeFirst();
       if (!has) await db.insertInto("product_variants").values({
         id: `var_${pid.replace(/^prd_/, "")}_${locale}_${format}`, product_id: pid, book_locale: locale, format,
-        price_minor: format === "pdf" ? PRICE_PDF : PRICE_PRINT, stock: format === "print" ? START_STOCK : null, private_pdf_key: null, is_active: 1, restock_note: null,
+        price_minor: format === "pdf" ? (b.pricePdf ?? PRICE_PDF) : (b.pricePrint ?? PRICE_PRINT), stock: format === "print" ? START_STOCK : null, private_pdf_key: null, is_active: 1, restock_note: null,
       }).execute();
     }
   }
