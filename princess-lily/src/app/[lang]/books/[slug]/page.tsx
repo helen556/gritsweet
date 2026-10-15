@@ -5,7 +5,8 @@ import { getDict, hasLocale } from "@/i18n";
 import { getPublicProduct } from "@/lib/catalog";
 import ProductBuy from "@/components/cart/ProductBuy";
 import Spreads from "@/components/Spreads";
-import { pageMeta, siteUrl } from "@/lib/seo";
+import { breadcrumbLd, orgId, pageMeta, siteUrl } from "@/lib/seo";
+import JsonLd from "@/components/JsonLd";
 import { priceLabel } from "@/components/ProductCard";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]/books/[slug]">): Promise<Metadata> {
@@ -14,9 +15,16 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/books/[slu
   const p = await getPublicProduct(slug, lang);
   if (!p) return {};
   const t = getDict(lang);
-  const desc = p.description ? p.description.slice(0, 160) : `${t.brand.name}. ${t.product.age(p.age_from ?? 2, p.age_to ?? 6)}.`;
+  const desc = p.description ? clip(p.description.replace(/\s+/g, " "), 160) : `${p.title}. ${t.seo.orgDescription}`;
   const img = p.cover ? `${p.cover.base}-${p.cover.widths[Math.min(2, p.cover.widths.length - 1)]}.webp` : undefined;
-  return pageMeta(lang, `/books/${slug}`, p.title, desc, { image: img });
+  return pageMeta(lang, `/books/${slug}`, p.title, desc, { image: img, imageAlt: `${p.title} — ${t.brand.name}` });
+}
+
+/** Обрізає опис до межі слова, щоб сніпет у пошуку не обривався посеред слова. */
+function clip(s: string, max: number) {
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max - 1);
+  return cut.slice(0, Math.max(cut.lastIndexOf(" "), max - 30)).replace(/[\s,;:—-]+$/, "") + "…";
 }
 
 export default async function BookPage({ params }: PageProps<"/[lang]/books/[slug]">) {
@@ -33,17 +41,26 @@ export default async function BookPage({ params }: PageProps<"/[lang]/books/[slu
   const { age: _age, ...productStrings } = t.product;
   void _age;
 
-  // Schema.org Product/Offer — лише для опублікованих товарів із реальною ціною; без рейтингів
-  const jsonLd = p.status === "published" && sellable.length ? {
-    "@context": "https://schema.org", "@type": "Product", name: p.title,
+  // Schema.org: книжка (Book) і, якщо вона реально продається, товар (Product) з пропозиціями за фактичними цінами й форматами; без рейтингів
+  const url = `${siteUrl()}/${lang}/books/${p.slug}`;
+  const offers = p.status === "published" ? sellable.filter((v) => v.price_minor != null).map((v) => ({
+    "@type": "Offer", name: `${t.formats[v.format]} · ${t.bookLocales[v.book_locale]}`, sku: v.id,
+    price: (v.price_minor! / 100).toFixed(2), priceCurrency: v.currency,
+    availability: "https://schema.org/InStock", itemCondition: "https://schema.org/NewCondition",
+    url, seller: { "@id": orgId() },
+  })) : [];
+  const bookLd = {
+    "@type": offers.length ? ["Book", "Product"] : "Book", "@id": `${url}#book`, name: p.title, url,
     image: p.cover ? `${siteUrl()}${p.cover.base}-${p.cover.widths.at(-1)}.webp` : undefined,
     description: p.description || undefined,
-    offers: sellable.map((v) => ({
-      "@type": "Offer", price: (v.price_minor! / 100).toFixed(2), priceCurrency: v.currency,
-      availability: "https://schema.org/InStock", url: `${siteUrl()}/${lang}/books/${p.slug}`,
-      itemCondition: "https://schema.org/NewCondition",
-    })),
-  } : null;
+    inLanguage: [...new Set(p.variants.map((v) => v.book_locale))].map((l) => (l === "uk" ? "uk-UA" : l)),
+    author: { "@type": "Person", name: t.author.name },
+    publisher: { "@id": orgId() },
+    ...(p.age_from != null && p.age_to != null ? { typicalAgeRange: `${p.age_from}-${p.age_to}` } : {}),
+    ...(p.pages != null ? { numberOfPages: p.pages } : {}),
+    ...(offers.length ? { brand: { "@type": "Brand", name: t.brand.name }, offers } : {}),
+  };
+  const crumbs = breadcrumbLd(lang, [{ name: t.catalog.title, path: "/books" }, { name: p.title, path: `/books/${p.slug}` }]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
@@ -69,7 +86,7 @@ export default async function BookPage({ params }: PageProps<"/[lang]/books/[slu
           <Spreads items={p.spreads} hint={t.home.insideHint} close={t.home.close} />
         </section>
       )}
-      {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />}
+      <JsonLd nodes={[bookLd, crumbs]} />
     </div>
   );
 }

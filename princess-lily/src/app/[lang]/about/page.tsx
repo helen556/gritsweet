@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDict, hasLocale } from "@/i18n";
-import { pageMeta } from "@/lib/seo";
+import { breadcrumbLd, pageMeta } from "@/lib/seo";
+import JsonLd from "@/components/JsonLd";
 import Picture from "@/components/Picture";
 import manifest from "@/lib/media-manifest.json";
 import { getAuthorPhoto } from "@/lib/author";
@@ -10,7 +11,7 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/about">): 
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
   const t = getDict(lang);
-  return pageMeta(lang, "/about", t.pages.about.title, t.author.greeting);
+  return pageMeta(lang, "/about", t.seo.aboutTitle, t.seo.aboutDescription);
 }
 export default async function About({ params }: PageProps<"/[lang]/about">) {
   const { lang } = await params;
@@ -20,6 +21,7 @@ export default async function About({ params }: PageProps<"/[lang]/about">) {
   const photo = await getAuthorPhoto();
   return (
     <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
+      <JsonLd nodes={[breadcrumbLd(lang, [{ name: t.pages.about.title, path: "/about" }])]} />
       <p className="text-sm font-semibold uppercase tracking-[0.18em] text-copper">{t.pages.about.title}</p>
       <div className="mt-6 grid gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] md:gap-14">
         <div className="mx-auto w-full max-w-xs md:sticky md:top-24 md:self-start">

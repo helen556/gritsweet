@@ -12,7 +12,9 @@ import { getAuthorPhoto, getBooksPhoto } from "@/lib/author";
 import { listPublicProducts, listPublicSpreads } from "@/lib/catalog";
 import { pdfDeliveryMode } from "@/lib/storefront";
 import { effectivePaymentMode } from "@/lib/orders";
-import { pageMeta } from "@/lib/seo";
+import { pageMeta, organizationLd, websiteLd } from "@/lib/seo";
+import JsonLd from "@/components/JsonLd";
+import { getSettings } from "@/lib/settings";
 import manifest from "@/lib/media-manifest.json";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]">): Promise<Metadata> {
@@ -44,8 +46,12 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
   const d = t.pages.delivery;
   const payText = payMode === "provider" ? d.paymentProvider : payMode === "manual_link" ? d.paymentManual : d.paymentDisabled;
 
+  const s = await getSettings();
+  const sameAs = [s.contact_instagram && (s.contact_instagram.startsWith("http") ? s.contact_instagram : `https://instagram.com/${s.contact_instagram.replace(/^@/, "")}`),
+    s.contact_telegram && (s.contact_telegram.startsWith("http") ? s.contact_telegram : `https://t.me/${s.contact_telegram.replace(/^@/, "")}`)].filter(Boolean) as string[];
   return (
     <>
+      <JsonLd nodes={[organizationLd(lang, sameAs, s.contact_email || undefined), websiteLd(lang)]} />
       <Hero ctaHref="#catalog" t={{ title: t.brand.name, slogan: t.brand.slogan, intro: t.hero.intro, cta: t.hero.cta, pause: t.hero.pause, play: t.hero.play, videoLabel: t.hero.videoLabel, posterAlt: t.hero.posterAlt }} />
 
       <div className="home-flow">

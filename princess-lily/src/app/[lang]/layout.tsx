@@ -9,7 +9,7 @@ import { CartProvider } from "@/components/cart/CartProvider";
 import CursorTrail from "@/components/effects/CursorTrail";
 import MotionEnhancer from "@/components/effects/MotionEnhancer";
 import Analytics from "@/components/Analytics";
-import { siteUrl } from "@/lib/seo";
+import { googleSiteVerification, siteUrl } from "@/lib/seo";
 
 export const generateStaticParams = () => LOCALES.map((lang) => ({ lang }));
 export const dynamicParams = false;
@@ -23,6 +23,9 @@ export async function generateMetadata({ params }: LayoutProps<"/[lang]">): Prom
     metadataBase: new URL(siteUrl()),
     title: { default: t.meta.homeTitle, template: `%s · ${t.meta.siteName}` },
     description: t.meta.homeDescription,
+    applicationName: t.meta.siteName,
+    // підтвердження власника в Google Search Console — на кожній сторінці сайту
+    verification: { google: googleSiteVerification() },
   };
 }
 export const viewport: Viewport = { themeColor: "#faf6ee", width: "device-width", initialScale: 1 };

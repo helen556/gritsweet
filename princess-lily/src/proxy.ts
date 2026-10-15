@@ -12,7 +12,7 @@ export function proxy(req: NextRequest) {
   if (!LOCALES.includes(first) && first !== "admin" && first !== "api") {
     const url = req.nextUrl.clone();
     url.pathname = `/uk${pathname === "/" ? "" : pathname}`;
-    return NextResponse.redirect(url, pathname === "/" ? 307 : 308);
+    return NextResponse.redirect(url, 308); // постійно: українська — мова за замовчуванням, не залежить від браузера
   }
   const res = NextResponse.next();
   res.headers.set("X-Frame-Options", "DENY");

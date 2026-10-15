@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDict, hasLocale } from "@/i18n";
-import { pageMeta } from "@/lib/seo";
+import { breadcrumbLd, pageMeta } from "@/lib/seo";
+import JsonLd from "@/components/JsonLd";
 import InfoPage from "@/components/InfoPage";
 import { effectivePaymentMode } from "@/lib/orders";
 import { pdfDeliveryMode } from "@/lib/storefront";
@@ -10,7 +11,7 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/delivery">
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
   const t = getDict(lang);
-  return pageMeta(lang, "/delivery", t.pages.delivery.title, t.faq.items[8].a[0]);
+  return pageMeta(lang, "/delivery", t.pages.delivery.title, t.seo.deliveryDescription);
 }
 export default async function Delivery({ params }: PageProps<"/[lang]/delivery">) {
   const { lang } = await params;
@@ -22,6 +23,7 @@ export default async function Delivery({ params }: PageProps<"/[lang]/delivery">
     : s === "@PAYMENT_MODE" ? (mode === "provider" ? d.paymentProvider : mode === "manual_link" ? d.paymentManual : d.paymentDisabled) : s;
   return (
     <InfoPage title={d.title}>
+      <JsonLd nodes={[breadcrumbLd(lang, [{ name: d.title, path: "/delivery" }])]} />
       {d.sections.map((s) => (<section key={s.h}><h2>{s.h}</h2>{s.p.map((p, i) => <p key={i}>{resolve(p)}</p>)}</section>))}
     </InfoPage>
   );

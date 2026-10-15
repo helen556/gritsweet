@@ -4,13 +4,14 @@ import { notFound } from "next/navigation";
 import { getDict, hasLocale } from "@/i18n";
 import { listPublicProducts } from "@/lib/catalog";
 import ProductCard, { ComingSoonCard } from "@/components/ProductCard";
-import { pageMeta } from "@/lib/seo";
+import { breadcrumbLd, pageMeta } from "@/lib/seo";
+import JsonLd from "@/components/JsonLd";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]/books">): Promise<Metadata> {
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
   const t = getDict(lang);
-  return pageMeta(lang, "/books", t.catalog.title, t.catalog.intro);
+  return pageMeta(lang, "/books", t.seo.booksTitle, t.seo.booksDescription);
 }
 
 export default async function Books({ params, searchParams }: PageProps<"/[lang]/books">) {
@@ -39,6 +40,7 @@ export default async function Books({ params, searchParams }: PageProps<"/[lang]
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
+      <JsonLd nodes={[breadcrumbLd(lang, [{ name: t.catalog.title, path: "/books" }])]} />
       <h1 className="text-5xl text-plum-900 sm:text-6xl">{t.catalog.title}</h1>
       <p className="mt-3 max-w-2xl text-lg text-ink-soft">{t.catalog.intro}</p>
       {groups.length > 0 && (
