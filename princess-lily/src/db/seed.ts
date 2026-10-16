@@ -55,11 +55,15 @@ const BOOKS: BookSeed[] = [
     id: "prd_friend", slug: "lili-vchytsya-druzhyty", sort: 4,
     ukTitle: "Лілі вчиться дружити", ukAlt: "Обкладинка книжки «Історії принцеси Лілі. Лілі вчиться дружити»: Лілі із зайчиком грається з друзями на дитячому майданчику",
     enTitle: "Lily Learns to Be a Friend", enAlt: "Cover of “Princess Lily’s Lily Learns to Be a Friend”: Lily with her bunny playing with friends at the playground",
+    ukDesc: "Знайомитися, ділитися іграшками й гратися разом — не завжди просто. Разом із Лілі малюки дізнаються, як знаходити друзів, домовлятися та підтримувати одне одного. Історія допомагає дорослим м’яко поговорити з дитиною про дружбу, доброту й почуття інших.",
+    enDesc: "Making friends, sharing toys and playing together isn’t always easy. With Lily, little readers discover how to meet new friends, take turns and look out for one another. The story gives families a gentle way to talk about friendship, kindness, and other people’s feelings.",
   },
   {
     id: "prd_sleep", slug: "lili-ta-kazka-pro-son", sort: 5,
     ukTitle: "Лілі та казка про сон", ukAlt: "Обкладинка книжки «Історії принцеси Лілі. Лілі та казка про сон»: мама читає Лілі казку перед сном",
     enTitle: "Lily and the Bedtime Story", enAlt: "Cover of “Princess Lily Stories: Lily and the Bedtime Story”: Mum reads Lily a bedtime story",
+    ukDesc: "Якщо ваш малюк щоразу протестує, коли час спати, ця історія для вас. Разом із Лілі діти дізнаються, що вечір може бути затишним, а сон — початком чарівних снів, а не кінцем веселощів. Тепла казка, яка допомагає перетворити вкладання на спокійний сімейний ритуал.",
+    enDesc: "If your little one resists bedtime, this story is for you. With Lily, children discover that evenings can be cosy and sleep can be the start of magical dreams rather than the end of the fun. A warm tale that helps turn bedtime into a calm family ritual.",
   },
   // Комплект — окремий товар (ціни від власниці 15.10.2026): PDF 1395 грн, друкований 1895 грн
   {
