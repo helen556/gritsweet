@@ -346,3 +346,14 @@ describe("підключення до бази", () => {
     expect(normalizePgUrl("postgres://postgres:pg@localhost:5432/pl")).toBe("postgres://postgres:pg@localhost:5432/pl");
   });
 });
+
+describe("sitemap: дати lastmod", () => {
+  it("текст дати з Postgres перетворюється на коректну дату ISO", async () => {
+    const { w3cDate } = await import("@/lib/seo");
+    expect(w3cDate("2026-10-12 21:03:35.814673+00")?.toISOString()).toBe("2026-10-12T21:03:35.814Z");
+    expect(w3cDate("2026-10-13T07:15:25.292Z")?.toISOString()).toBe("2026-10-13T07:15:25.292Z");
+    expect(w3cDate("2026-10-13 07:15:25")?.toISOString()).toBe("2026-10-13T07:15:25.000Z");
+    expect(w3cDate("nonsense")).toBeUndefined();
+    expect(w3cDate(null)).toBeUndefined();
+  });
+});

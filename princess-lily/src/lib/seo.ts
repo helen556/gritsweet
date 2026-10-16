@@ -65,3 +65,15 @@ export function ldJson(...nodes: (object | null | undefined)[]) {
   const graph = nodes.filter(Boolean);
   return JSON.stringify({ "@context": "https://schema.org", "@graph": graph }).replace(/</g, "\\u003c");
 }
+
+/**
+ * Дата для <lastmod> у форматі W3C (ISO 8601). Postgres може повертати текст на кшталт
+ * "2026-10-12 21:03:35.814673+00", який Google не приймає; некоректну дату просто пропускаємо.
+ */
+export function w3cDate(v: unknown): Date | undefined {
+  if (v instanceof Date) return isNaN(v.getTime()) ? undefined : v;
+  if (typeof v !== "string" || !v) return undefined;
+  const s = v.trim().replace(" ", "T").replace(/(\.\d{3})\d+/, "$1").replace(/([+-]\d{2})$/, "$1:00");
+  const d = new Date(/[zZ]|[+-]\d{2}:\d{2}$/.test(s) ? s : s + "Z");
+  return isNaN(d.getTime()) ? undefined : d;
+}
