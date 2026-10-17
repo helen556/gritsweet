@@ -9,12 +9,15 @@ const LOCALES = ["uk", "en"];
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const first = pathname.split("/")[1] ?? "";
-  if (!LOCALES.includes(first) && first !== "admin" && first !== "api") {
+  // Корінь сайту віддає українську головну без переадресації (canonical → /uk): Google бере іконку сайту
+  // саме з кореневої сторінки, тож там має бути справжній HTML з <link rel="icon">.
+  const root = pathname === "/";
+  if (!root && !LOCALES.includes(first) && first !== "admin" && first !== "api") {
     const url = req.nextUrl.clone();
-    url.pathname = `/uk${pathname === "/" ? "" : pathname}`;
+    url.pathname = `/uk${pathname}`;
     return NextResponse.redirect(url, 308); // постійно: українська — мова за замовчуванням, не залежить від браузера
   }
-  const res = NextResponse.next();
+  const res = root ? NextResponse.rewrite(new URL("/uk", req.url)) : NextResponse.next();
   res.headers.set("X-Frame-Options", "DENY");
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
