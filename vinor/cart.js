@@ -15,7 +15,7 @@
     subject: 'Order from the VINOR website',
     fName: 'Name', fPhone: 'Phone', fCompany: 'Company', fType: 'Interested in', fOrder: 'Order', fNone: 'cart is empty'
   };
-  var EMAIL = 'ribunslav@gmail.com';
+  var EMAIL = 'vinorcompany@gmail.com';
   var fmt = uk ? function (n) { return Math.round(n) + ' грн'; } : function (n) { return '€' + n.toFixed(2); };
   var cart = {};
   try { cart = JSON.parse(sessionStorage.getItem('vinor-cart-' + V.lang)) || {}; } catch (e) {}
