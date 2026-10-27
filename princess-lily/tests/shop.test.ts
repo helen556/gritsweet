@@ -385,7 +385,7 @@ describe("approved titles, new potty cover and specs (27.10.2026)", () => {
     const uk = await db.selectFrom("product_translations").selectAll().where("product_id", "=", "prd_potty").where("locale", "=", "uk").executeTakeFirstOrThrow();
     expect(uk.title).toBe("Як Лілі навчилася сідати на горщик");
     expect(uk.description).toMatch(/^Якщо ваш малюк какає стоячки/);
-    expect(uk.cover_base).toBe("/media/cover-yak-lili-navchylasia-sidaty-na-horshchyk-uk");
+    expect(uk.cover_base).toBe("/media/cover-yak-lili-navchylasia-sidaty-na-horshchyk-uk-v2");
     expect(uk.cover_alt).toContain("«Як Лілі навчилася сідати на горщик»");
     // відредагований в адмінці опис не перезаписано; alt без повтору Lily
     const fr = await db.selectFrom("product_translations").select(["locale", "description", "cover_alt"]).where("product_id", "=", "prd_friend").orderBy("locale").execute();
@@ -394,7 +394,7 @@ describe("approved titles, new potty cover and specs (27.10.2026)", () => {
     // комплект — нова назва в описі та нова обкладинка
     const set5 = await db.selectFrom("product_translations").select(["description", "cover_base"]).where("product_id", "=", "prd_set5").where("locale", "=", "uk").executeTakeFirstOrThrow();
     expect(set5.description).toContain("• Як Лілі навчилася сідати на горщик");
-    expect(set5.cover_base).toBe("/media/cover-komplekt-5-knyzhok-uk-v2");
+    expect(set5.cover_base).toBe("/media/cover-komplekt-5-knyzhok-uk-v3");
     // історія замовлень не змінюється
     const it = await db.selectFrom("order_items").select("title_snapshot").where("product_id", "=", "prd_potty").executeTakeFirstOrThrow();
     expect(it.title_snapshot).toBe("Як я навчилася сидіти на горщик");
