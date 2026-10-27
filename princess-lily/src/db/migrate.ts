@@ -8,7 +8,8 @@ import type { Database } from "./types";
 /** Додає відсутні колонки (ідемпотентно; SQLite і PostgreSQL). */
 async function addColumns(db: Kysely<Database>, table: string, cols: [string, "text" | "integer"][]) {
   const tables = await db.introspection.getTables();
-  const existing = new Set(tables.find((x) => x.name === table)?.columns.map((c) => c.name) ?? []);
+  // лише схема public: таблиці з тією ж назвою в інших схемах (напр. резервна копія backup_*) не враховуємо
+  const existing = new Set(tables.find((x) => x.name === table && (!x.schema || x.schema === "public"))?.columns.map((c) => c.name) ?? []);
   for (const [name, type] of cols) {
     if (!existing.has(name)) await db.schema.alterTable(table).addColumn(name, type).execute();
   }
