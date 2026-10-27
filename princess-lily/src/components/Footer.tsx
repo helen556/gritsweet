@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Dict } from "@/i18n";
 import ContactDetails from "./ContactDetails";
+import { ConsentSettingsButton } from "./tracking/ConsentBanner";
+import { metaPixelId } from "@/lib/tracking";
 
 export default function Footer({ lang, t }: { lang: "uk" | "en"; t: Dict }) {
   const f = t.footer.links;
@@ -20,7 +22,10 @@ export default function Footer({ lang, t }: { lang: "uk" | "en"; t: Dict }) {
           </ul>
         </nav>
       </div>
-      <div className="mx-auto max-w-6xl px-4 pb-8 text-sm text-ink-soft sm:px-6">© {new Date().getFullYear()} {t.footer.rights}</div>
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 px-4 pb-8 text-sm text-ink-soft sm:px-6">
+        <span>© {new Date().getFullYear()} {t.footer.rights}</span>
+        {metaPixelId() && <ConsentSettingsButton label={t.consent.settings} />}
+      </div>
     </footer>
   );
 }

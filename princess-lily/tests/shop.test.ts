@@ -37,7 +37,7 @@ describe("catalog rules", () => {
     expect(q.lines.map((l) => l.format).sort()).toEqual(["pdf", "pdf", "print", "print"]);
     expect(q.unavailable).toHaveLength(0);
     const books = await db.selectFrom("products").select(["slug", "status"]).where("id", "in", ["prd_bublik", "prd_doctor", "prd_potty"]).orderBy("sort_order").execute();
-    expect(books.map((b) => b.slug)).toEqual(["lili-ide-do-likarya", "lili-yak-ya-navchylasya-sydity-na-horshchyk", "yak-lili-vchyla-bublyka"]);
+    expect(books.map((b) => b.slug)).toEqual(["lili-ide-do-likarya", "yak-lili-navchylasia-sidaty-na-horshchyk", "yak-lili-vchyla-bublyka"]);
     expect(books.every((b) => b.status === "published")).toBe(true);
     const en = await db.selectFrom("product_translations").select(["title", "is_confirmed"]).where("product_id", "=", "prd_bublik").where("locale", "=", "en").executeTakeFirstOrThrow();
     expect(en).toEqual({ title: "How Lily Helped Spotty Get His Nails Trimmed", is_confirmed: 1 });
@@ -355,5 +355,123 @@ describe("sitemap: дати lastmod", () => {
     expect(w3cDate("2026-10-13 07:15:25")?.toISOString()).toBe("2026-10-13T07:15:25.000Z");
     expect(w3cDate("nonsense")).toBeUndefined();
     expect(w3cDate(null)).toBeUndefined();
+  });
+});
+
+describe("approved titles, new potty cover and specs (27.10.2026)", () => {
+  /** Стан бази, як у production до оновлення: стара назва й адреса, старі описи й обкладинка, замовлення зі старою назвою. */
+  async function legacyDb() {
+    await db.updateTable("products").set({ slug: "yak-ya-navchylasya-sydity-na-horshchyk", pages: null }).where("id", "=", "prd_potty").execute();
+    await db.updateTable("product_translations").set({
+      title: "Як я навчилася сидіти на горщик", cover_base: "/media/cover-lili-yak-ya-navchylasya-sydity-na-horshchyk-uk",
+      description: "Знайомство з горщиком — великий крок для маленької дитини. Історія Лілі допомагає підійти до нього з цікавістю, без сорому та поспіху. Читайте разом і говоріть про нові звички, самостійність та право вчитися у власному темпі.",
+    }).where("product_id", "=", "prd_potty").where("locale", "=", "uk").execute();
+    await db.updateTable("product_translations").set({ description: "Власний опис, відредагований в адмінці." }).where("product_id", "=", "prd_friend").where("locale", "=", "uk").execute();
+    await db.updateTable("product_translations").set({ cover_alt: "Cover of “Princess Lily’s Lily Learns to Be a Friend”" }).where("product_id", "=", "prd_friend").where("locale", "=", "en").execute();
+    const o = await createOrder(baseCheckout({ lines: [{ variantId: "var_potty_uk_print", quantity: 1 }], phone: "+380501234567", npCity: "Київ", npPoint: "1" }));
+    await db.deleteFrom("data_migrations").execute();
+    return o;
+  }
+
+  it("migration renames the potty book once, keeps admin edits and order history", async () => {
+    const { setSetting: set } = await import("@/lib/settings");
+    await set("payment_mode", "manual_link"); await set("payment_link_url", "https://send.monobank.ua/test");
+    const o = await legacyDb();
+    expect(o.ok).toBe(true);
+    const { seed } = await import("@/db/seed");
+    await seed(db);
+    const p = await db.selectFrom("products").select(["slug", "pages"]).where("id", "=", "prd_potty").executeTakeFirstOrThrow();
+    expect(p).toEqual({ slug: "yak-lili-navchylasia-sidaty-na-horshchyk", pages: 26 });
+    const uk = await db.selectFrom("product_translations").selectAll().where("product_id", "=", "prd_potty").where("locale", "=", "uk").executeTakeFirstOrThrow();
+    expect(uk.title).toBe("Як Лілі навчилася сідати на горщик");
+    expect(uk.description).toMatch(/^Якщо ваш малюк какає стоячки/);
+    expect(uk.cover_base).toBe("/media/cover-yak-lili-navchylasia-sidaty-na-horshchyk-uk");
+    expect(uk.cover_alt).toContain("«Як Лілі навчилася сідати на горщик»");
+    // відредагований в адмінці опис не перезаписано; alt без повтору Lily
+    const fr = await db.selectFrom("product_translations").select(["locale", "description", "cover_alt"]).where("product_id", "=", "prd_friend").orderBy("locale").execute();
+    expect(fr.find((x) => x.locale === "uk")!.description).toBe("Власний опис, відредагований в адмінці.");
+    expect(fr.find((x) => x.locale === "en")!.cover_alt).not.toMatch(/Lily’s Lily/);
+    // комплект — нова назва в описі та нова обкладинка
+    const set5 = await db.selectFrom("product_translations").select(["description", "cover_base"]).where("product_id", "=", "prd_set5").where("locale", "=", "uk").executeTakeFirstOrThrow();
+    expect(set5.description).toContain("• Як Лілі навчилася сідати на горщик");
+    expect(set5.cover_base).toBe("/media/cover-komplekt-5-knyzhok-uk-v2");
+    // історія замовлень не змінюється
+    const it = await db.selectFrom("order_items").select("title_snapshot").where("product_id", "=", "prd_potty").executeTakeFirstOrThrow();
+    expect(it.title_snapshot).toBe("Як я навчилася сидіти на горщик");
+    // стара адреса веде на нову
+    const { redirectedSlug } = await import("@/lib/catalog");
+    expect(await redirectedSlug("yak-ya-navchylasya-sydity-na-horshchyk")).toBe("yak-lili-navchylasia-sidaty-na-horshchyk");
+    expect(await redirectedSlug("no-such-book")).toBeNull();
+    // повторний запуск нічого не змінює (міграція одноразова)
+    await db.updateTable("product_translations").set({ title: "Назву змінено в адмінці" }).where("product_id", "=", "prd_potty").where("locale", "=", "uk").execute();
+    await seed(db);
+    expect((await db.selectFrom("product_translations").select("title").where("product_id", "=", "prd_potty").where("locale", "=", "uk").executeTakeFirstOrThrow()).title).toBe("Назву змінено в адмінці");
+  });
+
+  it("admin-uploaded covers are never replaced by packaged ones", async () => {
+    await db.updateTable("product_translations").set({ cover_base: "/uploads/covers/custom-abc" }).where("product_id", "=", "prd_potty").where("locale", "=", "uk").execute();
+    const { applyPackagedMedia } = await import("@/db/seed");
+    await applyPackagedMedia(db);
+    const t = await db.selectFrom("product_translations").select("cover_base").where("product_id", "=", "prd_potty").where("locale", "=", "uk").executeTakeFirstOrThrow();
+    expect(t.cover_base).toBe("/uploads/covers/custom-abc");
+  });
+
+  it("specs: author, 26 pages, glossy cover only for print, bundle pages per book", async () => {
+    const { bookSpecRows } = await import("@/lib/book-specs");
+    const { getDict } = await import("@/i18n");
+    const uk = getDict("uk");
+    const book = { id: "prd_potty", pages: null, age_from: 2, age_to: 6, size_label: null, binding_label: null };
+    const rows = bookSpecRows(uk, book, ["uk", "en"], ["pdf", "print"]);
+    const val = (k: string) => rows.find((r) => r.key === k)?.value;
+    expect(val("author")).toBe("Єлизавета Дяченко");
+    expect(val("series")).toBe("Історії принцеси Лілі");
+    expect(val("pages")).toBe("26");
+    expect(val("illustrations")).toBe("кольорові");
+    expect(val("language")).toBe("українська / англійська");
+    expect(val("format")).toBe("друкована книжка / PDF");
+    expect(rows.find((r) => r.key === "cover")).toMatchObject({ value: "глянцева", printOnly: true });
+    expect(val("category")).toBe("дитяча ілюстрована література");
+    // лише PDF — без обкладинки; тип палітурки й розмір не вигадуються
+    expect(bookSpecRows(uk, book, ["uk"], ["pdf"]).some((r) => r.key === "cover" || r.key === "binding" || r.key === "size")).toBe(false);
+    const set = bookSpecRows(getDict("en"), { ...book, id: "prd_set5", pages: 26 }, ["en"], ["print"]);
+    expect(set.find((r) => r.key === "pages")?.value).toBe("26 in each book");
+    expect(set.find((r) => r.key === "books")?.value).toBe("5");
+    expect(set.find((r) => r.key === "author")?.value).toBe("Elizaveta Dyachenko");
+  });
+
+  it("legal documents stay unpublished until details are filled and approved", async () => {
+    const { legalStatus } = await import("@/lib/legal");
+    expect((await legalStatus()).ready).toBe(false);
+    for (const [k, v] of [["seller_details_uk", "ФОП …"], ["seller_details_en", "Sole proprietor …"], ["legal_retention_uk", "3 роки"], ["legal_retention_en", "3 years"], ["contact_email", "a@b.ua"]] as const) await setSetting(k, v);
+    expect((await legalStatus()).ready).toBe(false); // ще не погоджено
+    await setSetting("legal_approved", "1");
+    expect(await legalStatus()).toMatchObject({ ready: true, missing: [] });
+  });
+});
+
+describe("Meta Conversions API", () => {
+  it("Purchase only after confirmed payment, only with consent; hashed contacts; same event_id as the pixel", async () => {
+    await setSetting("payment_mode", "manual_link"); await setSetting("payment_link_url", "https://send.monobank.ua/test");
+    vi.stubEnv("NEXT_PUBLIC_META_PIXEL_ID", "1234567890"); vi.stubEnv("META_CAPI_ACCESS_TOKEN", "test-token");
+    const calls: { url: string; body: string }[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => { calls.push({ url: String(url), body: String(init?.body) }); return new Response("{}", { status: 200 }); });
+    try {
+      const noConsent = await createOrder(baseCheckout());
+      const withConsent = await createOrder(baseCheckout({ meta: { fbp: "fb.1.123.456", fbc: null } }));
+      if (!noConsent.ok || !withConsent.ok) throw new Error("order");
+      const { sendPurchaseToMeta } = await import("@/lib/meta-capi");
+      expect(await sendPurchaseToMeta(withConsent.orderId)).toBe("skipped"); // ще не оплачено
+      await markPaid(noConsent.orderId, { source: "admin", checkedBy: "owner@example.com" });
+      expect(calls.filter((c) => c.url.includes("graph.facebook.com"))).toHaveLength(0);
+      await markPaid(withConsent.orderId, { source: "admin", checkedBy: "owner@example.com" });
+      const meta = calls.filter((c) => c.url.includes("graph.facebook.com/"));
+      expect(meta).toHaveLength(1);
+      expect(meta[0].url).toContain("/1234567890/events");
+      const ev = JSON.parse(meta[0].body).data[0];
+      expect(ev).toMatchObject({ event_name: "Purchase", event_id: `purchase-${withConsent.orderId}`, custom_data: { currency: "UAH", value: 250 } });
+      expect(ev.user_data.em[0]).toMatch(/^[a-f0-9]{64}$/);
+      expect(meta[0].body).not.toContain("parent@example.com");
+      expect(ev.user_data.fbp).toBe("fb.1.123.456");
+    } finally { vi.unstubAllEnvs(); }
   });
 });

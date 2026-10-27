@@ -1,4 +1,4 @@
-import { sql, type Kysely } from "kysely";
+import { PostgresAdapter, sql, type Kysely } from "kysely";
 import type { Database } from "./types";
 
 /**
@@ -267,6 +267,9 @@ export async function migrate(db: Kysely<Database>) {
   // ---- v6: куди надіслати PDF (email або Telegram) ----
   await addColumns(db, "orders", [["pdf_channel", "text"], ["telegram", "text"]]);
 
+  // ---- v7: згода покупця на рекламні cookie та cookie Meta (Conversions API лише за згодою) ----
+  await addColumns(db, "orders", [["ad_consent", "integer"], ["meta_fbp", "text"], ["meta_fbc", "text"]]);
+
   // ---- v4: запасне приватне сховище файлів у самій БД (квитанції; base64, до ~4 МБ на файл) ----
   await t("private_files")
     .addColumn("key", "text", (c) => c.primaryKey())
@@ -283,6 +286,21 @@ export async function migrate(db: Kysely<Database>) {
     .addColumn("data_b64", "text", (c) => c.notNull())
     .addColumn("created_at", "text", (c) => c.notNull())
     .execute();
+
+  // ---- v7: журнал data-міграцій (src/db/data-migrations.ts) і старі адреси книжок для постійної переадресації ----
+  await t("data_migrations")
+    .addColumn("id", "text", (c) => c.primaryKey())
+    .addColumn("applied_at", "text", (c) => c.notNull())
+    .execute();
+  await t("slug_redirects")
+    .addColumn("old_slug", "text", (c) => c.primaryKey())
+    .addColumn("product_id", "text", (c) => c.notNull().references("products.id").onDelete("cascade"))
+    .addColumn("created_at", "text", (c) => c.notNull())
+    .execute();
+  // PostgreSQL (Supabase): нові таблиці одразу з RLS без політик — недоступні через публічний API (anon/authenticated);
+  // сервер підключається як власник таблиць, тож його доступ не змінюється. Див. також supabase/policies.sql.
+  if (db.getExecutor().adapter instanceof PostgresAdapter) for (const name of ["data_migrations", "slug_redirects"])
+    await sql`alter table ${sql.table(name)} enable row level security`.execute(db);
 
   await t("rate_limits")
     .addColumn("key", "text", (c) => c.primaryKey())

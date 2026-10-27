@@ -41,6 +41,9 @@ const checkoutSchema = z.object({
   pdfChannel: z.enum(["email", "telegram"]).optional().default("email"),
   telegram: z.string().trim().max(64).optional().default(""),
   website: z.string().max(0).optional().default(""), // honeypot
+  adConsent: z.boolean().optional().default(false),
+  fbp: z.string().max(200).optional().default(""),
+  fbc: z.string().max(500).optional().default(""),
 });
 export type CheckoutPayload = z.input<typeof checkoutSchema>;
 export type CheckoutResult = { ok: true; redirect: string } | { ok: false; error: string; fields?: string[] };
@@ -69,6 +72,7 @@ export async function placeOrder(payload: CheckoutPayload): Promise<CheckoutResu
     npCity: d.npCity || null, npCityRef: d.npCityRef || null, npPoint: d.npPoint || null, npPointRef: d.npPointRef || null,
     note: d.note || null, siteLocale: d.lang, idempotencyKey: d.idempotencyKey,
     pdfChannel: d.pdfChannel, telegram: d.pdfChannel === "telegram" ? d.telegram : null,
+    meta: d.adConsent ? { fbp: d.fbp || null, fbc: d.fbc || null } : null,
   }, d.expectedTotalMinor);
   if (!r.ok) return { ok: false, error: r.error };
   if (r.duplicate || !r.accessToken) return { ok: false, error: "duplicate" };

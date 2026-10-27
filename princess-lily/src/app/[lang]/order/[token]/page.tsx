@@ -8,6 +8,8 @@ import { formatMinor } from "@/lib/money";
 import CopyAmount from "@/components/CopyAmount";
 import ReceiptUpload from "@/components/ReceiptUpload";
 import { db } from "@/db";
+import Track from "@/components/tracking/Track";
+import { purchaseEventId } from "@/lib/meta-capi";
 
 export const metadata: Metadata = { robots: { index: false, follow: false }, referrer: "no-referrer" };
 
@@ -41,6 +43,11 @@ export default async function OrderPage({ params }: PageProps<"/[lang]/order/[to
           <p className="mx-auto mt-6 max-w-lg font-display text-xl leading-snug text-plum-900">{t.order.thanksWish}</p>
         </section>
       )}
+      {/* Purchase — лише після підтвердженої оплати; той самий eventID, що й у Conversions API (без дублів) */}
+      {st === "paid" && <Track event="Purchase" eventId={purchaseEventId(o.id)} onceKey={`pl_px_${purchaseEventId(o.id)}`} params={{
+        value: o.total_minor / 100, currency: o.currency, content_type: "product", content_ids: [...new Set(d.items.map((i) => i.product_id))],
+        contents: d.items.map((i) => ({ id: i.product_id, quantity: i.quantity, item_price: i.unit_price_minor / 100 })), num_items: d.items.reduce((a, i) => a + i.quantity, 0),
+      }} />}
       {thanks ? <h2 className="text-3xl text-plum-900">{t.order.title} {o.number}</h2> : <h1 className="text-5xl text-plum-900">{t.order.title} {o.number}</h1>}
       <p className="mt-2 text-sm text-ink-soft">{t.order.keepLink}</p>
       <div className="card mt-8 p-6 sm:p-8" aria-live="polite">

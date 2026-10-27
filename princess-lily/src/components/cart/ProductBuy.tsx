@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import AddToCart from "./AddToCart";
+import BookSpecs from "../BookSpecs";
+import type { SpecRow } from "@/lib/book-specs";
 import type { Dict } from "@/i18n";
 
 type Cover = { base: string; widths: number[]; width: number; height: number; alt: string } | null;
@@ -23,13 +25,16 @@ function CoverImg({ c, priority }: { c: NonNullable<Cover>; priority?: boolean }
  * Сторінка книжки: обкладинка відповідає обраній мові (UA/EN), поруч — інформація й панель покупки.
  * Якщо книжка ще не продається — лишається перемикач мови для обкладинки й блок «Незабаром».
  */
-export default function ProductBuy({ lang, t, covers, variants, comingSoon, children }: {
+export default function ProductBuy({ lang, t, product, covers, variants, comingSoon, specs, children }: {
   lang: "uk" | "en"; t: { product: Omit<Dict["product"], "age">; formats: Dict["formats"]; bookLocales: Dict["bookLocales"] };
-  covers: { uk: Cover; en: Cover }; variants: V[]; comingSoon: { title: string; note: string }; children: React.ReactNode;
+  product: { id: string; title: string }; covers: { uk: Cover; en: Cover }; variants: V[]; comingSoon: { title: string; note: string };
+  specs: { rows: SpecRow[]; t: { title: string; printOnlyNote: string } }; children: React.ReactNode;
 }) {
   const sellable = variants.some((v) => v.sellable);
   const coverLocales = (["uk", "en"] as const).filter((l) => covers[l]);
   const [loc, setLoc] = useState<"uk" | "en">(covers[lang] ? lang : coverLocales[0] ?? "uk");
+  const formats = [...new Set(variants.filter((v) => !sellable || v.sellable).map((v) => v.format))];
+  const [fmt, setFmt] = useState<"pdf" | "print" | null>(formats.length === 1 ? formats[0] : null);
   const shown = covers[loc] ?? covers.uk ?? covers.en;
   const distinct = !!covers.uk && !!covers.en && covers.uk.base !== covers.en.base;
 
@@ -44,7 +49,7 @@ export default function ProductBuy({ lang, t, covers, variants, comingSoon, chil
         {children}
         <div className="mt-8">
           {sellable ? (
-            <AddToCart lang={lang} t={t} variants={variants} onLocaleChange={setLoc} />
+            <AddToCart lang={lang} t={t} variants={variants} product={product} onLocaleChange={setLoc} onFormatChange={setFmt} />
           ) : (
             <div className="card p-6">
               {distinct && (
@@ -59,6 +64,7 @@ export default function ProductBuy({ lang, t, covers, variants, comingSoon, chil
             </div>
           )}
         </div>
+        <BookSpecs rows={specs.rows} t={specs.t} format={fmt} />
       </div>
     </div>
   );

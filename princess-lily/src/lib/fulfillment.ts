@@ -9,6 +9,7 @@ import { formatMinor } from "./money";
 import { logOrderEvent } from "./events";
 import { notifyPaid } from "./telegram";
 import { adapterById } from "./payments/providers";
+import { sendPurchaseToMeta } from "./meta-capi";
 
 const nowIso = () => new Date().toISOString();
 
@@ -91,6 +92,8 @@ export async function markPaid(orderId: string, by: { source: string; checkedBy?
     }
   }
   // Telegram «оплату підтверджено» — лише тут, тобто після перевіреного вебхука або ручного підтвердження
+  // Meta Conversions API — лише за згоди покупця й заданого токена; помилка не впливає на оплату
+  await sendPurchaseToMeta(orderId).catch(() => {});
   await notifyPaid(orderId, by.source.startsWith("provider:") ? `підписаний вебхук ${by.source.slice(9)}` : `перевірено вручну: ${by.checkedBy ?? by.source}`).catch(() => {});
   return true;
 }
@@ -140,7 +143,7 @@ export async function deliverPdfEmail(orderId: string, dedupeKey: string) {
   const subject = uk ? `Ваша книжка — замовлення ${order.number}` : `Your book — order ${order.number}`;
   const intro = uk ? `Дякуємо за замовлення ${order.number} (${formatMinor(order.total_minor, "uk")}).` : `Thank you for your order ${order.number} (${formatMinor(order.total_minor, "en")}).`;
   const note = uk
-    ? `Посилання особисті й діють до ${exp} (до ${downloadMax()} завантажень). Електронна книга призначена для особистого використання.`
+    ? `Посилання особисті й діють до ${exp} (до ${downloadMax()} завантажень). Електронна книжка призначена для особистого використання.`
     : `These links are personal and valid until ${exp} (up to ${downloadMax()} downloads). The digital book is for personal use.`;
   const lang = (l: string) => (l === "uk" ? (uk ? "українська" : "Ukrainian") : uk ? "англійська" : "English");
   const text = [intro, "", ...links.map((l) => `${l.title} (PDF, ${lang(l.bookLocale)}): ${l.url}`), "", note].join("\n");

@@ -13,6 +13,7 @@ import { appUrl } from "@/lib/config";
 import { logOrderEvent, ORDER_TRANSITIONS } from "@/lib/events";
 import { privateStorage } from "@/lib/storage";
 import { retryDueNotifications } from "@/lib/telegram";
+import { rememberSlug } from "@/db/data-migrations";
 
 export type ActionState = { ok?: string; error?: string; links?: { title: string; url: string }[] };
 const now = () => new Date().toISOString();
@@ -85,6 +86,8 @@ export async function saveProductAction(_: ActionState, fd: FormData): Promise<A
     if (ex) await db.updateTable("product_translations").set({ title, description, cover_alt, is_confirmed }).where("product_id", "=", id).where("locale", "=", loc).execute();
     else await db.insertInto("product_translations").values({ product_id: id, locale: loc, title, description, cover_alt, is_confirmed }).execute();
   }
+  // стара адреса продовжує працювати: сторінка постійно переадресовує на нову
+  if (slug !== p.slug) await rememberSlug(db, p.slug, id);
   await db.updateTable("products").set({
     slug, status: status.data, age_from, age_to, pages, sort_order: sort_order ?? 0,
     size_label: str(fd, "size_label", 120) || null, binding_label: str(fd, "binding_label", 120) || null, updated_at: now(),

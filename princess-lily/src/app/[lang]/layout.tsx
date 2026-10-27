@@ -9,6 +9,9 @@ import { CartProvider } from "@/components/cart/CartProvider";
 import CursorTrail from "@/components/effects/CursorTrail";
 import MotionEnhancer from "@/components/effects/MotionEnhancer";
 import Analytics from "@/components/Analytics";
+import MetaPixel from "@/components/tracking/MetaPixel";
+import ConsentBanner from "@/components/tracking/ConsentBanner";
+import { metaPixelId } from "@/lib/tracking";
 import { googleSiteVerification, siteUrl } from "@/lib/seo";
 
 export const generateStaticParams = () => LOCALES.map((lang) => ({ lang }));
@@ -37,6 +40,7 @@ export default async function LangLayout({ children, params }: LayoutProps<"/[la
   const { lang } = await params;
   if (!hasLocale(lang)) notFound();
   const t = getDict(lang);
+  const pixel = metaPixelId();
   return (
     <html lang={lang} suppressHydrationWarning>
       <head>
@@ -55,6 +59,10 @@ export default async function LangLayout({ children, params }: LayoutProps<"/[la
         <CursorTrail />
         <MotionEnhancer />
         <Analytics />
+        {pixel && (<>
+          <Suspense fallback={null}><MetaPixel pixelId={pixel} /></Suspense>
+          <ConsentBanner lang={lang} t={{ text: t.consent.text, accept: t.consent.accept, decline: t.consent.decline, more: t.consent.more }} />
+        </>)}
       </body>
     </html>
   );

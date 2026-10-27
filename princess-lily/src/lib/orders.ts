@@ -17,6 +17,8 @@ export type CheckoutInput = {
   note: string | null; siteLocale: Locale; idempotencyKey: string;
   /** Куди надіслати PDF (для замовлень з PDF) */
   pdfChannel?: "email" | "telegram"; telegram?: string | null;
+  /** Покупець дав згоду на рекламні cookie: cookie Meta для Conversions API (null — згоди немає) */
+  meta?: { fbp: string | null; fbc: string | null } | null;
 };
 export type CreateOrderResult =
   | { ok: true; orderId: string; accessToken: string | null; duplicate: boolean }
@@ -101,6 +103,7 @@ export async function createOrder(input: CheckoutInput, expectedTotalMinor?: num
       shipping_required: q.shippingRequired ? 1 : 0,
       np_city: q.shippingRequired ? input.npCity : null, np_city_ref: q.shippingRequired ? input.npCityRef : null,
       np_point: q.shippingRequired ? input.npPoint : null, np_point_ref: q.shippingRequired ? input.npPointRef : null,
+      ad_consent: input.meta ? 1 : 0, meta_fbp: input.meta?.fbp ?? null, meta_fbc: input.meta?.fbc ?? null,
       customer_note: input.note, paid_at: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }).execute();
     await trx.insertInto("order_items").values(q.lines.map((l) => ({

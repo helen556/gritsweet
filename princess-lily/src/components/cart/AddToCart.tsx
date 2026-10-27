@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useCart } from "./CartProvider";
 import { formatMinor } from "@/lib/money";
+import { trackPixel } from "../tracking/consent";
 import type { Dict } from "@/i18n";
 
 type V = { id: string; bookLocale: "uk" | "en"; format: "pdf" | "print"; priceMinor: number | null; stock: number | null; sellable: boolean; restockNote: string | null };
@@ -14,7 +15,7 @@ type V = { id: string; bookLocale: "uk" | "en"; format: "pdf" | "print"; priceMi
  * до вибору валідного варіанта покупка неактивна; 4) «Купити зараз» — оформлення лише цієї книжки, кошик не змінюється;
  * 5) «Додати в кошик» — з підтвердженням і кількістю в кошику. Ціна тут лише для показу; сума рахується на сервері.
  */
-export default function AddToCart({ lang, t, variants, onLocaleChange }: { lang: "uk" | "en"; t: { product: Omit<Dict["product"], "age">; formats: Dict["formats"]; bookLocales: Dict["bookLocales"] }; variants: V[]; onLocaleChange?: (l: "uk" | "en") => void }) {
+export default function AddToCart({ lang, t, variants, product, onLocaleChange, onFormatChange }: { lang: "uk" | "en"; t: { product: Omit<Dict["product"], "age">; formats: Dict["formats"]; bookLocales: Dict["bookLocales"] }; variants: V[]; product: { id: string; title: string }; onLocaleChange?: (l: "uk" | "en") => void; onFormatChange?: (f: "pdf" | "print" | null) => void }) {
   const cart = useCart();
   const router = useRouter();
   const available = variants.filter((v) => v.sellable);
@@ -32,8 +33,14 @@ export default function AddToCart({ lang, t, variants, onLocaleChange }: { lang:
   const chooseLang = (l: V["bookLocale"]) => {
     setBl(l); setAdded(false); setQty(1); onLocaleChange?.(l);
     const f = formatsFor(l);
-    setFmt(f.length === 1 ? f[0] : f.includes(fmt as V["format"]) ? fmt : null);
+    pickFormat(f.length === 1 ? f[0] : f.includes(fmt as V["format"]) ? fmt : null);
   };
+  const pickFormat = (f: V["format"] | null) => { setFmt(f); onFormatChange?.(f); };
+  // ціна до вибору формату: найменша ціна кожного формату (для обраної мови, якщо її вже вибрано)
+  const formatPrices = (["print", "pdf"] as const).flatMap((f) => {
+    const ps = available.filter((v) => v.format === f && (!bl || v.bookLocale === bl)).map((v) => v.priceMinor!);
+    return ps.length ? [{ f, min: Math.min(...ps) }] : [];
+  });
 
   return (
     <div className="card p-6">
@@ -49,7 +56,7 @@ export default function AddToCart({ lang, t, variants, onLocaleChange }: { lang:
         <legend className="mb-2 font-semibold">{t.product.formatLabel}</legend>
         <div className="flex flex-wrap gap-2">
           {(bl ? fmts : [...new Set(available.map((v) => v.format))]).map((f) => (
-            <label key={f} className="chip"><input className="sr-only" type="radio" name="fmt" value={f} disabled={!bl} checked={fmt === f} onChange={() => { setFmt(f); setAdded(false); setQty(1); }} />{t.formats[f]}</label>
+            <label key={f} className="chip"><input className="sr-only" type="radio" name="fmt" value={f} disabled={!bl} checked={fmt === f} onChange={() => { pickFormat(f); setAdded(false); setQty(1); }} />{t.formats[f]}</label>
           ))}
         </div>
         {available.some((v) => v.format === "pdf") && <p className="mt-3 flex gap-2 text-sm text-ink-soft"><span aria-hidden="true">📱</span><span>{t.product.pdfHint}</span></p>}
@@ -62,7 +69,12 @@ export default function AddToCart({ lang, t, variants, onLocaleChange }: { lang:
             <p className="text-ink-soft">{sel.format === "pdf" ? t.product.digital : `${t.product.inStock}${sel.stock != null && sel.stock <= 10 ? ` · ${sel.stock}` : ""}`}</p>
           </div>
         ) : (
-          <p className="text-ink-soft">{t.product.chooseVariant}</p>
+          <>
+            <ul className="space-y-0.5">
+              {formatPrices.map((x) => <li key={x.f}><span className="text-2xl font-semibold">{formatMinor(x.min, lang)}</span> <span className="text-ink-soft">— {t.formats[x.f]}</span></li>)}
+            </ul>
+            <p className="mt-1 text-sm text-ink-soft">{t.product.chooseVariant}</p>
+          </>
         )}
       </div>
 
@@ -80,7 +92,11 @@ export default function AddToCart({ lang, t, variants, onLocaleChange }: { lang:
           {t.product.buyNow}
         </button>
         <button type="button" className="btn btn-ghost" disabled={!sel}
-          onClick={() => { if (sel) { cart.add(sel.id, qty); setAdded(true); } }}>
+          onClick={() => {
+            if (!sel) return;
+            cart.add(sel.id, qty); setAdded(true);
+            trackPixel("AddToCart", { content_ids: [product.id], content_name: product.title, content_type: "product", contents: [{ id: product.id, quantity: qty }], value: (sel.priceMinor! * qty) / 100, currency: "UAH" });
+          }}>
           {t.product.add}
         </button>
       </div>

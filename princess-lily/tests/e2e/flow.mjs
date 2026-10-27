@@ -23,11 +23,11 @@ const page = await ctx.newPage();
 await page.goto(`${BASE}/uk/books/demo-book`);
 check("до вибору варіанта покупка неактивна", await page.getByRole("button", { name: "Купити зараз" }).isDisabled());
 await page.getByText("Українська", { exact: true }).first().click();
-await page.getByText("Друкована книга", { exact: true }).click();
+await page.getByText("Друкована книжка", { exact: true }).click();
 check("ціна оновлюється за варіантом (друк 380,50)", (await page.locator("main").innerText()).includes("380,50 грн"));
 await page.getByRole("button", { name: "Додати в кошик" }).click();
 check("підтвердження додавання з кількістю в кошику", await page.getByText("У кошику: 1").isVisible());
-await page.getByText("Електронна книга (PDF)", { exact: true }).click();
+await page.getByText("Електронна книжка (PDF)", { exact: true }).click();
 await page.getByRole("button", { name: "Додати в кошик" }).click();
 // «Купити зараз» — лише ця книжка, кошик не змінюється
 await page.getByRole("button", { name: "Купити зараз" }).click();
@@ -40,7 +40,7 @@ check("«Купити зараз» не змінює кошик (2 рядки)",
 await page.goto(`${BASE}/uk/cart`);
 await page.getByText("Разом за книжки").waitFor();
 const cartText = await page.locator("main").innerText();
-check("кошик: окремі рядки PDF і друк", cartText.includes("Друкована книга · Українська") && cartText.includes("Електронна книга (PDF) · Українська"));
+check("кошик: окремі рядки PDF і друк", cartText.includes("Друкована книжка · Українська") && cartText.includes("Електронна книжка (PDF) · Українська"));
 check("кошик: серверна сума 199 + 380,50", cartText.includes("579,50 грн"));
 await page.screenshot({ path: path.join(OUT, "cart-desktop.png"), fullPage: true });
 
@@ -199,7 +199,7 @@ for (const p of ["/uk", "/uk/books", "/uk/books/demo-book", "/uk/contacts", "/en
 }
 await mp.goto(`${BASE}/uk/books/demo-book`);
 await mp.locator("label.chip", { hasText: "Українська" }).click();
-await mp.locator("label.chip", { hasText: "Друкована книга" }).click();
+await mp.locator("label.chip", { hasText: "Друкована книжка" }).click();
 await mp.getByRole("button", { name: "Додати в кошик" }).click();
 await mp.goto(`${BASE}/uk/checkout`);
 await mp.getByLabel("Email", { exact: true }).waitFor();

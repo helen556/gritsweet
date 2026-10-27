@@ -55,7 +55,7 @@ export default async function OrderAdmin({ params }: PageProps<"/admin/orders/[i
           {o.customer_note && (<><dt className="text-ink-soft">Коментар</dt><dd className="whitespace-pre-wrap">{o.customer_note}</dd></>)}
         </dl>
         <table className="mt-5 w-full text-left text-sm"><thead><tr className="border-b border-black/10"><th className="py-2">Позиція (знімок на момент купівлі)</th><th>К-сть</th><th className="text-right">Сума</th></tr></thead>
-          <tbody>{items.map((i) => <tr key={i.id} className="border-b border-black/5"><td className="py-2">{i.title_snapshot} · {i.format} · {i.book_locale}</td><td>{i.quantity} × {formatMinor(i.unit_price_minor, "uk")}</td><td className="text-right">{formatMinor(i.line_total_minor, "uk")}</td></tr>)}</tbody>
+          <tbody>{items.map((i) => <tr key={i.id} className="border-b border-black/5"><td className="py-2">{i.title_snapshot} · {i.format === "pdf" ? "PDF" : "друкована"} · {i.book_locale === "uk" ? "українська" : "англійська"}</td><td>{i.quantity} × {formatMinor(i.unit_price_minor, "uk")}</td><td className="text-right">{formatMinor(i.line_total_minor, "uk")}</td></tr>)}</tbody>
           <tfoot><tr><td className="py-2 font-semibold" colSpan={2}>Разом (без доставки)</td><td className="text-right font-semibold">{formatMinor(o.total_minor, "uk")}</td></tr></tfoot></table>
       </section>
 

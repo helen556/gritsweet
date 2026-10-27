@@ -6,6 +6,8 @@ import { formatMinor } from "@/lib/money";
 import type { Dict } from "@/i18n";
 import { useQuote } from "./useQuote";
 import NpPicker from "./NpPicker";
+import Track from "../tracking/Track";
+import { getConsent, metaCookies } from "../tracking/consent";
 import type { CartLine } from "./CartProvider";
 
 type T = Pick<Dict, "checkout" | "cart" | "formats" | "bookLocales">;
@@ -55,6 +57,8 @@ export default function CheckoutForm({ lang, t, npMode, direct }: { lang: "uk" |
       otherRecipient: ship && otherRecipient, recipientFirstName: get("recipientFirstName"), recipientLastName: get("recipientLastName"), recipientPhone: get("recipientPhone"), npCity: get("npCity"), npCityRef: get("npCityRef"),
       npPoint: get("npPoint"), npPointRef: get("npPointRef"), note: get("note"), website: get("website"),
       pdfChannel: hasPdf ? pdfChannel : "email", telegram: hasPdf && pdfChannel === "telegram" ? get("telegram") : "",
+      // згода на рекламні cookie — для серверної події Purchase (Conversions API); без згоди нічого не передається
+      ...(getConsent() === "granted" ? { adConsent: true, ...metaCookies() } : {}),
     }).catch(() => ({ ok: false as const, error: "generic" }));
     // «Купити зараз» не чіпає кошик; оформлення кошика — очищає його
     if (r.ok) { if (!direct) cart.clear(); window.location.assign(r.redirect); return; }
@@ -69,6 +73,7 @@ export default function CheckoutForm({ lang, t, npMode, direct }: { lang: "uk" |
 
   return (
     <form ref={formRef} onSubmit={onSubmit} noValidate className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+      <Track event="InitiateCheckout" params={{ content_ids: [...new Set(quote.lines.map((l) => l.productId))], contents: quote.lines.map((l) => ({ id: l.productId, quantity: l.quantity })), content_type: "product", num_items: quote.lines.reduce((a, l) => a + l.quantity, 0), value: quote.totalMinor / 100, currency: "UAH" }} />
       <div className="space-y-8">
         <fieldset className="card space-y-5 p-6 sm:p-8">
           <legend className="float-left mb-2 w-full font-display text-3xl text-plum-900">{t.checkout.contact}</legend>

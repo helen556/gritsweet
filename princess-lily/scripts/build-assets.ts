@@ -63,7 +63,8 @@ const slugOk = (s: string) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s);
 
 /**
  * Необов'язкові матеріали (додаються, коли надані):
- *  - assets-src/covers/<slug>-uk.jpg, <slug>-en.jpg — обкладинки мовних версій (підв'язуються до книжок у db:setup)
+ *  - assets-src/covers/<slug>-uk.jpg, <slug>-en.jpg — обкладинки мовних версій (підв'язуються до книжок у db:setup);
+ *    заміна наявної обкладинки — <slug>-uk@v2.jpg: нова адреса файлів, тож браузери не показують стару з кешу
  *  - assets-src/spreads/<slug>-01.jpg (… -02, або <slug>-01-uk.jpg) — СПРАВЖНІ розвороти для «Книжка зсередини»
  *  - assets-src/hero-desktop.(mp4|mov), assets-src/hero-mobile.(mp4|mov) — відео першого екрана (див. heroVideo)
  */
@@ -71,9 +72,9 @@ async function extras() {
   const covers: Record<string, Partial<Record<"uk" | "en", { base: string } & Img>>> = {};
   const cdir = path.join(SRC, "covers");
   if (fs.existsSync(cdir)) for (const f of fs.readdirSync(cdir).filter((x) => IMG_RE.test(x))) {
-    const m = /^(.+)-(uk|en)\.[a-z]+$/i.exec(f);
+    const m = /^(.+)-(uk|en)(?:@(v\d+))?\.[a-z]+$/i.exec(f);
     if (!m || !slugOk(m[1])) { console.warn("пропущено (назва має бути <slug>-uk.jpg / <slug>-en.jpg):", f); continue; }
-    const name = `cover-${m[1]}-${m[2]}`;
+    const name = `cover-${m[1]}-${m[2]}${m[3] ? `-${m[3]}` : ""}`;
     (covers[m[1]] ??= {})[m[2] as "uk" | "en"] = { base: `/media/${name}`, ...(await img(path.join(cdir, f), name, [360, 640, 960, 1254])) };
   }
   const spreads: Record<string, ({ base: string; locale: "uk" | "en" | null } & Img)[]> = {};

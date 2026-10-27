@@ -68,6 +68,12 @@ export async function getPublicProduct(slug: string, locale: Locale) {
   const h = p ? (await hydrate([p], locale))[0] : null;
   return h?.cover ? h : null; // без обкладинки книжка на вітрині не показується
 }
+/** Нова адреса книжки, якщо `slug` — її попередня адреса (для постійної переадресації). */
+export async function redirectedSlug(slug: string) {
+  const r = await db.selectFrom("slug_redirects as r").innerJoin("products as p", "p.id", "r.product_id")
+    .select("p.slug").where("r.old_slug", "=", slug).where("p.status", "in", ["published", "coming_soon"]).executeTakeFirst();
+  return r && r.slug !== slug ? r.slug : null;
+}
 export async function getProductForAdmin(id: string) {
   const p = await db.selectFrom("products").selectAll().where("id", "=", id).executeTakeFirst();
   if (!p) return null;

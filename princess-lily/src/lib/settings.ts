@@ -6,6 +6,8 @@ export const SETTING_KEYS = [
   "contact_email", "contact_phone", "contact_instagram", "contact_telegram",
   "payment_link_url", "payment_link_note_uk", "payment_link_note_en",
   "seller_details_uk", "seller_details_en", "author_photo", "payment_mode", "books_photo",
+  // юридичні сторінки: строк зберігання даних і позначка «оферту й політику погоджено власницею» ("1")
+  "legal_retention_uk", "legal_retention_en", "legal_approved",
 ] as const;
 export type SettingKey = (typeof SETTING_KEYS)[number];
 

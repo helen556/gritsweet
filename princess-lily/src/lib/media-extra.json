@@ -13,7 +13,7 @@
         ]
       },
       "uk": {
-        "base": "/media/cover-komplekt-5-knyzhok-uk",
+        "base": "/media/cover-komplekt-5-knyzhok-uk-v2",
         "width": 1254,
         "height": 1254,
         "widths": [
@@ -96,9 +96,9 @@
         ]
       }
     },
-    "lili-yak-ya-navchylasya-sydity-na-horshchyk": {
+    "yak-lili-navchylasia-sidaty-na-horshchyk": {
       "en": {
-        "base": "/media/cover-lili-yak-ya-navchylasya-sydity-na-horshchyk-en",
+        "base": "/media/cover-yak-lili-navchylasia-sidaty-na-horshchyk-en",
         "width": 1254,
         "height": 1254,
         "widths": [
@@ -109,7 +109,7 @@
         ]
       },
       "uk": {
-        "base": "/media/cover-lili-yak-ya-navchylasya-sydity-na-horshchyk-uk",
+        "base": "/media/cover-yak-lili-navchylasia-sidaty-na-horshchyk-uk",
         "width": 1254,
         "height": 1254,
         "widths": [

@@ -2,6 +2,7 @@ import { requireAdmin } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { effectivePaymentMode } from "@/lib/orders";
 import { paymentConfig } from "@/lib/config";
+import { legalStatus } from "@/lib/legal";
 import ActionForm from "@/components/admin/ActionForm";
 import UploadForm from "@/components/admin/UploadForm";
 import { saveSettingsAction, changePasswordAction } from "../../actions";
@@ -10,7 +11,8 @@ export const metadata = { title: "Налаштування" };
 const F: [string, string, string?][] = [
   ["contact_email", "Email для зв’язку (на сайті)"], ["contact_phone", "Телефон (на сайті)"], ["contact_instagram", "Instagram (@нік або посилання)"], ["contact_telegram", "Telegram (@нік або посилання)"],
   ["payment_link_url", "Платіжне посилання (manual-link), https://… — сума в URL не дописується"], ["payment_link_note_uk", "Підказка до оплати (укр.)", "area"], ["payment_link_note_en", "Підказка до оплати (англ.)", "area"],
-  ["seller_details_uk", "Реквізити продавця (укр., для оферти)", "area"], ["seller_details_en", "Реквізити продавця (англ.)", "area"],
+  ["seller_details_uk", "Реквізити продавця (укр.): ПІБ ФОП / назва, ІПН або ЄДРПОУ, адреса", "area"], ["seller_details_en", "Реквізити продавця (англ.)", "area"],
+  ["legal_retention_uk", "Строк зберігання даних замовлень (укр., для політики конфіденційності)", "area"], ["legal_retention_en", "Строк зберігання даних (англ.)", "area"],
   ["author_photo", "author_photo: порожньо — фото з пакета; none — без фото"],
   ["books_photo", "books_photo: заповнюється завантаженням нижче; none — сховати блок"],
 ];
@@ -20,6 +22,7 @@ export default async function Settings() {
   const s = await getSettings();
   const effective = await effectivePaymentMode();
   const monoReady = !!paymentConfig().monoToken;
+  const legal = await legalStatus();
   return (
     <div className="space-y-8">
       <section className="card p-5 sm:p-6">
@@ -37,6 +40,17 @@ export default async function Settings() {
               <p className="hint">Діє зараз: <strong>{effective === "disabled" ? "оплата вимкнена" : effective === "manual_link" ? "посилання + ручна перевірка" : "еквайринг / провайдер"}</strong>.
                 {s.payment_mode === "mono_acquiring" && !monoReady && " ⚠️ MONOBANK_TOKEN не задано на сервері — режим не активний."}
                 {" "}Еквайринг monobank ще не перевірений наживо — перед увімкненням зробіть тестовий платіж.</p></div>
+          </fieldset>
+          <fieldset className="rounded-2xl border border-black/10 p-4 sm:col-span-2">
+            <legend className="px-2 font-semibold">Оферта й політика конфіденційності</legend>
+            <div className="field"><label htmlFor="legal_approved">Публікація</label>
+              <select id="legal_approved" name="legal_approved" defaultValue={s.legal_approved === "1" ? "1" : ""} className="input">
+                <option value="">не опубліковано — на сайті примітка «документ готується»</option>
+                <option value="1">тексти погоджено — опублікувати</option>
+              </select>
+              <p className="hint">Зараз: <strong>{legal.ready ? "опубліковано" : "не опубліковано"}</strong>.
+                {legal.missing.length > 0 && ` Для публікації бракує: ${legal.missing.join(", ")}.`}
+                {" "}Перегляньте тексти на сторінках /uk/offer і /uk/privacy після публікації; реквізити й строк зберігання — у полях нижче.</p></div>
           </fieldset>
           {F.filter(([k]) => k !== "payment_mode").map(([k, l, t]) => (
             <div key={k} className={`field ${t ? "sm:col-span-2" : ""}`}><label htmlFor={k}>{l}</label>

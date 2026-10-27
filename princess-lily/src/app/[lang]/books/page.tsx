@@ -42,7 +42,8 @@ export default async function Books({ params, searchParams }: PageProps<"/[lang]
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
       <JsonLd nodes={[breadcrumbLd(lang, [{ name: t.catalog.title, path: "/books" }])]} />
       <h1 className="text-5xl text-plum-900 sm:text-6xl">{t.catalog.title}</h1>
-      <p className="mt-3 max-w-2xl text-lg text-ink-soft">{t.catalog.intro}</p>
+      <p className="mt-3 max-w-2xl text-lg text-ink-soft">{t.seriesBlurb}</p>
+      <p className="mt-2 max-w-2xl text-ink-soft">{t.catalog.intro}</p>
       {groups.length > 0 && (
         <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:gap-10">
           {groups.map((g) => (

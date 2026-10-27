@@ -92,6 +92,10 @@ export interface OrdersTable {
   pdf_channel: "email" | "telegram" | null;
   /** Telegram покупця (@нік або номер), якщо PDF — у Telegram */
   telegram: string | null;
+  /** 1 — покупець дав згоду на рекламні cookie (Meta Pixel / Conversions API) */
+  ad_consent: number | null;
+  meta_fbp: string | null;
+  meta_fbc: string | null;
   site_locale: Locale;
   payment_status: PaymentStatus;
   payment_mode: string;
@@ -250,6 +254,8 @@ export interface AuditLogTable {
   created_at: Generated<string>;
 }
 export interface RateLimitsTable { key: string; count: number; window_end: string }
+export interface DataMigrationsTable { id: string; applied_at: string }
+export interface SlugRedirectsTable { old_slug: string; product_id: string; created_at: string }
 
 export interface Database {
   admin_users: AdminUsersTable;
@@ -272,6 +278,8 @@ export interface Database {
   product_images: ProductImagesTable;
   private_files: PrivateFilesTable;
   public_files: PublicFilesTable;
+  data_migrations: DataMigrationsTable;
+  slug_redirects: SlugRedirectsTable;
 }
 
 export type Product = Selectable<ProductsTable>;
