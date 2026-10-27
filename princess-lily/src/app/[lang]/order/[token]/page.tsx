@@ -14,8 +14,9 @@ import { purchaseEventId } from "@/lib/meta-capi";
 export const metadata: Metadata = { robots: { index: false, follow: false }, referrer: "no-referrer" };
 
 /** Статус замовлення завжди з сервера. Доступ — за секретним токеном із URL (без списку замовлень). */
-export default async function OrderPage({ params }: PageProps<"/[lang]/order/[token]">) {
+export default async function OrderPage({ params, searchParams }: PageProps<"/[lang]/order/[token]">) {
   const { lang, token } = await params;
+  const payError = (await searchParams).pay === "error";
   if (!hasLocale(lang)) notFound();
   const o = await orderByToken(token);
   if (!o) notFound();
@@ -86,11 +87,18 @@ export default async function OrderPage({ params }: PageProps<"/[lang]/order/[to
             <ReceiptUpload token={token} done={false} t={receiptT} />
           </details>
         )}
-        {st === "pending_payment" && o.payment_mode === "provider" && (
-          <div className="mt-6"><p className="text-ink-soft">{t.order.providerWaiting}</p>
-            <Link href={`/${lang}/order/${token}`} className="btn btn-ghost btn-sm mt-3" prefetch={false}>{t.order.refresh}</Link></div>
+        {(st === "pending_payment" || st === "failed") && o.payment_mode === "provider" && (
+          <div className="mt-6">
+            <p className="text-ink-soft">{st === "failed" ? t.order.failedText : t.order.providerWaiting}</p>
+            {payError && <p className="err mt-2" role="alert">{t.order.payError}</p>}
+            <div className="mt-3 flex flex-wrap gap-3">
+              {/* новий рахунок у платіжній системі (якщо попередній не створився, сплив або оплата не пройшла) */}
+              <form method="post" action={`/${lang}/order/${token}/pay`}><button type="submit" className="btn btn-primary">{t.order.payLink}</button></form>
+              <Link href={`/${lang}/order/${token}`} className="btn btn-ghost" prefetch={false}>{t.order.refresh}</Link>
+            </div>
+          </div>
         )}
-        {st === "failed" && <p className="mt-6 text-ink-soft">{t.order.failedText}</p>}
+        {st === "failed" && o.payment_mode !== "provider" && <p className="mt-6 text-ink-soft">{t.order.failedText}</p>}
       </div>
 
       <section className="card mt-6 p-6 sm:p-8" aria-labelledby="items-h">

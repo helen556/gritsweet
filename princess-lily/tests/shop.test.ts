@@ -475,3 +475,32 @@ describe("Meta Conversions API", () => {
     } finally { vi.unstubAllEnvs(); }
   });
 });
+
+describe("provider payment retry", () => {
+  it("new invoice for an unpaid or failed order, localized description; never for a paid one", async () => {
+    // тестовий провайдер (як у vitest.config: PAYMENT_MODE=provider, PAYMENT_PROVIDER=test)
+    const { startProviderPayment } = await import("@/lib/orders");
+    const payments = await import("@/lib/payments/providers");
+    const seen: string[] = [];
+    const adapter = payments.adapterById("test")!;
+    const orig = adapter.createCheckout;
+    adapter.createCheckout = async (req) => { seen.push(req.description); return orig(req); };
+    try {
+      const o = await createOrder(baseCheckout());
+      if (!o.ok) throw new Error("order");
+      expect(await startProviderPayment(o.orderId, "/uk/order/x")).toMatch(/test-checkout/);
+      expect(seen.at(-1)).toMatch(/^Оплата замовлення PL-\d+ · Історії принцеси Лілі$/);
+      await db.updateTable("orders").set({ payment_status: "failed" }).where("id", "=", o.orderId).execute();
+      expect(await startProviderPayment(o.orderId, "/uk/order/x")).toMatch(/test-checkout/);
+      await markPaid(o.orderId, { source: "admin", checkedBy: "owner@example.com" });
+      expect(await startProviderPayment(o.orderId, "/uk/order/x")).toBeNull();
+      // збій провайдера: null (покупець бачить кнопку повтору), подія в хронології
+      const o2 = await createOrder(baseCheckout());
+      if (!o2.ok) throw new Error("order");
+      adapter.createCheckout = async () => { throw new Error("timeout"); };
+      expect(await startProviderPayment(o2.orderId, "/uk/order/y")).toBeNull();
+      const ev = await db.selectFrom("order_events").select("details").where("order_id", "=", o2.orderId).execute();
+      expect(ev.some((e) => e.details?.includes("Рахунок провайдера не створено"))).toBe(true);
+    } finally { adapter.createCheckout = orig; }
+  });
+});

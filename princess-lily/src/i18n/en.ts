@@ -217,6 +217,7 @@ const en: Dict = {
     providerWaiting: "Waiting for confirmation from the payment provider. The status updates automatically — you can refresh this page.",
     refresh: "Refresh status",
     failedText: "The payment did not go through. You can try again or contact us.",
+    payError: "We couldn’t open the payment page. Please try again in a minute or contact us.",
     keepLink: "Keep the link to this page — you can use it to check your order status.",
     items: "Order items", total: "Total",
     help: "Need help? Contact us",

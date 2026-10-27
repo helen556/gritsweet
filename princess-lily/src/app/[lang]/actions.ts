@@ -2,12 +2,10 @@
 import { z } from "zod";
 import { db } from "@/db";
 import { quoteCart, type CartLineInput } from "@/lib/quote";
-import { createOrder, effectivePaymentMode } from "@/lib/orders";
-import { activePaymentAdapter } from "@/lib/orders";
+import { createOrder, startProviderPayment } from "@/lib/orders";
 import { after } from "next/server";
 import { notifyNewOrder } from "@/lib/telegram";
 import { rateLimit } from "@/lib/rate-limit";
-import { appUrl } from "@/lib/config";
 import { newId } from "@/lib/ids";
 
 const lineSchema = z.array(z.object({ variantId: z.string().max(64), quantity: z.number().int().min(1).max(10) })).max(30);
@@ -81,18 +79,9 @@ export async function placeOrder(payload: CheckoutPayload): Promise<CheckoutResu
   // Сповіщення власниці — після відповіді покупцю; недоступність Telegram не впливає на оформлення
   const orderId = r.orderId;
   after(() => notifyNewOrder(orderId).catch(() => {}));
-  if ((await effectivePaymentMode()) === "provider") {
-    const adapter = await activePaymentAdapter();
-    const order = await db.selectFrom("orders").select(["number", "total_minor", "currency"]).where("id", "=", r.orderId).executeTakeFirstOrThrow();
-    try {
-      const co = await adapter!.createCheckout({ orderId: r.orderId, orderNumber: order.number, amountMinor: order.total_minor, currency: order.currency, description: `Order ${order.number}`, returnUrl: `${appUrl()}${statusUrl}` });
-      await db.updateTable("orders").set({ payment_reference: co.reference }).where("id", "=", r.orderId).execute();
-      return { ok: true, redirect: co.redirectUrl };
-    } catch {
-      return { ok: true, redirect: statusUrl }; // замовлення збережене; статус-сторінка покаже «очікує оплату»
-    }
-  }
-  return { ok: true, redirect: statusUrl };
+  // провайдер недоступний — замовлення збережене, на сторінці статусу є кнопка «Перейти до оплати» для повтору
+  const payUrl = await startProviderPayment(r.orderId, statusUrl);
+  return { ok: true, redirect: payUrl ?? statusUrl };
 }
 
 const contactSchema = z.object({

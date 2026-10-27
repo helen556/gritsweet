@@ -3,7 +3,7 @@ import { db } from "@/db";
 import type { Locale, PaymentStatus } from "@/db/types";
 import { quoteCart, type CartLineInput } from "./quote";
 import { newId, newToken, sha256 } from "./ids";
-import { paymentConfig, PAYMENT_MODES } from "./config";
+import { appUrl, paymentConfig, PAYMENT_MODES } from "./config";
 import { adapterById } from "./payments/providers";
 import { logOrderEvent } from "./events";
 import { getSettings } from "./settings";
@@ -136,4 +136,25 @@ export async function customerClaimsPaid(orderId: string) {
   const r = await db.updateTable("orders").set({ payment_status: "pending_verification" satisfies PaymentStatus, updated_at: new Date().toISOString() })
     .where("id", "=", orderId).where("payment_status", "=", "pending_payment").where("payment_mode", "=", "manual_link").executeTakeFirst();
   if (Number(r.numUpdatedRows) === 1) await logOrderEvent(orderId, "payment", "pending_payment", "pending_verification", "покупець", "Позначка «Я оплатив(ла)» — потрібна перевірка");
+}
+
+/**
+ * Рахунок у платіжного провайдера для замовлення, що ще не оплачене (після оформлення або повторна спроба
+ * зі сторінки замовлення). Сума — лише збережена на сервері. Кожна спроба — новий рахунок з тим самим reference
+ * (id замовлення); вебхук зараховує оплату один раз. null — провайдер недоступний (покупець побачить кнопку повтору).
+ */
+export async function startProviderPayment(orderId: string, returnPath: string): Promise<string | null> {
+  if ((await effectivePaymentMode()) !== "provider") return null;
+  const adapter = await activePaymentAdapter();
+  const o = await db.selectFrom("orders").select(["id", "number", "total_minor", "currency", "site_locale", "payment_status"]).where("id", "=", orderId).executeTakeFirst();
+  if (!adapter || !o || !["pending_payment", "failed"].includes(o.payment_status)) return null;
+  const description = o.site_locale === "uk" ? `Оплата замовлення ${o.number} · Історії принцеси Лілі` : `Payment for order ${o.number} · Princess Lily Stories`;
+  try {
+    const co = await adapter.createCheckout({ orderId: o.id, orderNumber: o.number, amountMinor: o.total_minor, currency: o.currency, description, returnUrl: `${appUrl()}${returnPath}` });
+    await db.updateTable("orders").set({ payment_reference: co.reference, updated_at: new Date().toISOString() }).where("id", "=", o.id).execute();
+    return co.redirectUrl;
+  } catch (e) {
+    await logOrderEvent(o.id, "payment", null, null, "система", `Рахунок провайдера не створено: ${(e as Error).message}`.slice(0, 300));
+    return null;
+  }
 }
