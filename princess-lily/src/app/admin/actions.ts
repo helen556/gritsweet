@@ -11,7 +11,11 @@ import { markPaid, deliverPdfEmail, issueDownloadGrants } from "@/lib/fulfillmen
 import { setSetting, SETTING_KEYS, type SettingKey } from "@/lib/settings";
 import { appUrl } from "@/lib/config";
 import { logOrderEvent, ORDER_TRANSITIONS } from "@/lib/events";
-import { privateStorage } from "@/lib/storage";
+import { privateStorage, probeStoredFile, signedUploadUrl, storageSelfTest } from "@/lib/storage";
+import { randomBytes } from "node:crypto";
+import { getSettings } from "@/lib/settings";
+import { sendEmail, escapeHtml } from "@/lib/email";
+import { pdfEmailText } from "@/lib/pdf-delivery";
 import { retryDueNotifications } from "@/lib/telegram";
 import { rememberSlug } from "@/db/data-migrations";
 import { deleteOrderCompletely } from "@/lib/orders";
@@ -339,4 +343,58 @@ export async function quickProductAction(fd: FormData) {
   await audit(admin, "product.quick_update", "product", id, { from: p.status, to: set.status ?? p.status, sort: set.sort_order ?? p.sort_order });
   revalidatePath("/admin/products");
   revalidatePath("/", "layout");
+}
+
+/* ---------------- PDF книжок: пряме завантаження в приватне сховище ---------------- */
+
+/** Крок 1: підписане посилання для завантаження PDF прямо в Supabase (великі файли не проходять через сервер). */
+export async function pdfUploadStartAction(variantId: string): Promise<{ mode: "direct"; url: string; key: string } | { mode: "server" } | { error: string }> {
+  const admin = await requireAdmin("owner");
+  void admin;
+  const v = await db.selectFrom("product_variants").select(["id", "format"]).where("id", "=", String(variantId).slice(0, 64)).executeTakeFirst();
+  if (!v || v.format !== "pdf") return { error: "Варіант не знайдено" };
+  const key = `pdf/${v.id.toLowerCase().replace(/[^a-z0-9_-]/g, "")}-${randomBytes(8).toString("hex")}.pdf`;
+  const signed = await signedUploadUrl(key);
+  if (!signed) return { mode: "server" }; // локальне/базове сховище — через звичайний ендпоінт
+  if ("error" in signed) return { error: signed.error };
+  return { mode: "direct", url: signed.url, key };
+}
+
+/** Крок 2: перевірка, що в сховищі справді PDF, і прив'язка файлу до варіанта (старий файл видаляється). */
+export async function pdfUploadFinishAction(variantId: string, key: string): Promise<{ ok?: string; error?: string }> {
+  const admin = await requireAdmin("owner");
+  const v = await db.selectFrom("product_variants").select(["id", "format", "private_pdf_key"]).where("id", "=", String(variantId).slice(0, 64)).executeTakeFirst();
+  if (!v || v.format !== "pdf") return { error: "Варіант не знайдено" };
+  const expected = `pdf/${v.id.toLowerCase().replace(/[^a-z0-9_-]/g, "")}-`;
+  if (!key.startsWith(expected) || !/^pdf\/[a-z0-9_-]+\.pdf$/.test(key)) return { error: "Невірний файл" };
+  const probe = await probeStoredFile(key);
+  if (!probe) return { error: "Файл не знайдено у сховищі — спробуйте завантажити ще раз" };
+  if (!probe.head.startsWith("%PDF-")) { await privateStorage().remove(key).catch(() => {}); return { error: "Це не PDF-файл" }; }
+  await db.updateTable("product_variants").set({ private_pdf_key: key, updated_at: now() }).where("id", "=", v.id).execute();
+  if (v.private_pdf_key && v.private_pdf_key !== key) await privateStorage().remove(v.private_pdf_key).catch(() => {});
+  await audit(admin, "variant.pdf_upload", "variant", v.id, { bytes: probe.size, direct: true });
+  revalidatePath(`/admin/products`);
+  return { ok: `Завантажено (${(probe.size / 1048576).toFixed(1)} МБ)` };
+}
+
+/* ---------------- Перевірки сховища й пошти ---------------- */
+
+export async function storageCheckAction(): Promise<ActionState> {
+  await requireAdmin("owner");
+  const r = await storageSelfTest();
+  return r.ok ? { ok: `Сховище працює (${r.kind})` } : { error: `Сховище (${r.kind}) не працює: ${r.error}` };
+}
+
+/** Тестовий лист на email магазину: той самий текст, що отримає покупець, з тестовим PDF у вкладенні. */
+export async function emailTestAction(): Promise<ActionState> {
+  await requireAdmin("owner");
+  const s = await getSettings();
+  if (!s.contact_email) return { error: "Спершу вкажіть «Email для зв’язку» в налаштуваннях" };
+  const { subject, lines } = pdfEmailText("uk", "PL-TEST", null);
+  const res = await sendEmail({
+    to: s.contact_email, subject: `[ТЕСТ] ${subject}`, text: lines.join("\n"), replyTo: s.contact_email,
+    html: lines.map((l) => (l ? `<p style="margin:0 0 4px">${escapeHtml(l)}</p>` : "<br>")).join(""),
+    attachments: [{ filename: "Test-UA.pdf", content: Buffer.from("%PDF-1.4\n% test\n"), contentType: "application/pdf" }],
+  });
+  return res.ok ? { ok: `Тестовий лист надіслано на ${s.contact_email} — перевірте пошту (і «Спам»)` } : { error: res.error };
 }

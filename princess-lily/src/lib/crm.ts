@@ -28,7 +28,7 @@ export function kyivDayStartUtc(day: string): string | null {
 
 export const PAYMENT_LABEL: Record<string, string> = { pending_payment: "Очікує оплату", pending_verification: "Очікує перевірки", paid: "Оплачено", failed: "Неуспішно", cancelled: "Скасовано" };
 export const SHIPPING_LABEL: Record<string, string> = { awaiting_payment: "Після оплати", to_ship: "До відправлення", shipped: "Відправлено", delivered: "Доставлено", cancelled: "Скасовано" };
-export const DIGITAL_LABEL: Record<string, string> = { awaiting_payment: "Після оплати", ready: "Готується лист", sent: "Посилання надіслано", email_failed: "Лист не надіслано (повтор)", email_not_configured: "Email не налаштовано" };
+export const DIGITAL_LABEL: Record<string, string> = { awaiting_payment: "Після оплати", ready: "Готується лист", sent: "Лист із PDF надіслано", email_failed: "Лист не надіслано (повтор)", email_not_configured: "Email не налаштовано" };
 export const ORDER_LABEL: Record<string, string> = { new: "Нове", processing: "В роботі", completed: "Виконано", cancelled: "Скасовано" };
 export const METHOD_LABEL: Record<string, string> = { manual_link: "Посилання (ручна перевірка)", mono: "monobank еквайринг", test: "Тестовий провайдер" };
 export const KIND_LABEL = { pdf: "PDF", print: "Друк", mixed: "Змішане" } as const;

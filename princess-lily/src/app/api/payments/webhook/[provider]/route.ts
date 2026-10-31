@@ -1,4 +1,7 @@
 import { adapterById } from "@/lib/payments/providers";
+
+// після оплати PDF лист із вкладеннями надсилається у фоні цього ж виклику
+export const maxDuration = 60;
 import { processPaymentNotification } from "@/lib/fulfillment";
 
 /**

@@ -271,6 +271,9 @@ export async function migrate(db: Kysely<Database>) {
   // ---- v7: згода покупця на рекламні cookie та cookie Meta (Conversions API лише за згодою) ----
   await addColumns(db, "orders", [["ad_consent", "integer"], ["meta_fbp", "text"], ["meta_fbc", "text"]]);
 
+  // ---- v8: посилання на конкретний файл (електронний комплект = кілька PDF на одну позицію) ----
+  await addColumns(db, "download_grants", [["pdf_key", "text"], ["file_title", "text"]]);
+
   // ---- v4: запасне приватне сховище файлів у самій БД (квитанції; base64, до ~4 МБ на файл) ----
   await t("private_files")
     .addColumn("key", "text", (c) => c.primaryKey())

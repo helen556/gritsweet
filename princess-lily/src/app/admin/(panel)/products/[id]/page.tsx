@@ -4,6 +4,7 @@ import { getProductForAdmin } from "@/lib/catalog";
 import { minorToInput } from "@/lib/money";
 import ActionForm from "@/components/admin/ActionForm";
 import UploadForm from "@/components/admin/UploadForm";
+import PdfUploadForm from "@/components/admin/PdfUploadForm";
 import { saveProductAction, saveVariantAction, removePdfAction, deleteImageAction } from "../../../actions";
 
 export const metadata = { title: "Редагування товару" };
@@ -104,7 +105,7 @@ export default async function EditProduct({ params }: PageProps<"/admin/products
               {v.format === "pdf" && (
                 <div className="mt-3 border-t border-black/10 pt-3">
                   <p className="text-sm">PDF: {v.private_pdf_key ? <span className="font-semibold text-plum-700">завантажено (приватне сховище)</span> : <span className="text-copper">не завантажено</span>}</p>
-                  <UploadForm kind="pdf" targetId={v.id} accept="application/pdf" label="Завантажити PDF (до 100 МБ)" />
+                  <PdfUploadForm variantId={v.id} />
                   {v.private_pdf_key && <form action={removePdfAction} className="mt-2"><input type="hidden" name="id" value={v.id} /><button className="btn btn-danger btn-sm">Видалити PDF</button></form>}
                 </div>
               )}

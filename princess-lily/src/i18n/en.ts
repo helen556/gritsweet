@@ -194,7 +194,7 @@ const en: Dict = {
       pending_payment: "Awaiting payment", pending_verification: "Checking your payment", paid: "Paid", failed: "Payment failed", cancelled: "Cancelled",
     },
     digitalStatus: {
-      awaiting_payment: "Will be sent once payment is confirmed", manual: "We’ll send you the book shortly", manualEmail: "We’ll email you the book shortly", manualTelegram: "We’ll send you the book on Telegram shortly", ready: "Preparing your email", sent: "Download link sent to your email", email_failed: "We couldn’t send the email yet — we’ll retry", email_not_configured: "We’ll send your link shortly",
+      awaiting_payment: "Will be sent once payment is confirmed", manual: "We’ll send you the book shortly", manualEmail: "We’ll email you the book shortly", manualTelegram: "We’ll send you the book on Telegram shortly", ready: "Preparing your email", sent: "Your book has been sent to your email", email_failed: "We couldn’t send the email yet — we’ll retry", email_not_configured: "We’ll send your link shortly",
     },
     shippingStatus: {
       awaiting_payment: "Ships once payment is confirmed", to_ship: "Preparing for dispatch (1–3 business days)", shipped: "Shipped", delivered: "Delivered", cancelled: "Cancelled",

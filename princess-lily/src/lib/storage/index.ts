@@ -86,6 +86,55 @@ function withDbFallback(primary: PrivateStorage): PrivateStorage {
   };
 }
 
+// ---------- Пряме завантаження великих PDF у Supabase (повз сервер: ліміт тіла запиту на Vercel ~4,5 МБ) ----------
+
+function supabaseEnv() {
+  if (process.env.PRIVATE_STORAGE !== "supabase" || !process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  const url = process.env.SUPABASE_URL.replace(/\/$/, "");
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY.trim();
+  const keyH: Record<string, string> = key.split(".").length === 3 ? { Authorization: `Bearer ${key}`, apikey: key } : { apikey: key };
+  return { url, keyH, bucket: process.env.SUPABASE_PRIVATE_BUCKET ?? "private-books" };
+}
+
+/** Одноразове підписане посилання, за яким браузер адміністратора завантажує файл прямо в приватний bucket. null — не Supabase. */
+export async function signedUploadUrl(key: string): Promise<{ url: string } | { error: string } | null> {
+  const e = supabaseEnv();
+  if (!e) return null;
+  assertKey(key);
+  const r = await fetch(`${e.url}/storage/v1/object/upload/sign/${e.bucket}/${key}`, { method: "POST", headers: { ...e.keyH, "content-type": "application/json" }, body: "{}" }).catch(() => null);
+  const j = r ? ((await r.json().catch(() => ({}))) as { url?: string; message?: string; error?: string }) : {};
+  if (!r?.ok || !j.url) return { error: `Supabase Storage ${r?.status ?? "мережа"}: ${j.message ?? j.error ?? "не вдалося створити посилання"}`.slice(0, 300) };
+  return { url: `${e.url}/storage/v1${j.url}` };
+}
+
+/** Перші байти й розмір файлу в Supabase (перевірка, що завантажено саме PDF). */
+export async function probeStoredFile(key: string): Promise<{ head: string; size: number } | null> {
+  const e = supabaseEnv();
+  if (!e) return null;
+  assertKey(key);
+  const r = await fetch(`${e.url}/storage/v1/object/${e.bucket}/${key}`, { headers: { ...e.keyH, Range: "bytes=0-7" } }).catch(() => null);
+  if (!r?.ok) return null;
+  const head = Buffer.from(await r.arrayBuffer()).subarray(0, 8).toString("latin1");
+  const size = Number((r.headers.get("content-range") ?? "").split("/")[1]) || Number(r.headers.get("content-length")) || 0;
+  return { head, size };
+}
+
+/** Самоперевірка сховища для адмінки: запис → читання → видалення тестового файлу саме в основне сховище. */
+export async function storageSelfTest(): Promise<{ kind: string; ok: boolean; error?: string }> {
+  const e = supabaseEnv();
+  const target = e ? supabase() : privateStorage();
+  const key = `pdf/healthcheck-${Date.now().toString(36)}.pdf`;
+  try {
+    await target.put(key, Buffer.from("%PDF-1.4\n% healthcheck\n"), "application/pdf");
+    const back = await target.get(key);
+    await target.remove(key).catch(() => {});
+    if (!back || !back.toString("latin1").startsWith("%PDF-")) return { kind: target.kind, ok: false, error: "Файл записано, але не вдалося прочитати назад" };
+    return { kind: target.kind, ok: true };
+  } catch (err) {
+    return { kind: target.kind, ok: false, error: (err as Error).message.slice(0, 300) };
+  }
+}
+
 export function privateStorage(): PrivateStorage {
   if (process.env.PRIVATE_STORAGE === "supabase" && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) return withDbFallback(supabase());
   if (process.env.PRIVATE_STORAGE === "database" || process.env.VERCEL) return database();

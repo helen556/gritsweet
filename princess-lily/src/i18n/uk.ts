@@ -192,7 +192,7 @@ const uk = {
       pending_payment: "Очікує оплату", pending_verification: "Перевіряємо оплату", paid: "Оплачено", failed: "Оплата неуспішна", cancelled: "Скасовано",
     } as Record<string, string>,
     digitalStatus: {
-      awaiting_payment: "Буде надіслано після підтвердження оплати", manual: "Надішлемо книжку найближчим часом", manualEmail: "Надішлемо книжку на вашу пошту найближчим часом", manualTelegram: "Надішлемо книжку вам у Telegram найближчим часом", ready: "Готуємо лист", sent: "Посилання надіслано на email", email_failed: "Лист не вдалося надіслати — ми повторимо спробу", email_not_configured: "Надішлемо посилання найближчим часом",
+      awaiting_payment: "Буде надіслано після підтвердження оплати", manual: "Надішлемо книжку найближчим часом", manualEmail: "Надішлемо книжку на вашу пошту найближчим часом", manualTelegram: "Надішлемо книжку вам у Telegram найближчим часом", ready: "Готуємо лист", sent: "Книжку надіслано на ваш email", email_failed: "Лист не вдалося надіслати — ми повторимо спробу", email_not_configured: "Надішлемо посилання найближчим часом",
     } as Record<string, string>,
     shippingStatus: {
       awaiting_payment: "Надішлемо після підтвердження оплати", to_ship: "Готуємо до відправлення (1–3 робочі дні)", shipped: "Відправлено", delivered: "Доставлено", cancelled: "Скасовано",

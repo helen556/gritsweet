@@ -1,11 +1,13 @@
 import { requireAdmin } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { effectivePaymentMode } from "@/lib/orders";
-import { paymentConfig } from "@/lib/config";
+import { emailConfig, paymentConfig } from "@/lib/config";
 import { legalStatus } from "@/lib/legal";
 import ActionForm from "@/components/admin/ActionForm";
 import UploadForm from "@/components/admin/UploadForm";
-import { saveSettingsAction, changePasswordAction } from "../../actions";
+import { saveSettingsAction, changePasswordAction, storageCheckAction, emailTestAction } from "../../actions";
+import { db } from "@/db";
+import { BUNDLE_CONTENTS } from "@/lib/book-specs";
 
 export const metadata = { title: "Налаштування" };
 const F: [string, string, string?][] = [
@@ -23,6 +25,11 @@ export default async function Settings() {
   const effective = await effectivePaymentMode();
   const monoReady = !!paymentConfig().monoToken;
   const legal = await legalStatus();
+  const mail = emailConfig();
+  // книжки (не комплекти): кожна мовна версія PDF має мати файл
+  const pv = await db.selectFrom("product_variants as v").innerJoin("products as p", "p.id", "v.product_id").innerJoin("product_translations as t", (j) => j.onRef("t.product_id", "=", "p.id").on("t.locale", "=", "uk"))
+    .select(["v.private_pdf_key", "v.book_locale", "t.title", "p.id"]).where("v.format", "=", "pdf").where("p.status", "!=", "draft").orderBy("p.sort_order").orderBy("v.book_locale", "desc").execute();
+  const pdfs = pv.filter((x) => !BUNDLE_CONTENTS[x.id]).map((x) => ({ ok: !!x.private_pdf_key, label: `${x.title} (${x.book_locale === "uk" ? "UA" : "EN"})` }));
   return (
     <div className="space-y-8">
       <section className="card p-5 sm:p-6">
@@ -57,6 +64,20 @@ export default async function Settings() {
               {t ? <textarea id={k} name={k} rows={3} defaultValue={s[k as keyof typeof s]} className="input" /> : <input id={k} name={k} defaultValue={s[k as keyof typeof s]} className="input" />}</div>
           ))}
         </ActionForm>
+      </section>
+      <section className="card p-5 sm:p-6">
+        <h2 className="text-2xl">Автоматичне надсилання PDF після оплати</h2>
+        <p className="mt-1 text-sm text-ink-soft">Після підтвердженої оплати покупець автоматично отримує лист від авторки з PDF-книжкою у вкладенні (комплект — усі книжки) і квитанцією про оплату. Для цього потрібні пошта й завантажені PDF кожної мовної версії.</p>
+        <ul className="mt-3 space-y-1 text-sm">
+          <li>Пошта: <strong className={mail.provider === "none" ? "text-[#9a2f28]" : "text-plum-700"}>{mail.provider === "none" ? "не налаштована (EMAIL_PROVIDER у Vercel)" : mail.provider === "smtp" ? `Gmail/SMTP — ${mail.from}` : mail.provider === "resend" ? `Resend — ${mail.from}` : "outbox (розробка)"}</strong></li>
+          <li>Відповіді покупців приходитимуть на: <strong>{s.contact_email || "— (вкажіть «Email для зв’язку» вище)"}</strong></li>
+          <li>PDF завантажено: <strong>{pdfs.filter((p) => p.ok).length} з {pdfs.length}</strong>{pdfs.some((p) => !p.ok) && <span className="text-[#9a2f28]"> — бракує: {pdfs.filter((p) => !p.ok).map((p) => p.label).join("; ")}</span>}</li>
+        </ul>
+        <p className="mt-2 text-sm text-ink-soft">Без файлу книжки лист не надсилається автоматично: замовлення позначається «надішліть PDF вручну». PDF завантажуються на сторінці кожної книжки (Товари → книжка → «Завантажити PDF»).</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <ActionForm action={storageCheckAction} submit="Перевірити сховище файлів" />
+          <ActionForm action={emailTestAction} submit="Надіслати тестовий лист" />
+        </div>
       </section>
       <section className="card p-5 sm:p-6">
         <h2 className="text-2xl">Фото книжок для головної (атмосферний блок)</h2>

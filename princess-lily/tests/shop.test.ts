@@ -546,3 +546,86 @@ describe("18.1–18.3: phone, order deletion, picking PDF", () => {
     expect(pdf.length).toBeGreaterThan(5000);
   });
 });
+
+describe("PDF після оплати: лист авторки з книжкою у вкладенні й квитанцією", () => {
+  const pdf = (n: number, tag = "book") => Buffer.concat([Buffer.from(`%PDF-1.4\n% ${tag}\n`), Buffer.alloc(n, 32)]);
+  async function setup() {
+    const os = await import("node:os"); const fs = await import("node:fs"); const path = await import("node:path");
+    vi.stubEnv("PRIVATE_STORAGE_DIR", fs.mkdtempSync(path.join(os.tmpdir(), "lily-pdf-")));
+    vi.stubEnv("PRIVATE_STORAGE", "local");
+    await setSetting("payment_mode", "manual_link"); await setSetting("payment_link_url", "https://send.monobank.ua/test");
+    await setSetting("contact_email", "liza@example.com");
+    await setSetting("seller_details_uk", "ФОП Тестова Т. Т.");
+    const { privateStorage } = await import("@/lib/storage");
+    return privateStorage();
+  }
+
+  it("одна книжка: PDF у вкладенні, квитанція, текст авторки, відповідь — на пошту магазину; лист один раз", async () => {
+    const st = await setup();
+    try {
+      await st.put("pdf/test.pdf", pdf(2048), "application/pdf");
+      const spy = vi.spyOn(email, "sendEmail").mockResolvedValue({ ok: true, id: "m-att" });
+      const o = await createOrder(baseCheckout()); if (!o.ok) throw new Error("order");
+      await markPaid(o.orderId, { source: "admin", checkedBy: "owner@example.com" });
+      await markPaid(o.orderId, { source: "admin", checkedBy: "owner@example.com" }); // повтор — без другого листа
+      expect(spy).toHaveBeenCalledTimes(1);
+      const m = spy.mock.calls[0][0];
+      expect(m.to).toBe("parent@example.com");
+      expect(m.replyTo).toBe("liza@example.com");
+      expect(m.subject).toMatch(/^Ваша PDF-книжка про Лілі — замовлення PL-/);
+      expect(m.text).toContain("У вкладенні — ваша PDF-книжка про Лілі.");
+      expect(m.text).toContain("Єлизавета Дяченко");
+      expect(m.text).not.toContain("/api/download/");
+      const names = m.attachments!.map((a) => a.filename);
+      expect(names[0]).toMatch(/-UA\.pdf$/);
+      expect(m.attachments![0].content.subarray(0, 5).toString()).toBe("%PDF-");
+      expect(names.some((n) => /^Payment-PL-.*\.pdf$/.test(n))).toBe(true); // квитанція (не monobank — підтвердження оплати)
+      const rc = m.attachments!.find((a) => a.filename.startsWith("Payment-"))!;
+      expect(rc.content.subarray(0, 5).toString()).toBe("%PDF-");
+      const f = await db.selectFrom("fulfillments").select("status").where("order_id", "=", o.orderId).where("kind", "=", "digital").executeTakeFirstOrThrow();
+      expect(f.status).toBe("sent");
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it("електронний комплект: усі 5 книжок тієї ж мови; без однієї — лист не йде (ручне надсилання)", async () => {
+    const st = await setup();
+    try {
+      const books = ["doctor", "potty", "bublik", "friend"];
+      for (const b of books) {
+        await st.put(`pdf/${b}-uk.pdf`, pdf(1024, b), "application/pdf");
+        await db.updateTable("product_variants").set({ private_pdf_key: `pdf/${b}-uk.pdf` }).where("id", "=", `var_${b}_uk_pdf`).execute();
+      }
+      const spy = vi.spyOn(email, "sendEmail").mockResolvedValue({ ok: true, id: "m-set" });
+      const a = await createOrder(baseCheckout({ lines: [{ variantId: "var_set5_uk_pdf", quantity: 1 }] })); if (!a.ok) throw new Error("order");
+      await markPaid(a.orderId, { source: "admin", checkedBy: "owner" });
+      expect(spy).not.toHaveBeenCalled(); // «Лілі та казка про сон» ще без файлу
+      expect((await db.selectFrom("fulfillments").select("status").where("order_id", "=", a.orderId).where("kind", "=", "digital").executeTakeFirstOrThrow()).status).toBe("manual");
+
+      await st.put("pdf/sleep-uk.pdf", pdf(1024, "sleep"), "application/pdf");
+      await db.updateTable("product_variants").set({ private_pdf_key: "pdf/sleep-uk.pdf" }).where("id", "=", "var_sleep_uk_pdf").execute();
+      const b = await createOrder(baseCheckout({ lines: [{ variantId: "var_set5_uk_pdf", quantity: 1 }] })); if (!b.ok) throw new Error("order");
+      await markPaid(b.orderId, { source: "admin", checkedBy: "owner" });
+      expect(spy).toHaveBeenCalledTimes(1);
+      const books5 = spy.mock.calls[0][0].attachments!.filter((x) => !x.filename.startsWith("Payment-"));
+      expect(books5).toHaveLength(5);
+      expect(books5.every((x) => x.filename.endsWith("-UA.pdf"))).toBe(true);
+      expect(books5.map((x) => x.content.toString("latin1", 11, 18).trim()).sort()).toEqual(["bublik", "doctor", "friend", "potty", "sleep"].sort());
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it("завеликі файли → особисті посилання на кожну книжку, і вони віддають саме ці файли", async () => {
+    const st = await setup();
+    try {
+      const { MAX_ATTACH_BYTES } = await import("@/lib/fulfillment");
+      await st.put("pdf/test.pdf", pdf(MAX_ATTACH_BYTES + 10), "application/pdf");
+      const spy = vi.spyOn(email, "sendEmail").mockResolvedValue({ ok: true, id: "m-big" });
+      const o = await createOrder(baseCheckout()); if (!o.ok) throw new Error("order");
+      await markPaid(o.orderId, { source: "admin", checkedBy: "owner" });
+      const m = spy.mock.calls[0][0];
+      expect(m.attachments!.every((a) => a.filename.startsWith("Payment-"))).toBe(true); // лише квитанція
+      const token = /\/api\/download\/([A-Za-z0-9_-]+)/.exec(m.text)![1];
+      const r = await consumeDownload(token);
+      expect(r).toMatchObject({ ok: true, key: "pdf/test.pdf" });
+    } finally { vi.unstubAllEnvs(); }
+  });
+});

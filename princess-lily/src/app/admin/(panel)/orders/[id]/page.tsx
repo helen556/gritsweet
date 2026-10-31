@@ -13,7 +13,7 @@ import { confirmPaymentAction, cancelOrderAction, shippingAction, resendPdfActio
 export const metadata = { title: "Замовлення" };
 const PS: Record<string, string> = { pending_payment: "Очікує оплату", pending_verification: "Очікує перевірки", paid: "Оплачено", failed: "Неуспішно", cancelled: "Скасовано" };
 const FS: Record<string, string> = {
-  awaiting_payment: "очікує оплату", ready: "готується лист", manual: "надішліть PDF вручну", sent: "посилання надіслано", email_failed: "лист не надіслано (буде повтор)",
+  awaiting_payment: "очікує оплату", ready: "готується лист", manual: "надішліть PDF вручну", sent: "лист із PDF надіслано", email_failed: "лист не надіслано (буде повтор)",
   email_not_configured: "email не налаштовано — створіть посилання вручну", to_ship: "до відправлення", shipped: "відправлено", delivered: "доставлено", cancelled: "скасовано",
 };
 const KIND_EV: Record<string, string> = { order: "Замовлення", payment: "Оплата", digital: "PDF", shipping: "Доставка", note: "Примітка", receipt: "Квитанція", export: "Експорт" };

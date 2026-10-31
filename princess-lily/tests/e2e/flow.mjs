@@ -74,20 +74,20 @@ await page.getByRole("button", { name: "Імітувати успішну опл
 await page.waitForURL(/\/uk\/order\//);
 const orderText = await page.locator("main").innerText();
 check("статус після підписаного вебхука: Оплачено", orderText.includes("Оплачено"));
-check("PDF: посилання надіслано на email", orderText.includes("Посилання надіслано на email"));
+check("PDF: книжку надіслано на email", orderText.includes("Книжку надіслано на ваш email"));
 check("доставка: готуємо до відправлення", orderText.includes("Готуємо до відправлення"));
 await page.screenshot({ path: path.join(OUT, "order-paid-desktop.png"), fullPage: true });
 const orderUrl = page.url();
 
-// лист в outbox → посилання на завантаження
+// лист в outbox: текст авторки, PDF книжки й квитанція у вкладенні (особисті посилання — лише для завеликих файлів)
 const outbox = path.resolve("storage/outbox");
-const latest = fs.readdirSync(outbox).map((f) => path.join(outbox, f)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
-const link = /href="([^"]+\/api\/download\/[^"]+)"/.exec(fs.readFileSync(latest, "utf8"))?.[1];
-check("лист містить посилання на PDF", !!link);
-const d1 = await fetch(link);
-check("завантаження PDF: 200 application/pdf, no-store", d1.status === 200 && d1.headers.get("content-type") === "application/pdf" && d1.headers.get("cache-control").includes("no-store"));
-for (let i = 0; i < 4; i++) await fetch(link);
-check("ліміт завантажень → 410", (await fetch(link)).status === 410);
+const mails = fs.readdirSync(outbox).filter((f) => f.endsWith(".html")).map((f) => path.join(outbox, f)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+const mailHtml = fs.readFileSync(mails[0], "utf8");
+const mailId = path.basename(mails[0], ".html");
+const att = fs.readdirSync(outbox).filter((f) => f.startsWith(`${mailId}--`));
+check("лист: текст авторки «У вкладенні — ваша PDF-книжка про Лілі»", mailHtml.includes("У вкладенні — ваша PDF-книжка про Лілі.") && mailHtml.includes("Єлизавета Дяченко"));
+check("лист: PDF книжки у вкладенні", att.some((f) => /-UA\.pdf$/.test(f) && fs.readFileSync(path.join(outbox, f)).subarray(0, 5).toString() === "%PDF-"), att.join(", "));
+check("лист: квитанція про оплату у вкладенні", att.some((f) => /Payment-PL-.*\.pdf$/.test(f)));
 check("вигаданий токен → 404", (await fetch(`${BASE}/api/download/${"x".repeat(43)}`)).status === 404);
 
 // вебхук з невірним підписом

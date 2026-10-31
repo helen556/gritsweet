@@ -1,17 +1,25 @@
 import "server-only";
+import { after } from "next/server";
 import { sql } from "kysely";
 import { db } from "@/db";
 import type { VerifiedNotification } from "./payments/providers";
 import { newId, newToken, sha256 } from "./ids";
 import { appUrl, downloadMax, downloadTtlHours } from "./config";
 import { escapeHtml, sendEmail } from "./email";
-import { formatMinor } from "./money";
 import { logOrderEvent } from "./events";
 import { notifyPaid } from "./telegram";
 import { adapterById } from "./payments/providers";
 import { sendPurchaseToMeta } from "./meta-capi";
+import { attachmentName, paymentReceipt, pdfEmailText, pdfFilesForOrder } from "./pdf-delivery";
+import { privateStorage } from "./storage";
+import { getSettings } from "./settings";
 
 const nowIso = () => new Date().toISOString();
+
+/** Виконати після відповіді (next/server after); поза запитом (скрипти, тести) — одразу. */
+async function afterResponse(task: () => Promise<unknown>) {
+  try { after(() => task().catch((e) => console.error("[after]", e))); } catch { await task(); }
+}
 
 export type PaymentResult = "applied" | "duplicate" | "unknown_order" | "amount_mismatch" | "currency_mismatch" | "already_paid" | "failed_recorded" | "ignored" | "not_confirmed";
 
@@ -83,8 +91,9 @@ export async function markPaid(orderId: string, by: { source: string; checkedBy?
   await db.updateTable("fulfillments").set({ status: "ready", updated_at: nowIso() }).where("order_id", "=", orderId).where("kind", "=", "digital").where("status", "=", "awaiting_payment").execute();
   const pdfItems = items.filter((i) => i.format === "pdf");
   if (pdfItems.length) {
-    const files = await db.selectFrom("product_variants").select(["id", "private_pdf_key"]).where("id", "in", pdfItems.map((i) => i.variant_id)).execute();
-    if (pdfItems.every((i) => files.find((f) => f.id === i.variant_id)?.private_pdf_key)) await deliverPdfEmail(orderId, `pdf:${orderId}`);
+    const files = await pdfFilesForOrder(orderId);
+    // лист із файлами — після відповіді банку/адмінці (може тривати кілька секунд); збій → повтори за розкладом
+    if (files.length && files.every((f) => f.key)) await afterResponse(() => deliverPdfEmail(orderId, `pdf:${orderId}`));
     else {
       // файлу на сайті ще немає — книжку надсилає власниця сама (адмінка показує підказку й кнопку «PDF надіслано»)
       await db.updateTable("fulfillments").set({ status: "manual", updated_at: nowIso() }).where("order_id", "=", orderId).where("kind", "=", "digital").execute();
@@ -98,20 +107,23 @@ export async function markPaid(orderId: string, by: { source: string; checkedBy?
   return true;
 }
 
-/** Видає нові тимчасові токени на PDF-позиції оплаченого замовлення. Повертає відкриті токени (зберігаються лише хеші). */
+/** Видає нові тимчасові токени на кожен PDF оплаченого замовлення (комплект — по файлу на книжку). Зберігаються лише хеші. */
 export async function issueDownloadGrants(orderId: string) {
   const order = await db.selectFrom("orders").select(["payment_status"]).where("id", "=", orderId).executeTakeFirst();
   if (order?.payment_status !== "paid") throw new Error("Замовлення не оплачене — посилання не видаються");
-  const items = await db.selectFrom("order_items").selectAll().where("order_id", "=", orderId).where("format", "=", "pdf").execute();
+  const files = await pdfFilesForOrder(orderId);
   const expires = new Date(Date.now() + downloadTtlHours() * 3600_000).toISOString();
   const out: { itemId: string; title: string; bookLocale: string; token: string }[] = [];
-  for (const it of items) {
+  for (const f of files) {
     const token = newToken();
-    await db.insertInto("download_grants").values({ id: newId("dlg"), order_id: orderId, order_item_id: it.id, token_hash: sha256(token), expires_at: expires, max_downloads: downloadMax() }).execute();
-    out.push({ itemId: it.id, title: it.title_snapshot, bookLocale: it.book_locale, token });
+    await db.insertInto("download_grants").values({ id: newId("dlg"), order_id: orderId, order_item_id: f.itemId, pdf_key: f.bundle ? f.key : null, file_title: f.bundle ? f.title : null, token_hash: sha256(token), expires_at: expires, max_downloads: downloadMax() }).execute();
+    out.push({ itemId: f.itemId, title: f.title, bookLocale: f.locale, token });
   }
   return { grants: out, expires };
 }
+
+/** Межа вкладень: сумарний розмір PDF, після якого замість файлів надсилаються особисті посилання (ліміти пошти ~25 МБ). */
+export const MAX_ATTACH_BYTES = 18 * 1024 * 1024;
 
 const RETRY_MIN = [5, 30, 120, 720];
 export const MAX_EMAIL_ATTEMPTS = 5;
@@ -136,28 +148,41 @@ export async function deliverPdfEmail(orderId: string, dedupeKey: string) {
     .where("id", "=", row.id).where("attempts", "=", row.attempts).where("status", "!=", "sent").executeTakeFirst();
   if (Number(claim.numUpdatedRows) !== 1) return { status: "in_progress" as const };
 
-  const { grants, expires } = await issueDownloadGrants(orderId);
-  const uk = order.site_locale === "uk";
-  const links = grants.map((g) => ({ ...g, url: `${appUrl()}/api/download/${g.token}` }));
-  const exp = new Date(expires).toLocaleString(uk ? "uk-UA" : "en-GB", { timeZone: "Europe/Kyiv", dateStyle: "medium", timeStyle: "short" });
-  const subject = uk ? `Ваша книжка — замовлення ${order.number}` : `Your book — order ${order.number}`;
-  const intro = uk ? `Дякуємо за замовлення ${order.number} (${formatMinor(order.total_minor, "uk")}).` : `Thank you for your order ${order.number} (${formatMinor(order.total_minor, "en")}).`;
-  const note = uk
-    ? `Посилання особисті й діють до ${exp} (до ${downloadMax()} завантажень). Електронна книжка призначена для особистого використання.`
-    : `These links are personal and valid until ${exp} (up to ${downloadMax()} downloads). The digital book is for personal use.`;
-  const lang = (l: string) => (l === "uk" ? (uk ? "українська" : "Ukrainian") : uk ? "англійська" : "English");
-  const text = [intro, "", ...links.map((l) => `${l.title} (PDF, ${lang(l.bookLocale)}): ${l.url}`), "", note].join("\n");
-  const html = `<p>${escapeHtml(intro)}</p><ul>${links.map((l) => `<li><a href="${l.url}">${escapeHtml(l.title)}</a> — PDF, ${lang(l.bookLocale)}</li>`).join("")}</ul><p style="color:#555">${escapeHtml(note)}</p>`;
-
-  const res = await sendEmail({ to: order.email, subject, text, html });
+  const uk = order.site_locale !== "en";
+  const files = await pdfFilesForOrder(orderId);
+  // файли книжок: вкладення, якщо все є й разом не завелике; інакше — особисті посилання
+  const bufs = files.every((f) => f.key) ? await Promise.all(files.map((f) => privateStorage().get(f.key!))) : [];
+  const attachBooks = bufs.length === files.length && bufs.every(Boolean) && bufs.reduce((a, b) => a + b!.length, 0) <= MAX_ATTACH_BYTES;
+  let grants: { token: string; title: string; bookLocale: string }[] = [];
+  let exp = "";
+  if (!attachBooks) {
+    const g = await issueDownloadGrants(orderId);
+    grants = g.grants;
+    exp = new Date(g.expires).toLocaleString(uk ? "uk-UA" : "en-GB", { timeZone: "Europe/Kyiv", dateStyle: "medium", timeStyle: "short" });
+  }
+  const lang = (l: string) => (l === "uk" ? (uk ? "українською" : "Ukrainian") : uk ? "англійською" : "English");
+  const links = attachBooks ? null : grants.map((g) => ({ title: `${g.title} (PDF, ${lang(g.bookLocale)})`, url: `${appUrl()}/api/download/${g.token}` }));
+  const { subject, lines } = pdfEmailText(uk ? "uk" : "en", order.number, links, exp);
+  const receipt = await paymentReceipt(orderId).catch(() => null);
+  const attachments = [
+    ...(attachBooks ? files.map((f, i) => ({ filename: attachmentName(f.title, f.locale), content: bufs[i]!, contentType: "application/pdf" })) : []),
+    ...(receipt ? [{ filename: receipt.filename, content: receipt.content, contentType: "application/pdf" }] : []),
+  ];
+  const text = lines.join("\n");
+  const html = `<div style="font-family:Georgia,serif;font-size:16px;line-height:1.55;color:#2a2924;max-width:560px">${lines.map((l) => {
+    const link = links?.find((x) => l === `${x.title}: ${x.url}`);
+    return link ? `<p style="margin:0 0 6px"><a href="${link.url}">${escapeHtml(link.title)}</a></p>` : l ? `<p style="margin:0 0 4px">${escapeHtml(l)}</p>` : `<p style="margin:0 0 10px"></p>`;
+  }).join("")}</div>`;
+  const s = await getSettings();
+  const res = await sendEmail({ to: order.email, subject, text, html, attachments, replyTo: s.contact_email || undefined });
   if (res.ok) {
     await db.updateTable("email_deliveries").set({ status: "sent", provider_message_id: res.id, sent_at: nowIso(), last_error: null, next_attempt_at: null }).where("id", "=", row.id).execute();
     await db.updateTable("fulfillments").set({ status: "sent", updated_at: nowIso() }).where("order_id", "=", orderId).where("kind", "=", "digital").execute();
-    await logOrderEvent(orderId, "digital", null, "sent", "система", "Лист із посиланнями на PDF надіслано");
+    await logOrderEvent(orderId, "digital", null, "sent", "система", attachBooks ? `Лист із PDF у вкладенні надіслано (${files.length} файл.)${receipt ? " + квитанція" : ""}` : "Лист із посиланнями на PDF надіслано (файли завеликі для вкладення)");
     return { status: "sent" as const };
   }
   // Невдала спроба: щойно видані токени відкликаємо (лист їх не доставив)
-  await db.updateTable("download_grants").set({ revoked: 1 }).where("token_hash", "in", grants.map((g) => sha256(g.token)).concat("")).execute();
+  if (grants.length) await db.updateTable("download_grants").set({ revoked: 1 }).where("token_hash", "in", grants.map((g) => sha256(g.token)).concat("")).execute();
   const attempts = row.attempts + 1;
   const next = res.notConfigured || attempts >= MAX_EMAIL_ATTEMPTS ? null : new Date(Date.now() + RETRY_MIN[Math.min(attempts - 1, RETRY_MIN.length - 1)] * 60_000).toISOString();
   await db.updateTable("email_deliveries").set({ status: res.notConfigured ? "not_configured" : "failed", last_error: res.error, next_attempt_at: next }).where("id", "=", row.id).execute();
@@ -185,10 +210,11 @@ export async function consumeDownload(token: string): Promise<{ ok: true; key: s
   const item = await db.selectFrom("order_items").selectAll().where("id", "=", g.order_item_id).where("order_id", "=", g.order_id).executeTakeFirst();
   if (!item || item.format !== "pdf") return { ok: false, reason: "invalid" };
   const v = await db.selectFrom("product_variants").select(["private_pdf_key"]).where("id", "=", item.variant_id).executeTakeFirst();
-  if (!v?.private_pdf_key) return { ok: false, reason: "no_file" };
+  const fileKey = g.pdf_key ?? v?.private_pdf_key ?? null;
+  if (!fileKey) return { ok: false, reason: "no_file" };
   const upd = await db.updateTable("download_grants").set({ download_count: g.download_count + 1 })
     .where("id", "=", g.id).where("download_count", "=", g.download_count).where("download_count", "<", g.max_downloads).executeTakeFirst();
   if (Number(upd.numUpdatedRows) !== 1) return { ok: false, reason: "exhausted" };
   const product = await db.selectFrom("products").select("slug").where("id", "=", item.product_id).executeTakeFirst();
-  return { ok: true, key: v.private_pdf_key, filename: `${product?.slug ?? "book"}-${item.book_locale}-${order.number}.pdf` };
+  return { ok: true, key: fileKey, filename: g.file_title ? attachmentName(g.file_title, item.book_locale) : `${product?.slug ?? "book"}-${item.book_locale}-${order.number}.pdf` };
 }

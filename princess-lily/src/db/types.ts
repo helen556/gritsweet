@@ -210,6 +210,9 @@ export interface DownloadGrantsTable {
   id: string;
   order_id: string;
   order_item_id: string;
+  /** Конкретний файл (для електронного комплекту); null — PDF варіанта позиції */
+  pdf_key: string | null;
+  file_title: string | null;
   token_hash: string;
   expires_at: string;
   max_downloads: number;

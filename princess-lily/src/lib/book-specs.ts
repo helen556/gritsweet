@@ -15,6 +15,8 @@ export const SERIES_SPECS = {
 
 /** Комплекти: id товару → кількість книжок у ньому. */
 export const BUNDLES: Record<string, number> = { prd_set5: 5 };
+/** Склад комплектів: які книжки (PDF тієї ж мови) отримує покупець електронного комплекту. */
+export const BUNDLE_CONTENTS: Record<string, string[]> = { prd_set5: ["prd_doctor", "prd_potty", "prd_bublik", "prd_friend", "prd_sleep"] };
 
 export type SpecRow = { key: string; label: string; value: string; /** показувати лише для друкованого формату */ printOnly?: boolean };
 
