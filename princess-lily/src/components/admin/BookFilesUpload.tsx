@@ -33,6 +33,18 @@ export default function BookFilesUpload({ rows }: { rows: BookFileRow[] }) {
     setBusy(false);
     router.refresh();
   }
+  /** Кнопка рядка: PDF або ZIP (з архіву береться PDF саме цієї книжки й мови). */
+  async function onPickOne(row: BookFileRow, f: File) {
+    if (!(/\.zip$/i.test(f.name) || f.type.includes("zip"))) return run([{ row, file: f }]);
+    setBusy(true);
+    let pdfs: File[] = [];
+    try { pdfs = await pdfsFromZip(f); } catch { /* нижче — помилка */ }
+    const own = pdfs.filter((p) => { const m = matchBookFile(p.name); return m?.productId === row.productId && m.locale === row.locale; });
+    const file = own.length === 1 ? own[0] : pdfs.length === 1 ? pdfs[0] : undefined;
+    if (file) return run([{ row, file }]);
+    setBusy(false);
+    set(row.variantId, { error: pdfs.length ? `В архіві ${f.name} немає файлу саме цієї книжки — скористайтеся великою кнопкою вгорі` : `Не вдалося розпакувати ${f.name}` });
+  }
   async function onPickMany(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = [...(e.target.files ?? [])];
     e.target.value = "";
@@ -82,8 +94,8 @@ export default function BookFilesUpload({ rows }: { rows: BookFileRow[] }) {
                 </p>
               </div>
               <label className={`btn btn-ghost btn-sm cursor-pointer ${busy ? "pointer-events-none opacity-60" : ""}`}>
-                <input type="file" accept="application/pdf,.pdf" className="sr-only" disabled={busy}
-                  onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void run([{ row: r, file: f }]); }} />
+                <input type="file" accept="application/pdf,.pdf,application/zip,.zip" className="sr-only" disabled={busy}
+                  onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void onPickOne(r, f); }} />
                 {r.uploaded || s.ok ? "Замінити" : "Вибрати"}
               </label>
             </li>
