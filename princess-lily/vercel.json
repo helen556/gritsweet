@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run vercel-build",
-  "crons": [{ "path": "/api/cron/retry", "schedule": "17 6 * * *" }]
+  "crons": [
+    {
+      "path": "/api/cron/retry",
+      "schedule": "17 6 * * *"
+    }
+  ],
+  "ignoreCommand": "[ \"$VERCEL_ENV\" != \"production\" ]"
 }
