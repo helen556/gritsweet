@@ -7,6 +7,7 @@ import { appUrl, paymentConfig, PAYMENT_MODES } from "./config";
 import { adapterById } from "./payments/providers";
 import { logOrderEvent } from "./events";
 import { getSettings } from "./settings";
+import { privateStorage } from "./storage";
 
 export type CheckoutInput = {
   lines: CartLineInput[];
@@ -157,4 +158,33 @@ export async function startProviderPayment(orderId: string, returnPath: string):
     await logOrderEvent(o.id, "payment", null, null, "система", `Рахунок провайдера не створено: ${(e as Error).message}`.slice(0, 300));
     return null;
   }
+}
+
+/**
+ * Повне видалення помилкового замовлення з бази (не «скасування»): саме замовлення, позиції, доставка/видача,
+ * посилання на PDF, хронологія, квитанції (і їхні файли), події оплати, листи та Telegram-сповіщення.
+ * Якщо замовлення було оплачене, а друковані книжки ще не відправлені, примірники повертаються на склад.
+ * Повертає короткий підсумок для журналу дій або null, якщо замовлення немає.
+ */
+export async function deleteOrderCompletely(orderId: string) {
+  const o = await db.selectFrom("orders").select(["id", "number", "total_minor", "payment_status"]).where("id", "=", orderId).executeTakeFirst();
+  if (!o) return null;
+  const [items, ship, receipts] = await Promise.all([
+    db.selectFrom("order_items").select(["variant_id", "format", "quantity"]).where("order_id", "=", orderId).execute(),
+    db.selectFrom("fulfillments").select("status").where("order_id", "=", orderId).where("kind", "=", "shipping").executeTakeFirst(),
+    db.selectFrom("receipts").select("storage_key").where("order_id", "=", orderId).execute(),
+  ]);
+  // залишок списується при підтвердженні оплати (markPaid) — повертаємо, якщо посилку ще не відправили
+  const restock = o.payment_status === "paid" && !["shipped", "delivered"].includes(ship?.status ?? "");
+  await db.transaction().execute(async (trx) => {
+    if (restock) for (const it of items.filter((i) => i.format === "print"))
+      await trx.updateTable("product_variants").set((eb) => ({ stock: eb("stock", "+", it.quantity) })).where("id", "=", it.variant_id).where("stock", "is not", null).execute();
+    for (const t of ["notifications", "email_deliveries", "payment_events", "download_grants", "receipts", "order_events", "fulfillments", "order_items"] as const)
+      await trx.deleteFrom(t).where("order_id", "=", orderId).execute();
+    await trx.deleteFrom("orders").where("id", "=", orderId).execute();
+  });
+  // файли квитанцій — після видалення записів (помилка сховища не повертає замовлення)
+  const storage = privateStorage();
+  for (const r of receipts) await storage.remove(r.storage_key).catch(() => {});
+  return { number: o.number, totalMinor: o.total_minor, paymentStatus: o.payment_status, items: items.length, restocked: restock };
 }

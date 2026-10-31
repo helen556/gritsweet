@@ -43,7 +43,7 @@ const STUB = `window.__px=window.__px||[];(function(){var f=window.fbq;var rec=f
   ev = await px();
   ok('InitiateCheckout once', ev.filter((e) => e === 'InitiateCheckout').length === 1, JSON.stringify(ev));
   ok('no Purchase before payment', !ev.includes('Purchase'));
-  await pg.getByLabel('Email', { exact: true }).fill('px@example.com'); await pg.getByLabel('Ім’я', { exact: true }).fill('Олена'); await pg.getByLabel('Прізвище', { exact: true }).fill('Тестова');
+  await pg.getByRole('textbox', { name: 'Email', exact: true }).fill('px@example.com'); await pg.getByRole('textbox', { name: 'Ім’я', exact: true }).fill('Олена'); await pg.getByRole('textbox', { name: 'Прізвище', exact: true }).fill('Тестова');
   await pg.getByLabel('Телефон').fill('+380 50 123 45 67'); await pg.getByLabel('Місто або населений пункт').fill('Київ'); await pg.getByLabel('Відділення або поштомат').fill('Відділення №1');
   await pg.getByRole('button', { name: 'Перейти до оплати' }).click();
   await pg.waitForURL(/test-checkout/);

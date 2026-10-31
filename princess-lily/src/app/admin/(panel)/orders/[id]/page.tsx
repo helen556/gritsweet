@@ -7,6 +7,7 @@ import { kyiv, PAYMENT_LABEL, ORDER_LABEL, DIGITAL_LABEL, SHIPPING_LABEL, METHOD
 import { ORDER_TRANSITIONS } from "@/lib/events";
 import UploadForm from "@/components/admin/UploadForm";
 import ActionForm from "@/components/admin/ActionForm";
+import DeleteOrderButton from "@/components/admin/DeleteOrderButton";
 import { confirmPaymentAction, cancelOrderAction, shippingAction, resendPdfAction, makeLinksAction, markPdfSentAction, orderNoteAction, orderStatusAction } from "../../../actions";
 
 export const metadata = { title: "Замовлення" };
@@ -144,6 +145,11 @@ export default async function OrderAdmin({ params }: PageProps<"/admin/orders/[i
               <label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="confirm" className="h-5 w-5" /> Так, скасувати</label></ActionForm>
           </section>
         )}
+        <section className="card border border-rose-100 p-5">
+          <h2 className="text-2xl">Видалити замовлення</h2>
+          <p className="mt-1 text-sm text-ink-soft">Для помилкових і тестових замовлень: запис повністю зникне з бази (на відміну від «Скасувати»).</p>
+          <div className="mt-3"><DeleteOrderButton id={o.id} number={o.number} paid={o.payment_status === "paid"} /></div>
+        </section>
       </div>
     </div>
   );

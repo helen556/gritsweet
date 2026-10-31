@@ -7,6 +7,7 @@ import { after } from "next/server";
 import { notifyNewOrder } from "@/lib/telegram";
 import { rateLimit } from "@/lib/rate-limit";
 import { newId } from "@/lib/ids";
+import { normalizeUaPhone } from "@/lib/ua-phone";
 
 const lineSchema = z.array(z.object({ variantId: z.string().max(64), quantity: z.number().int().min(1).max(10) })).max(30);
 const langSchema = z.enum(["uk", "en"]);
@@ -48,25 +49,26 @@ export type CheckoutResult = { ok: true; redirect: string } | { ok: false; error
 
 export async function placeOrder(payload: CheckoutPayload): Promise<CheckoutResult> {
   const parsed = checkoutSchema.safeParse(payload);
-  if (!parsed.success) {
-    const fields = [...new Set(parsed.error.issues.map((i) => String(i.path[0])))];
+  // Обов'язкові для будь-якого замовлення: прізвище, ім'я, email (схема) і телефон +380XXXXXXXXX
+  const phone = normalizeUaPhone(typeof payload?.phone === "string" ? payload.phone : "");
+  if (!parsed.success || !phone) {
+    const fields = [...new Set([...(parsed.success ? [] : parsed.error.issues.map((i) => String(i.path[0]))), ...(phone ? [] : ["phone"])])];
     return { ok: false, error: fields.includes("website") ? "generic" : "invalid", fields };
   }
   const d = parsed.data;
   if (!(await rateLimit("checkout", 8, 600))) return { ok: false, error: "rate" };
-  const phoneOk = /^\+?[\d\s()-]{9,20}$/.test(d.phone);
   const q = await quoteCart(d.lines, d.lang);
   // PDF у Telegram — потрібен нік (@…) або номер телефону
   const TG = /^@?[A-Za-z][A-Za-z0-9_]{3,31}$|^\+?[\d\s()-]{9,20}$/;
   if (q.lines.some((l) => l.format === "pdf") && d.pdfChannel === "telegram" && !TG.test(d.telegram)) return { ok: false, error: "invalid", fields: ["telegram"] };
   if (q.shippingRequired) {
-    const recOk = !d.otherRecipient || (d.recipientFirstName && d.recipientLastName && /^\+?[\d\s()-]{9,20}$/.test(d.recipientPhone));
-    const missing = [!phoneOk && "phone", !d.npCity && "npCity", !d.npPoint && "npPoint", !recOk && "recipient"].filter(Boolean) as string[];
+    const recOk = !d.otherRecipient || (d.recipientFirstName && d.recipientLastName && normalizeUaPhone(d.recipientPhone));
+    const missing = [!d.npCity && "npCity", !d.npPoint && "npPoint", !recOk && "recipient"].filter(Boolean) as string[];
     if (missing.length) return { ok: false, error: "invalid", fields: missing };
   }
   const r = await createOrder({
-    lines: d.lines, email: d.email, firstName: d.firstName, lastName: d.lastName, phone: d.phone || null,
-    recipient: d.otherRecipient ? { firstName: d.recipientFirstName, lastName: d.recipientLastName, phone: d.recipientPhone } : null,
+    lines: d.lines, email: d.email, firstName: d.firstName, lastName: d.lastName, phone,
+    recipient: d.otherRecipient ? { firstName: d.recipientFirstName, lastName: d.recipientLastName, phone: normalizeUaPhone(d.recipientPhone) ?? "" } : null,
     npCity: d.npCity || null, npCityRef: d.npCityRef || null, npPoint: d.npPoint || null, npPointRef: d.npPointRef || null,
     note: d.note || null, siteLocale: d.lang, idempotencyKey: d.idempotencyKey,
     pdfChannel: d.pdfChannel, telegram: d.pdfChannel === "telegram" ? d.telegram : null,

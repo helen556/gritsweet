@@ -47,13 +47,13 @@ await page.screenshot({ path: path.join(OUT, "cart-desktop.png"), fullPage: true
 // підміна ціни в localStorage нічого не дає (зберігаються лише id/кількість)
 await page.evaluate(() => { const c = JSON.parse(localStorage.getItem("pl_cart_v1")); c[0].priceMinor = 1; localStorage.setItem("pl_cart_v1", JSON.stringify(c)); });
 await page.goto(`${BASE}/uk/checkout`);
-await page.getByLabel("Email", { exact: true }).waitFor();
+await page.getByRole("textbox", { name: "Email", exact: true }).waitFor();
 check("checkout: поля доставки є для друку", await page.getByLabel("Відділення або поштомат").isVisible());
 await page.getByRole("button", { name: "Перейти до оплати" }).click();
 check("checkout: валідація порожніх полів", await page.getByText("Вкажіть коректний email.").isVisible());
-await page.getByLabel("Email", { exact: true }).fill("parent@example.com");
-await page.getByLabel("Ім’я", { exact: true }).fill("Олена");
-await page.getByLabel("Прізвище", { exact: true }).fill("Тестова");
+await page.getByRole("textbox", { name: "Email", exact: true }).fill("parent@example.com");
+await page.getByRole("textbox", { name: "Ім’я", exact: true }).fill("Олена");
+await page.getByRole("textbox", { name: "Прізвище", exact: true }).fill("Тестова");
 await page.getByLabel("Телефон").fill("+380 50 123 45 67");
 await page.getByLabel("Місто або населений пункт").fill("Київ");
 await page.getByLabel("Відділення або поштомат").fill("Відділення №1");
@@ -135,7 +135,7 @@ check("статус оплати й доставки окремо (Оплаче�
 // ---------- Контактна форма ----------
 await page.goto(`${BASE}/en/contacts`);
 await page.getByLabel("Name").fill("Test Parent");
-await page.getByLabel("Email", { exact: true }).fill("p@example.com");
+await page.getByRole("textbox", { name: "Email", exact: true }).fill("p@example.com");
 await page.getByLabel("Message").fill("Hello! Where is my book? (e2e)");
 await page.getByRole("button", { name: "Send" }).click();
 check("контактна форма: підтвердження після збереження", await page.getByText("Your message has been saved").waitFor({ timeout: 20000 }).then(() => true, () => false));
@@ -202,7 +202,7 @@ await mp.locator("label.chip", { hasText: "Українська" }).click();
 await mp.locator("label.chip", { hasText: "Друкована книжка" }).click();
 await mp.getByRole("button", { name: "Додати в кошик" }).click();
 await mp.goto(`${BASE}/uk/checkout`);
-await mp.getByLabel("Email", { exact: true }).waitFor();
+await mp.getByRole("textbox", { name: "Email", exact: true }).waitFor();
 await mp.screenshot({ path: path.join(OUT, "checkout-mobile.png"), fullPage: true });
 check("touch: курсорний слід вимкнений", await mp.evaluate(() => [...document.querySelectorAll("canvas")].every((c) => getComputedStyle(c).display === "none" || c.closest(".hero-media"))));
 await m.close();

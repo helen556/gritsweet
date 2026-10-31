@@ -6,6 +6,8 @@ import { formatMinor } from "@/lib/money";
 import type { Dict } from "@/i18n";
 import { useQuote } from "./useQuote";
 import NpPicker from "./NpPicker";
+import PhoneInput from "./PhoneInput";
+import { normalizeUaPhone } from "@/lib/ua-phone";
 import Track from "../tracking/Track";
 import { getConsent, metaCookies } from "../tracking/consent";
 import type { CartLine } from "./CartProvider";
@@ -40,12 +42,13 @@ export default function CheckoutForm({ lang, t, npMode, direct }: { lang: "uk" |
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(get("email").trim())) local.push("email");
     if (!get("firstName").trim()) local.push("firstName");
     if (!get("lastName").trim()) local.push("lastName");
+    // телефон обов'язковий для будь-якого замовлення (і лише PDF теж)
+    if (!normalizeUaPhone(get("phone"))) local.push("phone");
     if (hasPdf && pdfChannel === "telegram" && !/^@?[A-Za-z][A-Za-z0-9_]{3,31}$|^\+?[\d\s()-]{9,20}$/.test(get("telegram").trim())) local.push("telegram");
     if (ship) {
-      if (!/^\+?[\d\s()-]{9,20}$/.test(get("phone").trim())) local.push("phone");
       if (!get("npCity").trim()) local.push("npCity");
       if (!get("npPoint").trim()) local.push("npPoint");
-      if (otherRecipient && (!get("recipientFirstName").trim() || !get("recipientLastName").trim() || !/^\+?[\d\s()-]{9,20}$/.test(get("recipientPhone").trim()))) local.push("recipient");
+      if (otherRecipient && (!get("recipientFirstName").trim() || !get("recipientLastName").trim() || !normalizeUaPhone(get("recipientPhone")))) local.push("recipient");
     }
     setFields(local);
     if (local.length) { setError("invalid"); formRef.current?.querySelector<HTMLElement>(`[name="${local[0]}"]`)?.focus(); return; }
@@ -70,27 +73,33 @@ export default function CheckoutForm({ lang, t, npMode, direct }: { lang: "uk" |
   const msg = error ? (error === "invalid" ? null : (e as Record<string, string>)[error] ?? e.generic) : null;
   const fe = (name: string, text: string) => fields.includes(name) ? <p id={`${name}-err`} className="err">{text}</p> : null;
   const inv = (name: string) => fields.includes(name) ? { "aria-invalid": true as const, "aria-describedby": `${name}-err` } : {};
+  const req = <span aria-hidden="true" className="req">*</span>;
+  // підсвітка знімається, щойно поле почали виправляти
+  const clearOnInput = (ev: React.FormEvent<HTMLFormElement>) => {
+    const n = (ev.target as HTMLInputElement).name;
+    const key = n.startsWith("recipient") ? "recipient" : n;
+    if (fields.includes(key)) setFields(fields.filter((x) => x !== key));
+  };
 
   return (
-    <form ref={formRef} onSubmit={onSubmit} noValidate className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+    <form ref={formRef} onSubmit={onSubmit} onInput={clearOnInput} noValidate className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
       <Track event="InitiateCheckout" params={{ content_ids: [...new Set(quote.lines.map((l) => l.productId))], contents: quote.lines.map((l) => ({ id: l.productId, quantity: l.quantity })), content_type: "product", num_items: quote.lines.reduce((a, l) => a + l.quantity, 0), value: quote.totalMinor / 100, currency: "UAH" }} />
       <div className="space-y-8">
         <fieldset className="card space-y-5 p-6 sm:p-8">
           <legend className="float-left mb-2 w-full font-display text-3xl text-plum-900">{t.checkout.contact}</legend>
-          <div className="field clear-both"><label htmlFor="email">{t.checkout.email}</label>
+          <p className="clear-both text-sm text-ink-soft"><span aria-hidden="true" className="req">*</span> {t.checkout.requiredNote}</p>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="field"><label htmlFor="lastName">{t.checkout.lastName}{req}</label>
+              <input id="lastName" name="lastName" autoComplete="family-name" required className="input" {...inv("lastName")} />{fe("lastName", e.lastName)}</div>
+            <div className="field"><label htmlFor="firstName">{t.checkout.firstName}{req}</label>
+              <input id="firstName" name="firstName" autoComplete="given-name" required className="input" {...inv("firstName")} />{fe("firstName", e.name)}</div>
+          </div>
+          <div className="field"><label htmlFor="phone">{t.checkout.phone}{req}</label>
+            <PhoneInput id="phone" name="phone" invalid={inv("phone")} />
+            <p className="hint">{ship ? t.checkout.phoneHint : t.checkout.phoneHintPdf}</p>{fe("phone", e.phone)}</div>
+          <div className="field"><label htmlFor="email">{t.checkout.email}{req}</label>
             <input id="email" name="email" type="email" autoComplete="email" inputMode="email" required className="input" {...inv("email")} />
             <p className="hint">{t.checkout.emailHint}</p>{fe("email", e.email)}</div>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div className="field"><label htmlFor="firstName">{t.checkout.firstName}</label>
-              <input id="firstName" name="firstName" autoComplete="given-name" required className="input" {...inv("firstName")} />{fe("firstName", e.name)}</div>
-            <div className="field"><label htmlFor="lastName">{t.checkout.lastName}</label>
-              <input id="lastName" name="lastName" autoComplete="family-name" required className="input" {...inv("lastName")} />{fe("lastName", e.lastName)}</div>
-          </div>
-          {ship && (
-            <div className="field"><label htmlFor="phone">{t.checkout.phone}</label>
-              <input id="phone" name="phone" type="tel" autoComplete="tel" inputMode="tel" required className="input" {...inv("phone")} />
-              <p className="hint">{t.checkout.phoneHint}</p>{fe("phone", e.phone)}</div>
-          )}
           {hasPdf && (
             <fieldset className="clear-both">
               <legend className="mb-2 font-semibold">{t.checkout.pdfWhere}</legend>
@@ -118,7 +127,7 @@ export default function CheckoutForm({ lang, t, npMode, direct }: { lang: "uk" |
               <div className="grid gap-4 rounded-2xl bg-cream/50 p-4 sm:grid-cols-2" role="group" aria-label={t.checkout.recipient}>
                 <div className="field"><label htmlFor="recipientFirstName">{t.checkout.recFirst}</label><input id="recipientFirstName" name="recipientFirstName" autoComplete="off" className="input" {...inv("recipient")} /></div>
                 <div className="field"><label htmlFor="recipientLastName">{t.checkout.recLast}</label><input id="recipientLastName" name="recipientLastName" autoComplete="off" className="input" {...inv("recipient")} /></div>
-                <div className="field sm:col-span-2"><label htmlFor="recipientPhone">{t.checkout.recPhone}</label><input id="recipientPhone" name="recipientPhone" type="tel" inputMode="tel" autoComplete="off" className="input" {...inv("recipient")} /></div>
+                <div className="field sm:col-span-2"><label htmlFor="recipientPhone">{t.checkout.recPhone}</label><PhoneInput id="recipientPhone" name="recipientPhone" autoComplete="off" invalid={inv("recipient")} /></div>
                 {fe("recipient", e.recipient)}
               </div>
             )}

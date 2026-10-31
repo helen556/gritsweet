@@ -31,16 +31,16 @@ export default function NpPicker({ mode, t, invalid }: { mode: "api" | "manual";
   return (
     <>
       <div className="field">
-        <label htmlFor="npCity">{t.city}</label>
-        <input id="npCity" name="npCity" className="input" autoComplete="address-level2" placeholder={t.cityHint} value={city} list={mode === "api" ? cl : undefined}
+        <label htmlFor="npCity">{t.city}<span aria-hidden="true" className="req">*</span></label>
+        <input id="npCity" name="npCity" required className="input" autoComplete="address-level2" placeholder={t.cityHint} value={city} list={mode === "api" ? cl : undefined}
           onChange={(e) => { const v = e.target.value; setCity(v); const m = cities.find((c) => c.name === v); setCityRef(m?.ref ?? ""); setPoint(""); setPointRef(""); }} {...inv("npCity")} />
         {mode === "api" && <datalist id={cl}>{cities.map((c) => <option key={c.ref} value={c.name}>{c.area}</option>)}</datalist>}
         <input type="hidden" name="npCityRef" value={cityRef} />
         {invalid.includes("npCity") && <p id="npCity-err" className="err">{t.errors.city}</p>}
       </div>
       <div className="field">
-        <label htmlFor="npPoint">{t.point}</label>
-        <input id="npPoint" name="npPoint" className="input" placeholder={t.pointHint} value={point} list={mode === "api" ? pl : undefined}
+        <label htmlFor="npPoint">{t.point}<span aria-hidden="true" className="req">*</span></label>
+        <input id="npPoint" name="npPoint" required className="input" placeholder={t.pointHint} value={point} list={mode === "api" ? pl : undefined}
           onChange={(e) => { const v = e.target.value; setPoint(v); setPointRef(points.find((p) => p.name === v)?.ref ?? ""); }} {...inv("npPoint")} />
         {mode === "api" && <datalist id={pl}>{points.map((p) => <option key={p.ref} value={p.name} />)}</datalist>}
         <input type="hidden" name="npPointRef" value={pointRef} />

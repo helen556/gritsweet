@@ -16,6 +16,7 @@
     "demo:fixtures": "tsx --import ./scripts/shim/register.mjs scripts/demo-fixtures.ts",
     "test:e2e": "node tests/e2e/flow.mjs",
     "test:e2e:pixel": "node tests/e2e/pixel.mjs",
+    "test:e2e:orders": "node tests/e2e/checkout-admin.mjs",
     "notify:retry": "tsx --import ./scripts/shim/register.mjs scripts/notify-retry.ts",
     "telegram:chat-id": "node scripts/telegram-chat-id.mjs",
     "vercel-build": "npm run db:setup && next build"

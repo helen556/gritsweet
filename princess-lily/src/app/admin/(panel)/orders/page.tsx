@@ -20,7 +20,9 @@ function SortLink({ f, col, label }: { f: CrmFilters; col: NonNullable<CrmFilter
 
 /** CRM: таблиця замовлень. Час — Europe/Kyiv (у БД — UTC). Усі фільтри працюють на сервері й однаково для експорту. */
 export default async function Orders({ searchParams }: PageProps<"/admin/orders">) {
-  const f = parseFilters(await searchParams);
+  const sp = await searchParams;
+  const f = parseFilters(sp);
+  const deleted = typeof sp.deleted === "string" ? sp.deleted.slice(0, 40) : "";
   const { rows, total, sum } = await listOrders(f);
   const pages = Math.max(1, Math.ceil(total / (f.pageSize ?? 25)));
   const exportQ = filtersToQuery({ ...f, page: 1 }, { page: undefined, size: undefined });
@@ -32,9 +34,21 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
         <h1 className="text-3xl text-plum-900">Замовлення</h1>
         <div className="flex flex-wrap gap-2">
           <a className="btn btn-ghost btn-sm" href={`/admin/orders-export?format=xlsx${exportQ ? `&${exportQ}` : ""}`}>⬇ Excel (.xlsx)</a>
-          <a className="btn btn-ghost btn-sm" href={`/admin/orders-export?format=pdf${exportQ ? `&${exportQ}` : ""}`}>⬇ PDF</a>
+          <a className="btn btn-ghost btn-sm" href={`/admin/orders-export?format=pdf${exportQ ? `&${exportQ}` : ""}`}>⬇ PDF-таблиця</a>
         </div>
       </div>
+
+      {/* Лист збірки: позначені галочками замовлення, або весь відфільтрований список, або одним кліком — оплачені до відправлення */}
+      <form id="pick" action="/admin/orders-export" method="get" target="_blank" className="card flex flex-wrap items-center gap-3 p-4">
+        <input type="hidden" name="format" value="picking" />
+        {Object.entries({ q: f.q, from: f.from, to: f.to, payment: f.payment, shipping: f.shipping, kind: f.kind, status: f.status }).map(([k, v]) => v ? <input key={k} type="hidden" name={k} value={v} /> : null)}
+        <span className="font-semibold">📦 Збірка замовлень (PDF):</span>
+        <button className="btn btn-primary btn-sm">Позначені або всі за фільтром</button>
+        <a className="btn btn-ghost btn-sm" target="_blank" href="/admin/orders-export?format=picking&payment=paid&shipping=to_ship">Оплачені, до відправлення</a>
+        <span className="text-sm text-ink-soft">Позначте замовлення галочками в списку; без позначок — усі знайдені ({total}).</span>
+      </form>
+
+      {deleted && <p role="status" className="card border border-plum-100 p-4">✓ Замовлення <strong>{deleted}</strong> видалено.</p>}
 
       <form className="card grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4" role="search" aria-label="Фільтри замовлень">
         <div className="field lg:col-span-2"><label htmlFor="q">Пошук: номер, ім’я, email, телефон</label><input id="q" name="q" defaultValue={f.q} className={sel} /></div>
@@ -58,6 +72,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
           <caption className="sr-only">Список замовлень</caption>
           <thead className="bg-plum-100/60 text-ink">
             <tr>
+              <th className="w-10 p-3"><span className="sr-only">Вибрати для збірки</span></th>
               <th className="p-3">Номер</th>
               <th className="p-3"><SortLink f={f} col="created_at" label="Створено (Київ)" /></th>
               <th className="p-3">Покупець / одержувач</th>
@@ -71,6 +86,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-t border-black/5 align-top hover:bg-plum-100/30">
+                <td className="p-3"><input type="checkbox" form="pick" name="id" value={r.id} className="h-5 w-5" aria-label={`Вибрати ${r.number} для збірки`} /></td>
                 <td className="whitespace-nowrap p-3"><Link href={`/admin/orders/${r.id}`} className="font-semibold underline underline-offset-4">{r.number}</Link>
                   <span className={`mt-1 block w-fit rounded-full px-2 py-0.5 text-xs ${KIND_STYLE[r.kind]}`}>{KIND_LABEL[r.kind]}</span></td>
                 <td className="whitespace-nowrap p-3">{kyiv(r.created_at)}<span className="block text-xs text-ink-soft">{ORDER_LABEL[r.order_status ?? "new"]}</span></td>
@@ -83,7 +99,7 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
                 <td className="p-3">{r.shippingStatus ? SHIPPING_LABEL[r.shippingStatus] : "—"}{r.ttn && <span className="block font-mono text-xs">{r.ttn}</span>}</td>
               </tr>
             ))}
-            {!rows.length && <tr><td colSpan={8} className="p-6 text-center text-ink-soft">Замовлень не знайдено</td></tr>}
+            {!rows.length && <tr><td colSpan={9} className="p-6 text-center text-ink-soft">Замовлень не знайдено</td></tr>}
           </tbody>
         </table>
       </div>
@@ -91,8 +107,10 @@ export default async function Orders({ searchParams }: PageProps<"/admin/orders"
       {/* Картки (телефон) */}
       <ul className="space-y-3 lg:hidden">
         {rows.map((r) => (
-          <li key={r.id}>
-            <Link href={`/admin/orders/${r.id}`} className="card block p-4">
+          <li key={r.id} className="relative">
+            <label className="absolute right-3 bottom-3 z-10 flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl bg-paper/90 px-2 text-sm">
+              <input type="checkbox" form="pick" name="id" value={r.id} className="h-5 w-5" /> збірка</label>
+            <Link href={`/admin/orders/${r.id}`} className="card block p-4 pb-14">
               <div className="flex items-center justify-between gap-2"><span className="font-semibold">{r.number}</span><span className={`rounded-full px-2 py-0.5 text-xs ${KIND_STYLE[r.kind]}`}>{KIND_LABEL[r.kind]}</span></div>
               <p className="text-sm text-ink-soft">{kyiv(r.created_at)} · {ORDER_LABEL[r.order_status ?? "new"]}</p>
               <p className="mt-1">{r.name}{r.recipient ? ` → ${r.recipient}` : ""}</p>

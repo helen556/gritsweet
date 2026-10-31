@@ -14,6 +14,7 @@ import { logOrderEvent, ORDER_TRANSITIONS } from "@/lib/events";
 import { privateStorage } from "@/lib/storage";
 import { retryDueNotifications } from "@/lib/telegram";
 import { rememberSlug } from "@/db/data-migrations";
+import { deleteOrderCompletely } from "@/lib/orders";
 
 export type ActionState = { ok?: string; error?: string; links?: { title: string; url: string }[] };
 const now = () => new Date().toISOString();
@@ -171,6 +172,19 @@ export async function cancelOrderAction(_: ActionState, fd: FormData): Promise<A
   await audit(admin, "order.cancel", "order", id);
   revalidatePath(`/admin/orders/${id}`);
   return Number(res.numUpdatedRows) ? { ok: "Замовлення скасовано, посилання на PDF відкликано" } : { error: "Вже скасовано" };
+}
+
+/** Повне видалення помилкового замовлення (лише адміністратор, лише через сервер; у журналі дій лишається запис). */
+export async function deleteOrderAction(fd: FormData): Promise<{ ok?: string; error?: string }> {
+  const admin = await requireAdmin();
+  const id = str(fd, "id", 64);
+  if (fd.get("confirm") !== "yes") return { error: "Підтвердіть видалення" };
+  const r = await deleteOrderCompletely(id);
+  if (!r) return { error: "Замовлення не знайдено (можливо, вже видалене)" };
+  await audit(admin, "order.delete", "order", id, r);
+  revalidatePath("/admin/orders");
+  revalidatePath("/admin");
+  return { ok: `Замовлення ${r.number} видалено` };
 }
 
 export async function shippingAction(_: ActionState, fd: FormData): Promise<ActionState> {

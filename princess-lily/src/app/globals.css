@@ -122,7 +122,8 @@ h1, h2 { text-wrap: balance; }
 .field .hint { font-size: .9rem; color: var(--color-ink-soft); margin-top: .25rem; }
 .input { width: 100%; min-height: 48px; padding: .7rem .95rem; border-radius: .9rem; border: 1px solid rgba(73,71,71,.2); background: var(--color-paper); color: var(--color-ink); transition: border-color 180ms, box-shadow 180ms; }
 .input:focus { outline: none; border-color: var(--color-plum-500); box-shadow: 0 0 0 3px rgba(241, 197, 209, .55); }
-.input[aria-invalid="true"] { border-color: #a33a33; }
+.input[aria-invalid="true"] { border-color: #a33a33; border-width: 2px; background-color: #fff4f2; box-shadow: 0 0 0 3px rgb(163 58 51 / .14); }
+.req { color: #9a2f28; margin-left: .15rem; }
 .err { color: #9a2f28; font-size: .92rem; margin-top: .3rem; }
 
 }

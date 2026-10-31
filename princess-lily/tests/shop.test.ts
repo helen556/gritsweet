@@ -504,3 +504,45 @@ describe("provider payment retry", () => {
     } finally { adapter.createCheckout = orig; }
   });
 });
+
+describe("18.1–18.3: phone, order deletion, picking PDF", () => {
+  it("phone must be +380XXXXXXXXX (common inputs normalized, the rest rejected)", async () => {
+    const { normalizeUaPhone, maskUaPhone } = await import("@/lib/ua-phone");
+    for (const ok of ["+380 50 123 45 67", "0501234567", "380501234567", "(050) 123-45-67"]) expect(normalizeUaPhone(ok)).toBe("+380501234567");
+    for (const bad of ["", "12345", "+38050123456", "+3800501234567", "+1 202 555 0100", null]) expect(normalizeUaPhone(bad)).toBeNull();
+    expect(maskUaPhone("0501234567")).toBe("+380 50 123 45 67");
+  });
+
+  it("deletes an order completely, with history and receipts; restocks unshipped paid print books", async () => {
+    await setSetting("payment_mode", "manual_link"); await setSetting("payment_link_url", "https://send.monobank.ua/test");
+    const before = (await db.selectFrom("product_variants").select("stock").where("id", "=", "v_print").executeTakeFirstOrThrow()).stock!;
+    const o = await createOrder(baseCheckout({ lines: [{ variantId: "v_print", quantity: 2 }], phone: "+380501234567", npCity: "Київ", npPoint: "1" }));
+    if (!o.ok) throw new Error("order");
+    await markPaid(o.orderId, { source: "admin", checkedBy: "owner@example.com" });
+    expect((await db.selectFrom("product_variants").select("stock").where("id", "=", "v_print").executeTakeFirstOrThrow()).stock).toBe(before - 2);
+    await db.insertInto("receipts").values({ id: "rcp_t", order_id: o.orderId, storage_key: "receipts/t.png", content_type: "image/png", size_bytes: 1, original_name: "t.png", uploaded_by: "покупець", created_at: new Date().toISOString() }).execute();
+    const { deleteOrderCompletely } = await import("@/lib/orders");
+    const r = await deleteOrderCompletely(o.orderId);
+    expect(r).toMatchObject({ paymentStatus: "paid", restocked: true });
+    for (const t of ["orders", "order_items", "order_events", "fulfillments", "receipts", "notifications", "payment_events", "email_deliveries", "download_grants"] as const) {
+      const n = await db.selectFrom(t).select(({ fn }) => fn.countAll<number>().as("n")).where(t === "orders" ? "id" : "order_id", "=", o.orderId).executeTakeFirstOrThrow();
+      expect(Number(n.n), t).toBe(0);
+    }
+    expect((await db.selectFrom("product_variants").select("stock").where("id", "=", "v_print").executeTakeFirstOrThrow()).stock).toBe(before);
+    expect(await deleteOrderCompletely(o.orderId)).toBeNull();
+  });
+
+  it("picking PDF: summary and one block per order, Cyrillic text", async () => {
+    await setSetting("payment_mode", "manual_link"); await setSetting("payment_link_url", "https://send.monobank.ua/test");
+    const a = await createOrder(baseCheckout({ lines: [{ variantId: "v_print", quantity: 2 }, { variantId: "v_pdf", quantity: 1 }], phone: "+380501234567", npCity: "Кропивницький", npPoint: "Відділення №5", note: "Подзвоніть перед відправкою" }));
+    if (!a.ok) throw new Error("order");
+    const { listOrders } = await import("@/lib/crm");
+    const { ordersToPickingPdf } = await import("@/lib/export");
+    const { rows } = await listOrders({ ids: [a.orderId] }, { all: true });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].items.map((i) => i.format).sort()).toEqual(["pdf", "print"]);
+    const pdf = await ordersToPickingPdf(rows, { title: "Збірка замовлень" });
+    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(5000);
+  });
+});

@@ -36,6 +36,8 @@ export const KIND_LABEL = { pdf: "PDF", print: "Друк", mixed: "Змішан�
 export type CrmFilters = {
   q?: string; from?: string; to?: string; payment?: string; shipping?: string; kind?: "pdf" | "print" | "mixed" | ""; status?: string;
   sort?: "created_at" | "total_minor" | "payment_status"; dir?: "asc" | "desc"; page?: number; pageSize?: number;
+  /** Лише ці замовлення (позначені в списку) — для листа збірки; задається сервером, не з URL фільтрів */
+  ids?: string[];
 };
 
 export function parseFilters(sp: Record<string, string | string[] | undefined>): CrmFilters {
@@ -54,6 +56,7 @@ export function parseFilters(sp: Record<string, string | string[] | undefined>):
 
 function base(f: CrmFilters) {
   let q = db.selectFrom("orders as o");
+  if (f.ids) q = q.where("o.id", "in", f.ids.concat(""));
   if (f.q) {
     const like = `%${f.q.toLowerCase()}%`;
     const digits = f.q.replace(/\D/g, "");
@@ -100,6 +103,7 @@ export async function listOrders(f: CrmFilters, opts: { all?: boolean; max?: num
       ...o,
       kind: (fmts.size > 1 ? "mixed" : fmts.has("print") ? "print" : "pdf") as keyof typeof KIND_LABEL,
       itemsText: its.map((i) => `${i.title_snapshot} — ${i.format === "pdf" ? "PDF" : "друк"}, ${i.book_locale === "uk" ? "укр." : "англ."} × ${i.quantity}`).join("; "),
+      items: its,
       shippingStatus: ship?.status ?? null, ttn: ship?.ttn ?? null, digitalStatus: dig?.status ?? null,
       recipient: o.recipient_last_name ? `${o.recipient_first_name ?? ""} ${o.recipient_last_name}`.trim() : null,
     };

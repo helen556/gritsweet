@@ -108,3 +108,78 @@ export async function ordersToPdf(rows: CrmRow[], meta: { title: string; sum: nu
   doc.end();
   return done;
 }
+
+const LANG_UK: Record<string, string> = { uk: "українська", en: "англійська" };
+
+/**
+ * Лист збірки (PDF, A4): підсумок «що зібрати» (друковані книжки за назвою й мовою, PDF до надсилання)
+ * і блок на кожне замовлення — покупець, телефон, одержувач, Нова пошта, куди надіслати PDF, позиції з
+ * квадратиками для позначок, коментар і рядок для ТТН. Неоплачені замовлення помітно позначено.
+ */
+export async function ordersToPickingPdf(rows: CrmRow[], meta: { title: string }) {
+  const doc = new PDFDocument({ size: "A4", margin: 36, info: { Title: meta.title, Author: "Історії принцеси Лілі" } });
+  doc.registerFont("r", FONT);
+  doc.registerFont("b", FONT_B);
+  const chunks: Buffer[] = [];
+  doc.on("data", (c: Buffer) => chunks.push(c));
+  const done = new Promise<Buffer>((res) => doc.on("end", () => res(Buffer.concat(chunks))));
+  const x0 = doc.page.margins.left;
+  const W = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const bottom = () => doc.page.height - doc.page.margins.bottom;
+  const ink = "#2a2924", soft = "#57534a", green = "#263d2d", red = "#9a2f28";
+
+  doc.font("b").fontSize(16).fillColor(green).text(meta.title);
+  doc.font("r").fontSize(9).fillColor(soft).text(`Сформовано: ${kyiv(new Date().toISOString())} (Київ) · замовлень: ${rows.length}`);
+  doc.moveDown(0.8);
+
+  // ---- Підсумок для збірки ----
+  const print = new Map<string, number>(), pdf = new Map<string, number>();
+  for (const r of rows) for (const i of r.items) {
+    const key = `${i.title_snapshot} — ${LANG_UK[i.book_locale] ?? i.book_locale}`;
+    const m = i.format === "print" ? print : pdf;
+    m.set(key, (m.get(key) ?? 0) + i.quantity);
+  }
+  const list = (h: string, m: Map<string, number>, box: boolean) => {
+    if (!m.size) return;
+    doc.font("b").fontSize(11).fillColor(green).text(h);
+    doc.font("r").fontSize(10).fillColor(ink);
+    for (const [k, q] of [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "uk"))) doc.text(`${box ? "☐ " : "• "}${k} × ${q}`, { indent: 6 });
+    doc.moveDown(0.5);
+  };
+  const unpaid = rows.filter((r) => r.payment_status !== "paid").length;
+  if (unpaid) doc.font("b").fontSize(10).fillColor(red).text(`Увага: ${unpaid} із ${rows.length} замовлень ще НЕ оплачені — їх позначено червоною рамкою, не відправляйте до підтвердження оплати.`).moveDown(0.5);
+  list(`Друковані книжки до збірки (усього ${[...print.values()].reduce((a, b) => a + b, 0)} шт.)`, print, true);
+  list("Електронні книжки (PDF) до надсилання", pdf, false);
+  if (!rows.length) doc.font("r").fontSize(11).fillColor(soft).text("Немає замовлень за обраними умовами.");
+
+  // ---- Блоки замовлень ----
+  for (const r of rows) {
+    const paid = r.payment_status === "paid";
+    const buyer = [r.last_name, r.first_name].filter(Boolean).join(" ") || r.name;
+    const lines: { t: string; b?: boolean; c?: string }[] = [];
+    lines.push({ t: `Покупець: ${buyer}`, b: true });
+    lines.push({ t: `Телефон: ${r.phone ?? "—"}   ·   Email: ${r.email}` });
+    if (r.recipient) lines.push({ t: `Одержувач: ${r.recipient}${r.recipient_phone ? `, тел. ${r.recipient_phone}` : ""}`, b: true });
+    lines.push({ t: r.shipping_required ? `Нова пошта: ${r.np_city ?? ""}, ${r.np_point ?? ""}` : "Доставка не потрібна (лише PDF)" });
+    if (r.items.some((i) => i.format === "pdf")) lines.push({ t: `PDF надіслати: ${r.pdf_channel === "telegram" ? `у Telegram ${r.telegram ?? ""}` : `на email ${r.email}`}` });
+    for (const i of r.items)
+      lines.push({ t: `☐  ${i.format === "pdf" ? "PDF" : `${i.quantity} шт.`}  ${i.title_snapshot} — ${i.format === "pdf" ? "електронна" : "друкована"}, ${LANG_UK[i.book_locale] ?? i.book_locale}` });
+    if (r.customer_note) lines.push({ t: `Коментар покупця: ${r.customer_note}`, c: soft });
+    lines.push({ t: r.shipping_required ? "ТТН: ______________________     Зібрано ☐     Відправлено ☐" : "PDF надіслано ☐", c: soft });
+
+    const head = `${r.number}   ·   ${kyiv(r.created_at)}   ·   ${formatMinor(r.total_minor, "uk")}`;
+    const status = paid ? "Оплачено" : `НЕ ОПЛАЧЕНО — ${PAYMENT_LABEL[r.payment_status] ?? r.payment_status}`;
+    doc.fontSize(10);
+    const h = 30 + lines.reduce((a, l) => a + doc.font(l.b ? "b" : "r").heightOfString(l.t, { width: W - 16 }) + 2, 0) + 10;
+    if (doc.y + h > bottom()) doc.addPage();
+    const y = doc.y;
+    doc.roundedRect(x0, y, W, h, 6).lineWidth(paid ? 0.8 : 1.6).strokeColor(paid ? "#c9cfc2" : red).stroke();
+    doc.font("b").fontSize(12).fillColor(green).text(head, x0 + 8, y + 8, { width: W - 16, continued: false });
+    doc.font("b").fontSize(10).fillColor(paid ? green : red).text(status, x0 + 8, y + 8, { width: W - 16, align: "right" });
+    doc.y = y + 30;
+    for (const l of lines) doc.font(l.b ? "b" : "r").fontSize(10).fillColor(l.c ?? ink).text(l.t, x0 + 8, doc.y, { width: W - 16 }).moveDown(0.1);
+    doc.y = y + h + 10;
+  }
+  doc.end();
+  return done;
+}
