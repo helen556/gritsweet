@@ -5,7 +5,6 @@ import { minorToInput } from "@/lib/money";
 import ActionForm from "@/components/admin/ActionForm";
 import UploadForm from "@/components/admin/UploadForm";
 import PdfUploadForm from "@/components/admin/PdfUploadForm";
-import BookFilesUpload from "@/components/admin/BookFilesUpload";
 import { bookFileRows } from "@/lib/book-files";
 import { BUNDLE_CONTENTS } from "@/lib/book-specs";
 import { saveProductAction, saveVariantAction, removePdfAction, deleteImageAction } from "../../../actions";
@@ -18,6 +17,7 @@ export default async function EditProduct({ params }: PageProps<"/admin/products
   const p = await getProductForAdmin(id);
   if (!p) notFound();
   const tr = (l: "uk" | "en") => p.translations.find((t) => t.locale === l);
+  const bundleRows = BUNDLE_CONTENTS[p.id] ? await bookFileRows(BUNDLE_CONTENTS[p.id]) : null;
   return (
     <div className="space-y-8">
       <Link href="/admin/products" className="underline">← Товари</Link>
@@ -106,7 +106,7 @@ export default async function EditProduct({ params }: PageProps<"/admin/products
                 <label className="flex min-h-11 items-center gap-2 sm:col-span-4"><input type="checkbox" name="is_active" defaultChecked={!!v.is_active} className="h-5 w-5" /> Увімкнено для продажу</label>
               </ActionForm>
               {v.format === "pdf" && BUNDLE_CONTENTS[p.id] && (
-                <p className="mt-3 border-t border-black/10 pt-3 text-sm">PDF: окремий файл не потрібен — покупець комплекту отримує PDF усіх 5 книжок цією мовою (вони завантажуються нижче, у блоці «Файли книжок комплекту»).</p>
+                <p className="mt-3 border-t border-black/10 pt-3 text-sm">PDF: окремий файл не потрібен — покупець комплекту отримує PDF усіх 5 книжок цією мовою (файли беруться з окремих книжок, див. нижче).</p>
               )}
               {v.format === "pdf" && !BUNDLE_CONTENTS[p.id] && (
                 <div className="mt-3 border-t border-black/10 pt-3">
@@ -118,13 +118,15 @@ export default async function EditProduct({ params }: PageProps<"/admin/products
             </div>
           ))}
         </div>
-        {BUNDLE_CONTENTS[p.id] && (
+        {BUNDLE_CONTENTS[p.id] && (() => { const rows = bundleRows!; const done = rows.filter((r) => r.uploaded).length; return (
           <div className="mt-6 rounded-2xl border border-plum-100 p-4">
             <h3 className="text-xl">Файли книжок комплекту (PDF)</h3>
-            <p className="mt-1 mb-4 text-sm text-ink-soft">Виберіть одразу кілька PDF або ZIP-архів — сайт сам розкладе файли по книжках і мовах.</p>
-            <BookFilesUpload rows={await bookFileRows(BUNDLE_CONTENTS[p.id])} />
-          </div>
-        )}
+            <p className="mt-1 text-sm">Комплект окремо завантажувати не треба — він бере вже завантажені файли цих 5 книжок. Готово: <b className={done === rows.length ? "text-plum-700" : "text-copper"}>{done} з {rows.length}</b>.</p>
+            <ul className="mt-3 space-y-1 text-sm">
+              {rows.map((r) => <li key={r.variantId}>{r.uploaded ? "✓" : "—"} {r.title} · {r.locale === "uk" ? "українська" : "англійська"}{!r.uploaded && <span className="text-copper"> — файлу немає</span>}</li>)}
+            </ul>
+            <Link href="/admin/files" className="btn btn-ghost btn-sm mt-3">Замінити файли → «Файли книжок»</Link>
+          </div>); })()}
         <h3 className="mt-6 text-xl">Додати варіант</h3>
         <ActionForm action={saveVariantAction} submit="Додати варіант" className="mt-2 grid gap-3 sm:grid-cols-4">
           <input type="hidden" name="product_id" value={p.id} />
