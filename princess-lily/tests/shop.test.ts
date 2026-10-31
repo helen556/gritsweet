@@ -275,7 +275,7 @@ describe("packaged covers", () => {
 });
 
 describe("Supabase storage auth headers", () => {
-  it("new sb_secret_ keys go only in apikey; legacy JWT keys also as Bearer", async () => {
+  it("both new sb_secret_ keys and legacy JWT keys go in apikey and as Bearer (Storage requires Authorization)", async () => {
     const { privateStorage } = await import("@/lib/storage");
     const seen: Record<string, string>[] = [];
     vi.stubGlobal("fetch", vi.fn(async (_u: string, init: RequestInit) => { seen.push(init.headers as Record<string, string>); return new Response("{}", { status: 200 }); }));
@@ -290,7 +290,8 @@ describe("Supabase storage auth headers", () => {
       delete process.env.PRIVATE_STORAGE; delete process.env.SUPABASE_URL; delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     }
     expect(seen[0].apikey).toBe("sb_secret_abc");
-    expect(seen[0].Authorization).toBeUndefined();
+    expect(seen[0].Authorization).toBe("Bearer sb_secret_abc");
+    expect(seen[1].apikey).toBe("aaa.bbb.ccc");
     expect(seen[1].Authorization).toBe("Bearer aaa.bbb.ccc");
   });
 });

@@ -33,12 +33,17 @@ function local(): PrivateStorage {
   };
 }
 
+/** Заголовки доступу до Supabase Storage для service-ключа (новий sb_secret_… або старий JWT). */
+export function storageHeaders(key: string): Record<string, string> {
+  return { apikey: key, Authorization: `Bearer ${key}` };
+}
+
 function supabase(): PrivateStorage {
   const url = process.env.SUPABASE_URL!.replace(/\/$/, "");
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY!.trim();
-  // Новий формат ключів Supabase (sb_secret_…) — не JWT: передається лише в заголовку apikey.
-  // Старий service_role JWT (три частини через крапку) — ще й як Bearer.
-  const keyH: Record<string, string> = key.split(".").length === 3 ? { Authorization: `Bearer ${key}`, apikey: key } : { apikey: key };
+  // Ключ — і в apikey, і в Authorization (як робить supabase-js): шлюз Supabase підміняє «Bearer sb_…» на внутрішній JWT.
+  // Без Authorization Storage відповідає 400 «headers must have required property 'authorization'» (так було на production).
+  const keyH = storageHeaders(key);
   const bucket = process.env.SUPABASE_PRIVATE_BUCKET ?? "private-books";
   const obj = (key: string) => { assertKey(key); return `${url}/storage/v1/object/${bucket}/${key}`; };
   return {
@@ -92,7 +97,7 @@ function supabaseEnv() {
   if (process.env.PRIVATE_STORAGE !== "supabase" || !process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
   const url = process.env.SUPABASE_URL.replace(/\/$/, "");
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY.trim();
-  const keyH: Record<string, string> = key.split(".").length === 3 ? { Authorization: `Bearer ${key}`, apikey: key } : { apikey: key };
+  const keyH = storageHeaders(key);
   return { url, keyH, bucket: process.env.SUPABASE_PRIVATE_BUCKET ?? "private-books" };
 }
 
