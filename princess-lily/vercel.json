@@ -6,6 +6,5 @@
       "path": "/api/cron/retry",
       "schedule": "17 6 * * *"
     }
-  ],
-  "ignoreCommand": "[ \"$VERCEL_ENV\" != \"production\" ]"
+  ]
 }
