@@ -4,7 +4,7 @@ import { logoutAction } from "../auth-actions";
 
 export default async function Panel({ children }: { children: React.ReactNode }) {
   const admin = await requireAdmin();
-  const nav = [["/admin", "Огляд"], ["/admin/orders", "Замовлення"], ["/admin/products", "Товари"], ["/admin/messages", "Звернення"], ...(admin.role === "owner" ? [["/admin/settings", "Налаштування"], ["/admin/log", "Журнал"]] : [])];
+  const nav = [["/admin", "Огляд"], ["/admin/orders", "Замовлення"], ["/admin/products", "Товари"], ["/admin/messages", "Звернення"], ...(admin.role === "owner" ? [["/admin/files", "Файли книжок"], ["/admin/settings", "Налаштування"], ["/admin/log", "Журнал"]] : [])];
   return (
     <div className="pb-24 md:pb-0">
       <header className="border-b border-black/5 bg-paper/80">

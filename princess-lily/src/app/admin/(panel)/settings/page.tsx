@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { effectivePaymentMode } from "@/lib/orders";
@@ -73,7 +74,7 @@ export default async function Settings() {
           <li>Відповіді покупців приходитимуть на: <strong>{s.contact_email || "— (вкажіть «Email для зв’язку» вище)"}</strong></li>
           <li>PDF завантажено: <strong>{pdfs.filter((p) => p.ok).length} з {pdfs.length}</strong>{pdfs.some((p) => !p.ok) && <span className="text-[#9a2f28]"> — бракує: {pdfs.filter((p) => !p.ok).map((p) => p.label).join("; ")}</span>}</li>
         </ul>
-        <p className="mt-2 text-sm text-ink-soft">Без файлу книжки лист не надсилається автоматично: замовлення позначається «надішліть PDF вручну». PDF завантажуються на сторінці кожної книжки (Товари → книжка → «Завантажити PDF»).</p>
+        <p className="mt-2 text-sm text-ink-soft">Без файлу книжки лист не надсилається автоматично: замовлення позначається «надішліть PDF вручну». PDF завантажуються на сторінці <Link className="font-semibold underline" href="/admin/files">«Файли книжок»</Link> — усі одразу однією кнопкою.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <ActionForm action={storageCheckAction} submit="Перевірити сховище файлів" />
           <ActionForm action={emailTestAction} submit="Надіслати тестовий лист" />
