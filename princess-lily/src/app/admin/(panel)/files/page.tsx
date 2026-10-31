@@ -1,19 +1,13 @@
-import { db } from "@/db";
 import { requireAdmin } from "@/lib/auth";
-import { BUNDLE_CONTENTS } from "@/lib/book-specs";
-import BookFilesUpload, { type BookFileRow } from "@/components/admin/BookFilesUpload";
+import { bookFileRows } from "@/lib/book-files";
+import BookFilesUpload from "@/components/admin/BookFilesUpload";
 
 export const metadata = { title: "Файли книжок" };
 
 /** PDF усіх книжок на одній сторінці: одна кнопка для всіх файлів або окремо для кожної мовної версії. */
 export default async function BookFiles() {
   await requireAdmin("owner");
-  const rows = await db.selectFrom("product_variants as v").innerJoin("products as p", "p.id", "v.product_id")
-    .innerJoin("product_translations as t", (j) => j.onRef("t.product_id", "=", "p.id").on("t.locale", "=", "uk"))
-    .select(["v.id", "v.book_locale", "v.private_pdf_key", "p.id as pid", "t.title"])
-    .where("v.format", "=", "pdf").where("p.status", "!=", "draft").orderBy("p.sort_order").orderBy("v.book_locale", "desc").execute();
-  const list: BookFileRow[] = rows.filter((r) => !BUNDLE_CONTENTS[r.pid])
-    .map((r) => ({ variantId: r.id, productId: r.pid, title: r.title, locale: r.book_locale, uploaded: !!r.private_pdf_key }));
+  const list = await bookFileRows();
   const done = list.filter((r) => r.uploaded).length;
   return (
     <div className="space-y-5">

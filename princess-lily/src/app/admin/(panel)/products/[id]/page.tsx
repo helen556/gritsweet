@@ -5,6 +5,9 @@ import { minorToInput } from "@/lib/money";
 import ActionForm from "@/components/admin/ActionForm";
 import UploadForm from "@/components/admin/UploadForm";
 import PdfUploadForm from "@/components/admin/PdfUploadForm";
+import BookFilesUpload from "@/components/admin/BookFilesUpload";
+import { bookFileRows } from "@/lib/book-files";
+import { BUNDLE_CONTENTS } from "@/lib/book-specs";
 import { saveProductAction, saveVariantAction, removePdfAction, deleteImageAction } from "../../../actions";
 
 export const metadata = { title: "Редагування товару" };
@@ -102,7 +105,10 @@ export default async function EditProduct({ params }: PageProps<"/admin/products
                 <div className="field sm:col-span-2"><label htmlFor={`rn-${v.id}`}>Примітка про надходження</label><input id={`rn-${v.id}`} name="restock_note" defaultValue={v.restock_note ?? ""} className="input" /></div>
                 <label className="flex min-h-11 items-center gap-2 sm:col-span-4"><input type="checkbox" name="is_active" defaultChecked={!!v.is_active} className="h-5 w-5" /> Увімкнено для продажу</label>
               </ActionForm>
-              {v.format === "pdf" && (
+              {v.format === "pdf" && BUNDLE_CONTENTS[p.id] && (
+                <p className="mt-3 border-t border-black/10 pt-3 text-sm">PDF: окремий файл не потрібен — покупець комплекту отримує PDF усіх 5 книжок цією мовою (вони завантажуються нижче, у блоці «Файли книжок комплекту»).</p>
+              )}
+              {v.format === "pdf" && !BUNDLE_CONTENTS[p.id] && (
                 <div className="mt-3 border-t border-black/10 pt-3">
                   <p className="text-sm">PDF: {v.private_pdf_key ? <span className="font-semibold text-plum-700">завантажено (приватне сховище)</span> : <span className="text-copper">не завантажено</span>}</p>
                   <PdfUploadForm variantId={v.id} />
@@ -112,6 +118,13 @@ export default async function EditProduct({ params }: PageProps<"/admin/products
             </div>
           ))}
         </div>
+        {BUNDLE_CONTENTS[p.id] && (
+          <div className="mt-6 rounded-2xl border border-plum-100 p-4">
+            <h3 className="text-xl">Файли книжок комплекту (PDF)</h3>
+            <p className="mt-1 mb-4 text-sm text-ink-soft">Виберіть одразу кілька PDF або ZIP-архів — сайт сам розкладе файли по книжках і мовах.</p>
+            <BookFilesUpload rows={await bookFileRows(BUNDLE_CONTENTS[p.id])} />
+          </div>
+        )}
         <h3 className="mt-6 text-xl">Додати варіант</h3>
         <ActionForm action={saveVariantAction} submit="Додати варіант" className="mt-2 grid gap-3 sm:grid-cols-4">
           <input type="hidden" name="product_id" value={p.id} />

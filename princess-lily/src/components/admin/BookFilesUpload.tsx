@@ -4,6 +4,14 @@ import { useState } from "react";
 import { uploadBookPdf } from "./upload-book-pdf";
 import { matchBookFile } from "@/lib/pdf-match";
 
+/** PDF з ZIP-архіву (розпаковка в браузері; службові файли macOS пропускаються). */
+async function pdfsFromZip(zip: File): Promise<File[]> {
+  const { unzip } = await import("fflate");
+  const data = new Uint8Array(await zip.arrayBuffer());
+  const entries = await new Promise<Record<string, Uint8Array>>((res, rej) => unzip(data, { filter: (f) => /\.pdf$/i.test(f.name) && !/(^|\/)(__MACOSX|\._)/.test(f.name) }, (err, out) => (err ? rej(err) : res(out))));
+  return Object.entries(entries).map(([name, bytes]) => new File([bytes as BlobPart], name.split("/").pop()!, { type: "application/pdf" }));
+}
+
 export type BookFileRow = { variantId: string; productId: string; title: string; locale: "uk" | "en"; uploaded: boolean };
 type St = { pct?: number; ok?: string; error?: string; file?: string };
 
@@ -25,9 +33,18 @@ export default function BookFilesUpload({ rows }: { rows: BookFileRow[] }) {
     setBusy(false);
     router.refresh();
   }
-  function onPickMany(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = [...(e.target.files ?? [])];
+  async function onPickMany(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = [...(e.target.files ?? [])];
     e.target.value = "";
+    if (!picked.length) return;
+    setBusy(true);
+    const files: File[] = [];
+    const bad: string[] = [];
+    for (const f of picked) {
+      if (/\.zip$/i.test(f.name) || f.type.includes("zip")) {
+        try { files.push(...(await pdfsFromZip(f))); } catch { bad.push(`${f.name} (не вдалося розпакувати)`); }
+      } else files.push(f);
+    }
     const pairs: { row: BookFileRow; file: File }[] = [];
     const miss: string[] = [];
     for (const f of files) {
@@ -35,18 +52,18 @@ export default function BookFilesUpload({ rows }: { rows: BookFileRow[] }) {
       const row = m && rows.find((r) => r.productId === m.productId && r.locale === m.locale);
       if (row) pairs.push({ row, file: f }); else miss.push(f.name);
     }
-    setUnknown(miss);
-    void run(pairs);
+    setUnknown([...miss, ...bad]);
+    if (pairs.length) await run(pairs); else setBusy(false);
   }
 
   return (
     <div className="space-y-5">
       <label className={`btn btn-primary w-full cursor-pointer py-4 text-lg ${busy ? "pointer-events-none opacity-70" : ""}`}>
-        <input type="file" accept="application/pdf,.pdf" multiple className="sr-only" onChange={onPickMany} disabled={busy} />
-        {busy ? "Завантаження… не закривайте сторінку" : "📚 Вибрати всі PDF-файли одразу"}
+        <input type="file" accept="application/pdf,.pdf,application/zip,.zip" multiple className="sr-only" onChange={(e) => void onPickMany(e)} disabled={busy} />
+        {busy ? "Завантаження… не закривайте сторінку" : "📚 Вибрати PDF або ZIP (кілька одразу)"}
       </label>
-      <p className="text-sm text-ink-soft">У вікні вибору виділіть усі файли книжок (можна всі 10 разом). Сайт сам визначить книжку й мову за назвою файлу.
-        Якщо файл не розпізнано — завантажте його кнопкою «Вибрати» у потрібному рядку.</p>
+      <p className="text-sm text-ink-soft">Можна вибрати ZIP-архіви з книжками (розпаковувати не треба) або кілька PDF одразу: на iPhone у вікні вибору натисніть «Вибрати» вгорі й позначте файли.
+        Сайт сам визначить книжку й мову за назвою файлу. Якщо файл не розпізнано — завантажте його кнопкою «Вибрати» у потрібному рядку.</p>
       {unknown.length > 0 && <p className="err" role="alert">Не розпізнано (завантажте в потрібний рядок вручну): {unknown.join(", ")}</p>}
       <ul className="divide-y divide-black/8 rounded-2xl border border-black/8 bg-paper">
         {rows.map((r) => {
