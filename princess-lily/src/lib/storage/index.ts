@@ -44,7 +44,7 @@ function supabase(): PrivateStorage {
   return {
     kind: "supabase",
     async put(key, data, contentType) {
-      const r = await fetch(obj(key), { method: "POST", headers: { ...keyH, "content-type": contentType, "x-upsert": "true" }, body: new Uint8Array(data) });
+      const r = await fetch(obj(key), { method: "POST", headers: { ...keyH, "content-type": contentType, "x-upsert": "true" }, body: new Uint8Array(data), signal: AbortSignal.timeout(30_000) });
       if (!r.ok) throw new Error(`Supabase upload: ${r.status} ${(await r.text().catch(() => "")).slice(0, 200)}`);
     },
     async get(key) {

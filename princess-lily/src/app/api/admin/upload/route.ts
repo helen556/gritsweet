@@ -9,6 +9,22 @@ import { newId } from "@/lib/ids";
 import { storeImage, MAX_IMG } from "@/lib/images";
 
 const MAX_PDF = 100 * 1024 * 1024;
+/** Розмір частини великого PDF (з запасом під ліміт тіла запиту Vercel ~4,5 МБ). */
+const CHUNK = 3 * 1024 * 1024;
+
+/** Перевіряє PDF і прив'язує його до PDF-варіанта книжки (старий файл видаляється). */
+async function storeBookPdf(admin: { id: string; email: string }, variantId: string, buf: Buffer) {
+  if (buf.length > MAX_PDF) return err("PDF до 100 МБ");
+  if (buf.subarray(0, 5).toString("latin1") !== "%PDF-") return err("Це не PDF-файл");
+  const v = await db.selectFrom("product_variants").select(["id", "product_id", "format", "private_pdf_key"]).where("id", "=", variantId).executeTakeFirst();
+  if (!v || v.format !== "pdf") return err("Варіант не знайдено");
+  const key = `pdf/${v.id.toLowerCase().replace(/[^a-z0-9_-]/g, "")}-${randomBytes(8).toString("hex")}.pdf`;
+  await privateStorage().put(key, buf, "application/pdf");
+  await db.updateTable("product_variants").set({ private_pdf_key: key, updated_at: new Date().toISOString() }).where("id", "=", v.id).execute();
+  if (v.private_pdf_key) await privateStorage().remove(v.private_pdf_key).catch(() => {});
+  await audit(admin, "variant.pdf_upload", "variant", v.id, { bytes: buf.length });
+  return Response.json({ ok: true, bytes: buf.length });
+}
 const COVER_WIDTHS = [360, 640, 960, 1254];
 const err = (error: string, status = 400) => Response.json({ error }, { status });
 
@@ -32,16 +48,23 @@ export async function POST(req: Request) {
 
   if (kind === "pdf") {
     if (admin.role !== "owner") return err("Лише власниця може завантажувати файли книжок", 403);
-    if (buf.length > MAX_PDF) return err("PDF до 100 МБ");
-    if (buf.subarray(0, 5).toString("latin1") !== "%PDF-") return err("Це не PDF-файл");
-    const v = await db.selectFrom("product_variants").select(["id", "product_id", "format", "private_pdf_key"]).where("id", "=", id).executeTakeFirst();
-    if (!v || v.format !== "pdf") return err("Варіант не знайдено");
-    const key = `pdf/${v.id.toLowerCase().replace(/[^a-z0-9_-]/g, "")}-${randomBytes(8).toString("hex")}.pdf`;
-    await privateStorage().put(key, buf, "application/pdf");
-    await db.updateTable("product_variants").set({ private_pdf_key: key, updated_at: new Date().toISOString() }).where("id", "=", v.id).execute();
-    if (v.private_pdf_key) await privateStorage().remove(v.private_pdf_key).catch(() => {});
-    await audit(admin, "variant.pdf_upload", "variant", v.id, { bytes: buf.length });
-    return Response.json({ ok: true });
+    return storeBookPdf(admin, id, buf);
+  }
+  if (kind === "pdf_chunk") {
+    // Частина великого PDF (≤ CHUNK): на Vercel тіло запиту обмежене ~4,5 МБ, тому файл приходить шматками
+    if (admin.role !== "owner") return err("Лише власниця може завантажувати файли книжок", 403);
+    const upload = String(fd.get("upload") ?? ""), idx = Number(fd.get("index")), total = Number(fd.get("total"));
+    if (!/^[a-f0-9]{16,32}$/.test(upload) || !Number.isInteger(idx) || !Number.isInteger(total) || total < 1 || total > Math.ceil(MAX_PDF / (3 * 1024 * 1024)) || idx < 0 || idx >= total) return err("Невірна частина файлу");
+    if (buf.length > CHUNK) return err("Частина завелика");
+    const cutoff = new Date(Date.now() - 24 * 3600_000).toISOString();
+    if (idx === 0) await db.deleteFrom("upload_chunks").where("created_at", "<", cutoff).execute(); // недокачані спроби
+    const row = { upload_id: upload, idx, data_b64: buf.toString("base64"), created_at: new Date().toISOString() };
+    await db.insertInto("upload_chunks").values(row).onConflict((oc) => oc.columns(["upload_id", "idx"]).doUpdateSet(row)).execute();
+    if (idx < total - 1) return Response.json({ ok: true, received: idx + 1 });
+    const parts = await db.selectFrom("upload_chunks").select(["idx", "data_b64"]).where("upload_id", "=", upload).orderBy("idx").execute();
+    await db.deleteFrom("upload_chunks").where("upload_id", "=", upload).execute();
+    if (parts.length !== total || parts.some((p, i) => p.idx !== i)) return err("Файл прийшов не повністю — спробуйте ще раз");
+    return storeBookPdf(admin, id, Buffer.concat(parts.map((p) => Buffer.from(p.data_b64, "base64"))));
   }
   if (kind === "cover") {
     // id = товар; locale = "" (загальна обкладинка) або "uk"/"en" (обкладинка мовної версії)

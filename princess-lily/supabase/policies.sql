@@ -11,7 +11,7 @@ begin
     'admin_users','products','product_translations','product_variants','orders','order_items',
     'payment_events','fulfillments','download_grants','email_deliveries','contact_messages',
     'settings','audit_log','rate_limits','order_events','receipts','notifications',
-    'product_images','private_files','public_files','data_migrations','slug_redirects'
+    'product_images','private_files','public_files','data_migrations','slug_redirects','upload_chunks'
   ] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('alter table public.%I force row level security', t);
@@ -36,7 +36,7 @@ begin
     'admin_users','products','product_translations','product_variants','orders','order_items',
     'payment_events','fulfillments','download_grants','email_deliveries','contact_messages',
     'settings','audit_log','rate_limits','order_events','receipts','notifications',
-    'product_images','private_files','public_files','data_migrations','slug_redirects'
+    'product_images','private_files','public_files','data_migrations','slug_redirects','upload_chunks'
   ] loop
     execute format('drop policy if exists server_all on public.%I', t);
     execute format('create policy server_all on public.%I for all to postgres using (true) with check (true)', t);

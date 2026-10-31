@@ -271,6 +271,16 @@ export async function migrate(db: Kysely<Database>) {
   // ---- v7: згода покупця на рекламні cookie та cookie Meta (Conversions API лише за згодою) ----
   await addColumns(db, "orders", [["ad_consent", "integer"], ["meta_fbp", "text"], ["meta_fbc", "text"]]);
 
+  // ---- v9: шматки великих PDF (завантаження частинами повз ліміт тіла запиту на Vercel) ----
+  await t("upload_chunks")
+    .addColumn("upload_id", "text", (c) => c.notNull())
+    .addColumn("idx", "integer", (c) => c.notNull())
+    .addColumn("data_b64", "text", (c) => c.notNull())
+    .addColumn("created_at", "text", (c) => c.notNull())
+    .addPrimaryKeyConstraint("upload_chunks_pk", ["upload_id", "idx"])
+    .execute();
+  if (db.getExecutor().adapter instanceof PostgresAdapter) await sql`alter table upload_chunks enable row level security`.execute(db);
+
   // ---- v8: посилання на конкретний файл (електронний комплект = кілька PDF на одну позицію) ----
   await addColumns(db, "download_grants", [["pdf_key", "text"], ["file_title", "text"]]);
 

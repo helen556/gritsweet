@@ -6,6 +6,7 @@ import { pdfUploadFinishAction, pdfUploadStartAction } from "@/app/admin/actions
 /**
  * Завантаження PDF книжки. На Supabase файл іде з браузера прямо в приватний bucket за одноразовим підписаним
  * посиланням (великі файли не впираються в ліміт сервера), потім сервер перевіряє, що це PDF, і прив'язує його.
+ * Якщо Supabase Storage недоступний — файл іде частинами по 3 МБ через сервер і зберігається в базі.
  */
 export default function PdfUploadForm({ variantId }: { variantId: string }) {
   const [msg, setMsg] = useState<{ ok?: string; error?: string }>({});
@@ -19,16 +20,24 @@ export default function PdfUploadForm({ variantId }: { variantId: string }) {
     if (!file) return;
     if (file.size > 100 * 1024 * 1024) return setMsg({ error: "PDF до 100 МБ" });
     setMsg({}); setProgress(0);
-    const start = await pdfUploadStartAction(variantId).catch(() => ({ error: "Не вдалося почати завантаження" }));
-    if ("error" in start) { setProgress(null); return setMsg({ error: start.error }); }
-    if (start.mode === "server") {
-      const fd = new FormData(); fd.set("kind", "pdf"); fd.set("id", variantId); fd.set("file", file);
-      const r = await fetch("/api/admin/upload", { method: "POST", body: fd }).catch(() => null);
-      const j = r ? await r.json().catch(() => ({})) : {};
-      setProgress(null);
-      if (!r?.ok) return setMsg({ error: j.error ?? "Помилка завантаження" });
-      setMsg({ ok: "Завантажено" }); form.reset(); return router.refresh();
-    }
+    const done = (ok: string) => { setProgress(null); setMsg({ ok }); form.reset(); router.refresh(); };
+    // запасний шлях: частинами по 3 МБ через сервер (працює й без Supabase Storage)
+    const chunked = async () => {
+      const CHUNK = 3 * 1024 * 1024, total = Math.max(1, Math.ceil(file.size / CHUNK));
+      const upload = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("");
+      for (let i = 0; i < total; i++) {
+        const fd = new FormData();
+        fd.set("kind", "pdf_chunk"); fd.set("id", variantId); fd.set("upload", upload); fd.set("index", String(i)); fd.set("total", String(total));
+        fd.set("file", new File([file.slice(i * CHUNK, (i + 1) * CHUNK)], "part.bin", { type: "application/octet-stream" }));
+        let r: Response | null = null;
+        for (let attempt = 0; attempt < 3 && !r?.ok; attempt++) r = await fetch("/api/admin/upload", { method: "POST", body: fd }).catch(() => null);
+        if (!r?.ok) { const j = r ? await r.json().catch(() => ({})) : {}; setProgress(null); setMsg({ error: j.error ?? "Помилка завантаження. Перевірте інтернет і спробуйте ще раз." }); return; }
+        setProgress(Math.round(((i + 1) / total) * 100));
+      }
+      done(`Завантажено (${(file.size / 1048576).toFixed(1)} МБ)`);
+    };
+    const start = await pdfUploadStartAction(variantId).catch(() => ({ error: "start" }));
+    if ("error" in start || start.mode === "server") return chunked();
     const okPut = await new Promise<boolean>((resolve) => {
       const x = new XMLHttpRequest();
       x.open("PUT", start.url);
@@ -39,11 +48,11 @@ export default function PdfUploadForm({ variantId }: { variantId: string }) {
       x.onerror = () => resolve(false);
       x.send(file);
     });
-    if (!okPut) { setProgress(null); return setMsg({ error: "Не вдалося завантажити файл у сховище. Перевірте інтернет і спробуйте ще раз." }); }
+    if (!okPut) { setProgress(0); return chunked(); } // сховище Supabase не прийняло файл — частинами через сервер
     const fin: { ok?: string; error?: string } = await pdfUploadFinishAction(variantId, start.key).catch(() => ({ error: "Помилка перевірки файлу" }));
+    if (fin.ok) return done(fin.ok);
     setProgress(null);
     setMsg(fin);
-    if (fin.ok) { form.reset(); router.refresh(); }
   }
 
   const busy = progress !== null;

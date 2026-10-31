@@ -257,6 +257,7 @@ export interface AuditLogTable {
   created_at: Generated<string>;
 }
 export interface RateLimitsTable { key: string; count: number; window_end: string }
+export interface UploadChunksTable { upload_id: string; idx: number; data_b64: string; created_at: string }
 export interface DataMigrationsTable { id: string; applied_at: string }
 export interface SlugRedirectsTable { old_slug: string; product_id: string; created_at: string }
 
@@ -283,6 +284,7 @@ export interface Database {
   public_files: PublicFilesTable;
   data_migrations: DataMigrationsTable;
   slug_redirects: SlugRedirectsTable;
+  upload_chunks: UploadChunksTable;
 }
 
 export type Product = Selectable<ProductsTable>;
