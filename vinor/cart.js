@@ -1,4 +1,4 @@
-// Кошик і форма замовлення лендінгу ВІНОР. Дані (товари, ціни, тексти) — у window.VINOR на кожній сторінці.
+// Кошик і форма замовлення лендінгу ВІНОР. Замовлення не зберігається на сервері — форма лише готує лист у поштовій програмі покупця. Дані (товари, ціни, тексти) — у window.VINOR на кожній сторінці.
 (function () {
   var V = window.VINOR;
   var uk = V.lang === 'uk';
@@ -6,16 +6,21 @@
     empty: 'Кошик порожній — додайте стіки з лінійки або набір вище.',
     total: 'Разом', less: 'Менше', more: 'Більше', remove: 'Прибрати',
     phone: 'Вкажіть телефон, щоб ми могли з вами зв’язатися.',
+    agree: 'Щоб оформити замовлення, підтвердіть згоду з публічною офертою та ознайомлення з політикою конфіденційності.',
+    fAgree: 'Прийняття публічної оферти: так (редакція документів від ', fAgreeEnd: ')',
     subject: 'Замовлення з сайту ВІНОР',
     fName: 'Ім’я', fPhone: 'Телефон', fCompany: 'Компанія', fType: 'Цікавить', fOrder: 'Замовлення', fNone: 'кошик порожній'
   } : {
     empty: 'Your cart is empty — add sticks from the range or a set above.',
     total: 'Total', less: 'Less', more: 'More', remove: 'Remove',
     phone: 'Please enter a phone number so we can reach you.',
+    agree: 'To place an order, please confirm that you accept the public offer and have read the privacy policy.',
+    fAgree: 'Public offer accepted: yes (documents version dated ', fAgreeEnd: ')',
     subject: 'Order from the VINOR website',
     fName: 'Name', fPhone: 'Phone', fCompany: 'Company', fType: 'Interested in', fOrder: 'Order', fNone: 'cart is empty'
   };
-  var EMAIL = 'vinorcompany@gmail.com';
+  var EMAIL = 'vinor.trade@gmail.com';
+  var DOCS_DATE = uk ? '11.11.2026' : '11 Nov 2026'; // дата редакції оферти та політики конфіденційності
   var fmt = uk ? function (n) { return Math.round(n) + ' грн'; } : function (n) { return '€' + n.toFixed(2); };
   var cart = {};
   try { cart = JSON.parse(sessionStorage.getItem('vinor-cart-' + V.lang)) || {}; } catch (e) {}
@@ -93,6 +98,11 @@
   var submitBtn = document.getElementById('vn-submit');
   submitBtn.parentNode.insertBefore(err, submitBtn);
   document.getElementById('f-phone').addEventListener('input', function () { err.hidden = true; });
+  var agree = document.getElementById('f-agree');
+  var agreeErr = document.createElement('p');
+  agreeErr.className = 'vn-err'; agreeErr.hidden = true; agreeErr.setAttribute('role', 'alert'); agreeErr.textContent = T.agree;
+  agree.parentNode.parentNode.appendChild(agreeErr);
+  agree.addEventListener('change', function () { if (agree.checked) agreeErr.hidden = true; });
 
   function submit(e) {
     if (e) e.preventDefault();
@@ -104,6 +114,12 @@
       return;
     }
     err.hidden = true;
+    if (!agree.checked) {
+      agreeErr.hidden = false;
+      agree.focus();
+      return;
+    }
+    agreeErr.hidden = true;
     var c = calc();
     var order = c.lines.length
       ? c.lines.map(function (l) { return '• ' + l.name + ' × ' + l.qty + ' = ' + fmt(l.sum); }).join('\n') + '\n' + T.total + ': ' + fmt(c.total)
@@ -113,6 +129,7 @@
       T.fPhone + ': ' + phone,
       T.fCompany + ': ' + val('f-company'),
       T.fType + ': ' + val('f-type'),
+      T.fAgree + DOCS_DATE + T.fAgreeEnd,
       '',
       T.fOrder + ':',
       order

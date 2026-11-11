@@ -39,7 +39,9 @@ a{color:#8a6a1f}a:hover{color:#5f4812}
 <style>html{scroll-behavior:smooth}body{background:#F6F2EA}[hidden]{display:none!important}
 #vn-form input:focus,#vn-form select:focus{outline:2px solid #B8892E;outline-offset:1px}
 @media (max-width: 640px){.vn-grid{grid-template-columns:minmax(0,1fr)!important}.vn-grid>*{min-width:0}}
-.vn-err{margin:0;font-size:14px;font-weight:600;color:#A33A16}</style>
+.vn-err{margin:0;font-size:14px;font-weight:600;color:#A33A16}
+.vn-foot-links{display:flex;flex-wrap:wrap;gap:8px 20px;width:100%;padding-top:16px;border-top:1px solid #35312A}.vn-foot-links a{text-decoration:none;font-size:14px;color:#C9C1B2}.vn-foot-links a:hover{color:#F6F2EA}
+.vn-agree{display:flex;gap:12px;align-items:flex-start;font-size:14px;line-height:1.5;color:#4A443A;cursor:pointer}.vn-agree input{flex:0 0 auto;width:20px;height:20px;margin:1px 0 0;accent-color:#B8892E;cursor:pointer}.vn-agree a{color:#8a6a1f;font-weight:600}</style>
 </head>
 <body>
 <div style="font-family: Manrope, Arial, sans-serif; color: #1E1B16; background: #F6F2EA; width: 100%; box-sizing: border-box; display: flex; flex-direction: column">
@@ -391,7 +393,7 @@ a{color:#8a6a1f}a:hover{color:#5f4812}
       <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px">
         <a href="tel:+380950213453" class="vn-tel" style="text-decoration: none; font-family: Oswald, 'Arial Narrow', sans-serif; font-size: 28px; font-weight: 600; color: #1E1B16">+38 (095) 021-34-53</a>
         <span style="font-size: 15px; color: #6B6457">ТОВ «ВІНОР», Одеса · Пн–Пт 9:00–18:00</span>
-        <a href="mailto:vinorcompany@gmail.com" style="text-decoration: none; font-size: 17px; font-weight: 600; color: #1E1B16">vinorcompany@gmail.com</a>
+        <a href="mailto:vinor.trade@gmail.com" style="text-decoration: none; font-size: 17px; font-weight: 600; color: #1E1B16">vinor.trade@gmail.com</a>
       </div>
     </div>
     <form id="vn-form" class="vn-form" novalidate style="flex: 1 1 400px; min-width: 0; box-sizing: border-box; background: #F6F2EA; border-radius: 20px; padding: 32px; display: flex; flex-direction: column; gap: 16px">
@@ -420,6 +422,9 @@ a{color:#8a6a1f}a:hover{color:#5f4812}
           <option>Брендований бокс з нашим логотипом</option>
         </select>
       </div>
+      <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px">
+        <label class="vn-agree" for="f-agree"><input id="f-agree" name="agree" type="checkbox" required value="1"><span>Погоджуюся з <a href="/offer/" target="_blank" rel="noopener">умовами публічної оферти</a> та підтверджую ознайомлення з <a href="/privacy/" target="_blank" rel="noopener">політикою конфіденційності</a>.</span></label>
+      </div>
       <button type="button" style="height: 52px; margin-top: 6px; font-size: 16px; font-weight: 700; font-family: Manrope, Arial, sans-serif; color: #F6F2EA; background: #1E1B16; border: 0; border-radius: 999px; cursor: pointer" id="vn-submit">Оформити замовлення</button>
       <div id="vn-thanks" hidden>
         <div style="box-sizing: border-box; background: #FFFFFF; border: 1px solid #D9B45A; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
@@ -427,7 +432,7 @@ a{color:#8a6a1f}a:hover{color:#5f4812}
           <button type="button" id="vn-reset" style="align-self: flex-start; height: 40px; padding: 0 16px; border: 1px solid #1E1B16; border-radius: 999px; background: #FFFFFF; color: #1E1B16; font-weight: 700; font-size: 14px; font-family: Manrope, Arial, sans-serif; cursor: pointer">Нове замовлення</button>
         </div>
       </div>
-      <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #6B6457">Натискаючи кнопку, ви погоджуєтесь на обробку контактних даних для зв’язку щодо замовлення.</p>
+      <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #6B6457">Контактні дані використовуються лише для зв’язку щодо замовлення. Чекбокс вище не є згодою на рекламні розсилки.</p>
     </form>
   </div>
 </section>
@@ -435,8 +440,9 @@ a{color:#8a6a1f}a:hover{color:#5f4812}
 <footer style="box-sizing: border-box; width: 100%; background: #1E1B16; color: #C9C1B2; padding: 40px 32px">
   <div style="max-width: 1180px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px">
     <span style="font-family: Oswald, 'Arial Narrow', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.12em; color: #F6F2EA">ВІНОР</span>
-    <span style="font-size: 14px">ТОВ «ВІНОР», Одеса · +38 (095) 021-34-53 · vinorcompany@gmail.com</span>
+    <span style="font-size: 14px">ТОВ «ВІНОР», Одеса · +38 (095) 021-34-53 · vinor.trade@gmail.com</span>
     <span style="font-size: 14px">© 2026 · Олія холодного віджиму в стіках 10 мл</span>
+    <nav class="vn-foot-links" aria-label="Юридичні документи"><a href="/returns/">Обмін і повернення</a><a href="/offer/">Публічна оферта</a><a href="/privacy/">Політика конфіденційності</a></nav>
   </div>
 </footer>
 
