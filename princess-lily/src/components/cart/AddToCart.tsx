@@ -7,6 +7,9 @@ import { formatMinor } from "@/lib/money";
 import { trackAddToCart } from "@/lib/pixel";
 import type { Dict } from "@/i18n";
 
+/** Номер кроку; коли крок виконано — ✓ (з м’якою анімацією появи) */
+const StepNo = ({ n, done }: { n: number; done: boolean }) => <span className={`step-no ${done ? "is-done" : ""}`} aria-hidden="true">{done ? "✓" : n}</span>;
+
 type V = { id: string; bookLocale: "uk" | "en"; format: "pdf" | "print"; priceMinor: number | null; stock: number | null; sellable: boolean; restockNote: string | null };
 
 /**
@@ -27,7 +30,7 @@ export default function AddToCart({ lang, t, variants, product, onLocaleChange, 
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   /** Натиснули «Купити»/«Додати» до вибору — підсвічуємо крок, якого бракує */
-  const [nudge, setNudge] = useState(false);
+  const [nudge, setNudge] = useState(0); // лічильник натискань — кожне перезапускає анімацію
   const sel = available.find((v) => v.bookLocale === bl && v.format === fmt) ?? null;
   const maxQty = sel?.format === "print" ? Math.min(10, sel.stock ?? 1) : 1;
   const inCart = sel ? cart.lines.find((l) => l.variantId === sel.id)?.quantity ?? 0 : 0;
@@ -37,12 +40,12 @@ export default function AddToCart({ lang, t, variants, product, onLocaleChange, 
   const fmtRef = useRef<HTMLFieldSetElement>(null);
   /** Кнопка покупки до вибору: показати, що саме обрати, і прокрутити до цього кроку */
   const requireChoice = () => {
-    setNudge(true);
+    setNudge((n) => n + 1);
     const el = need === "lang" ? langRef.current : fmtRef.current;
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
     el?.querySelector<HTMLInputElement>("input:not(:disabled)")?.focus({ preventScroll: true });
   };
-  const ring = (step: "lang" | "format") => `-mx-3 rounded-2xl px-3 py-2 ring-2 transition-shadow ${nudge && need === step ? "ring-[#c0623a]" : "ring-transparent"}`;
+  const attn = (step: "lang" | "format") => nudge > 0 && need === step;
 
   const chooseLang = (l: V["bookLocale"]) => {
     setBl(l); setAdded(false); setQty(1); onLocaleChange?.(l);
@@ -58,19 +61,19 @@ export default function AddToCart({ lang, t, variants, product, onLocaleChange, 
 
   return (
     <div className="card p-6">
-      <div className={ring("lang")}><fieldset ref={langRef}>
-        <legend className="mb-2 font-semibold"><span className="step-no" aria-hidden="true">1</span> {t.product.languageLabel}</legend>
-        <div className="flex flex-wrap gap-2">
+      <div className="step-box">{attn("lang") && <span key={nudge} className="step-glow" aria-hidden="true" />}<fieldset ref={langRef}>
+        <legend className="mb-2 font-semibold"><StepNo n={1} done={!!bl} /> {t.product.languageLabel}</legend>
+        <div key={attn("lang") ? `n${nudge}` : "s"} className={`flex flex-wrap gap-2 ${attn("lang") ? "chips-nudge" : ""}`}>
           {langs.map((l) => (
-            <label key={l} className="chip"><input className="sr-only" type="radio" name="bl" value={l} checked={bl === l} onChange={() => { chooseLang(l); setNudge(false); }} /><strong>{l === "uk" ? "UA" : "EN"}</strong><span className="opacity-80">{t.bookLocales[l]}</span></label>
+            <label key={l} className="chip"><input className="sr-only" type="radio" name="bl" value={l} checked={bl === l} onChange={() => { chooseLang(l); setNudge(0); }} /><strong>{l === "uk" ? "UA" : "EN"}</strong><span className="opacity-80">{t.bookLocales[l]}</span></label>
           ))}
         </div>
       </fieldset></div>
-      <div className={`mt-3 ${ring("format")}`}><fieldset ref={fmtRef}>
-        <legend className="mb-2 font-semibold"><span className="step-no" aria-hidden="true">2</span> {t.product.formatLabel}</legend>
-        <div className="flex flex-wrap gap-2">
+      <div className="step-box mt-3">{attn("format") && <span key={nudge} className="step-glow" aria-hidden="true" />}<fieldset ref={fmtRef}>
+        <legend className="mb-2 font-semibold"><StepNo n={2} done={!!fmt && !!bl} /> {t.product.formatLabel}</legend>
+        <div key={attn("format") ? `n${nudge}` : "s"} className={`flex flex-wrap gap-2 ${attn("format") ? "chips-nudge" : ""}`}>
           {(bl ? fmts : [...new Set(available.map((v) => v.format))]).map((f) => (
-            <label key={f} className="chip"><input className="sr-only" type="radio" name="fmt" value={f} checked={fmt === f} onChange={() => { pickFormat(f); setAdded(false); setQty(1); setNudge(false); }} />{t.formats[f]}</label>
+            <label key={f} className="chip"><input className="sr-only" type="radio" name="fmt" value={f} checked={fmt === f} onChange={() => { pickFormat(f); setAdded(false); setQty(1); setNudge(0); }} />{t.formats[f]}</label>
           ))}
         </div>
         {available.some((v) => v.format === "pdf") && <p className="mt-3 flex gap-2 text-sm text-ink-soft"><span aria-hidden="true">📱</span><span>{t.product.pdfHint}</span></p>}
@@ -100,16 +103,16 @@ export default function AddToCart({ lang, t, variants, product, onLocaleChange, 
       )}
 
       {need && (
-        <p role={nudge ? "alert" : undefined} className={`mt-4 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm ${nudge ? "bg-[#fbe9df] font-semibold text-[#9a3f1c]" : "bg-plum-100/60 text-plum-900"}`}>
-          <span aria-hidden="true">👆</span>{needText}
+        <p key={`${needText}|${nudge}`} role={nudge ? "alert" : undefined} className="hint mt-4" data-strong={nudge ? "" : undefined}>
+          <span className="hint__icon" aria-hidden="true">👆</span><span>{needText}</span>
         </p>
       )}
       <div className="mt-4 flex flex-wrap gap-3">
-        <button type="button" className={`btn btn-primary ${sel ? "" : "opacity-60"}`} aria-disabled={!sel}
+        <button type="button" className={`btn btn-primary transition-opacity duration-300 ${sel ? "" : "opacity-60"}`} aria-disabled={!sel}
           onClick={() => { if (!sel) return requireChoice(); router.push(`/${lang}/checkout?buy=${encodeURIComponent(sel.id)}&qty=${qty}`); }}>
           {t.product.buyNow}
         </button>
-        <button type="button" className={`btn btn-ghost ${sel ? "" : "opacity-60"}`} aria-disabled={!sel}
+        <button type="button" className={`btn btn-ghost transition-opacity duration-300 ${sel ? "" : "opacity-60"}`} aria-disabled={!sel}
           onClick={() => {
             if (!sel) return requireChoice();
             cart.add(sel.id, qty); setAdded(true);
