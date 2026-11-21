@@ -124,6 +124,7 @@ const uk = {
     inStock: "В наявності", outOfStock: "Тимчасово немає", digital: "Електронна книжка: надсилаємо на email або в Telegram", pdfHint: "PDF зручно читати на телефоні, планшеті чи комп’ютері. Після підтвердження оплати надішлемо книжку на email або в Telegram — як вам зручніше.", cardPdf: "PDF", cardPrint: "друкована",
     add: "Додати в кошик", added: "Додано в кошик", goCart: "Перейти до кошика", buyNow: "Купити зараз", inCart: "У кошику",
     chooseVariant: "Оберіть мову книжки та формат",
+    needLanguage: "Спершу оберіть мову книжки — UA або EN", needFormat: "Тепер оберіть формат — PDF чи друкована", needBoth: "Оберіть мову книжки та формат, щоб купити",
     originalTitleNote: "",
     coverNote: "",
     back: "← Усі книжки",

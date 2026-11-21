@@ -116,6 +116,7 @@ h1, h2 { text-wrap: balance; }
 .chip[aria-pressed="true"], .chip:has(input:checked) { background: var(--color-powder); border-color: var(--color-powder-strong); color: var(--color-btn-ink); font-weight: 600; box-shadow: 0 6px 14px -10px rgba(137, 86, 107, .6); }
 .chip:has(input:focus-visible) { outline: 3px solid var(--color-plum-700); outline-offset: 3px; }
 .chip:has(input:disabled) { opacity: .5; cursor: not-allowed; }
+.step-no { display:inline-grid; place-items:center; width:1.6rem; height:1.6rem; margin-right:.35rem; border-radius:999px; background: var(--color-plum-700); color:#fff; font-size:.85rem; font-weight:700; vertical-align: .1em; }
 
 /* Поля форм */
 .field label { display:block; font-weight: 600; margin-bottom: .35rem; }

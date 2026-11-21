@@ -22,6 +22,10 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } })
 const page = await ctx.newPage();
 await page.goto(`${BASE}/uk/books/demo-book`);
 check("до вибору варіанта покупка неактивна", await page.getByRole("button", { name: "Купити зараз" }).isDisabled());
+await page.getByRole("button", { name: "Купити зараз" }).click({ force: true });
+check("натискання до вибору: підказка, що обрати, і без переходу", (await page.getByText("Оберіть мову книжки та формат, щоб купити").isVisible()) && page.url().endsWith("/demo-book"));
+await page.getByText("Українська", { exact: true }).first().click();
+check("після мови — підказка обрати формат", await page.getByText("Тепер оберіть формат — PDF чи друкована").isVisible());
 await page.getByText("Українська", { exact: true }).first().click();
 await page.getByText("Друкована книжка", { exact: true }).click();
 check("ціна оновлюється за варіантом (друк 380,50)", (await page.locator("main").innerText()).includes("380,50 грн"));

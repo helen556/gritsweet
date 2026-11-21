@@ -126,6 +126,7 @@ const en: Dict = {
     inStock: "In stock", outOfStock: "Temporarily out of stock", digital: "Digital book: sent by email or on Telegram", pdfHint: "The PDF is easy to read on a phone, tablet or computer. Once the payment is confirmed we’ll send the book by email or on Telegram — whichever you prefer.", cardPdf: "PDF", cardPrint: "printed",
     add: "Add to cart", added: "Added to cart", goCart: "Go to cart", buyNow: "Buy now", inCart: "In cart",
     chooseVariant: "Choose the book language and format",
+    needLanguage: "First choose the book language — UA or EN", needFormat: "Now choose the format — PDF or printed", needBoth: "Choose the book language and format to buy",
     originalTitleNote: "Original Ukrainian title. An English translation of the title is not available yet.",
     coverNote: "Cover of the Ukrainian edition.",
     back: "← All books",
