@@ -59,6 +59,10 @@ const STUB = `window.__px=window.__px||[];(function(){var f=window.fbq;var rec=f
   ok('Purchase has eventID for CAPI dedup', /^purchase-ord_/.test(pur[0]?.[3]?.eventID ?? ''));
   await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForTimeout(400);
   ok('reload: Purchase not repeated', (await pg.evaluate(() => window.__px.filter((a) => a[1] === 'Purchase').length)) === 0);
+  const pvCount = () => pg.evaluate(() => window.__px.filter((a) => a[1] === 'PageView').length);
+  const pv0 = await pvCount();
+  await pg.locator("header a[href='/uk/books']").first().click(); await pg.waitForURL('**/uk/books'); await pg.waitForTimeout(400);
+  ok('client-side navigation: exactly one new PageView', (await pvCount()) === pv0 + 1);
   await br.close();
   console.log(res.join('\n')); console.log(`\n${res.filter((r) => r.startsWith('PASS')).length}/${res.length} passed`);
 

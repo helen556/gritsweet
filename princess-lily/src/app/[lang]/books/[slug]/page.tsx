@@ -96,7 +96,7 @@ export default async function BookPage({ params }: PageProps<"/[lang]/books/[slu
         </section>
       )}
       <JsonLd nodes={[bookLd, crumbs]} />
-      {sellable.length > 0 && <Track event="ViewContent" params={{ content_ids: [p.id], content_name: p.title, content_type: "product", value: Math.min(...sellable.map((v) => v.price_minor!)) / 100, currency: "UAH" }} />}
+      {sellable.length > 0 && <Track event="ViewContent" data={{ id: p.id, name: p.title, price: Math.min(...sellable.map((v) => v.price_minor!)) / 100 }} />}
     </div>
   );
 }

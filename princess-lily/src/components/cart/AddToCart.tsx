@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useCart } from "./CartProvider";
 import { formatMinor } from "@/lib/money";
-import { trackPixel } from "../tracking/consent";
+import { trackAddToCart } from "@/lib/pixel";
 import type { Dict } from "@/i18n";
 
 type V = { id: string; bookLocale: "uk" | "en"; format: "pdf" | "print"; priceMinor: number | null; stock: number | null; sellable: boolean; restockNote: string | null };
@@ -95,7 +95,7 @@ export default function AddToCart({ lang, t, variants, product, onLocaleChange, 
           onClick={() => {
             if (!sel) return;
             cart.add(sel.id, qty); setAdded(true);
-            trackPixel("AddToCart", { content_ids: [product.id], content_name: product.title, content_type: "product", contents: [{ id: product.id, quantity: qty }], value: (sel.priceMinor! * qty) / 100, currency: "UAH" });
+            trackAddToCart({ id: product.id, name: product.title, price: sel.priceMinor! / 100, quantity: qty });
           }}>
           {t.product.add}
         </button>

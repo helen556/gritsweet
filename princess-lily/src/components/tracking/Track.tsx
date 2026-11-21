@@ -1,30 +1,34 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { CONSENT_EVENT, trackPixel } from "./consent";
+import { CONSENT_EVENT } from "./consent";
+import { PIXEL_READY_EVENT } from "./MetaPixel";
+import { trackInitiateCheckout, trackPurchase, trackViewContent, type PixelLine } from "@/lib/pixel";
 
-type Ev = "ViewContent" | "InitiateCheckout" | "Purchase";
+type Props =
+  | { event: "ViewContent"; data: { id: string; name: string; price: number } }
+  | { event: "InitiateCheckout"; data: { lines: PixelLine[]; value: number } }
+  | { event: "Purchase"; data: { orderId: string; eventId: string; lines: PixelLine[]; value: number } };
 
 /**
- * Одна подія Meta Pixel на показ сторінки. Якщо згоду дають уже на сторінці — подія надсилається тоді.
- * onceKey — захист від повтору між сеансами (Purchase: одна покупка = одна подія навіть при оновленні сторінки).
+ * Одна подія Meta Pixel на показ сторінки (для серверних сторінок, які самі не можуть викликати fbq).
+ * Якщо піксель ще вантажиться або згоду дають уже на сторінці — подія надсилається, щойно він готовий.
  */
-export default function Track({ event, params, eventId, onceKey }: { event: Ev; params: Record<string, unknown>; eventId?: string; onceKey?: string }) {
+export default function Track(props: Props) {
   const sent = useRef(false);
-  const json = JSON.stringify(params);
+  const json = JSON.stringify(props);
   useEffect(() => {
+    const p = JSON.parse(json) as Props;
     const fire = () => {
       if (sent.current) return;
-      if (onceKey) { try { if (localStorage.getItem(onceKey)) { sent.current = true; return; } } catch {} }
-      if (typeof window.fbq !== "function") return;
-      trackPixel(event, JSON.parse(json), eventId);
-      sent.current = true;
-      if (onceKey) { try { localStorage.setItem(onceKey, "1"); } catch {} }
+      sent.current = p.event === "ViewContent" ? trackViewContent(p.data)
+        : p.event === "InitiateCheckout" ? trackInitiateCheckout(p.data)
+        : trackPurchase(p.data);
     };
-    // піксель ініціалізується в ефекті MetaPixel — даємо йому відпрацювати (і після згоди, наданої вже на сторінці)
     let id = setTimeout(fire, 50);
-    const onConsent = () => { clearTimeout(id); id = setTimeout(fire, 50); };
-    window.addEventListener(CONSENT_EVENT, onConsent);
-    return () => { clearTimeout(id); window.removeEventListener(CONSENT_EVENT, onConsent); };
-  }, [event, json, eventId, onceKey]);
+    const again = () => { clearTimeout(id); id = setTimeout(fire, 50); };
+    window.addEventListener(CONSENT_EVENT, again);
+    window.addEventListener(PIXEL_READY_EVENT, again);
+    return () => { clearTimeout(id); window.removeEventListener(CONSENT_EVENT, again); window.removeEventListener(PIXEL_READY_EVENT, again); };
+  }, [json]);
   return null;
 }

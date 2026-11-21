@@ -45,9 +45,9 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/[l
         </section>
       )}
       {/* Purchase — лише після підтвердженої оплати; той самий eventID, що й у Conversions API (без дублів) */}
-      {st === "paid" && <Track event="Purchase" eventId={purchaseEventId(o.id)} onceKey={`pl_px_${purchaseEventId(o.id)}`} params={{
-        value: o.total_minor / 100, currency: o.currency, content_type: "product", content_ids: [...new Set(d.items.map((i) => i.product_id))],
-        contents: d.items.map((i) => ({ id: i.product_id, quantity: i.quantity, item_price: i.unit_price_minor / 100 })), num_items: d.items.reduce((a, i) => a + i.quantity, 0),
+      {st === "paid" && <Track event="Purchase" data={{
+        orderId: o.id, eventId: purchaseEventId(o.id), value: o.total_minor / 100,
+        lines: d.items.map((i) => ({ id: i.product_id, quantity: i.quantity, price: i.unit_price_minor / 100 })),
       }} />}
       {thanks ? <h2 className="text-3xl text-plum-900">{t.order.title} {o.number}</h2> : <h1 className="text-5xl text-plum-900">{t.order.title} {o.number}</h1>}
       <p className="mt-2 text-sm text-ink-soft">{t.order.keepLink}</p>
