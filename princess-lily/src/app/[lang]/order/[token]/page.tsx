@@ -9,6 +9,7 @@ import CopyAmount from "@/components/CopyAmount";
 import ReceiptUpload from "@/components/ReceiptUpload";
 import { db } from "@/db";
 import Track from "@/components/tracking/Track";
+import OrderAutoRefresh from "@/components/OrderAutoRefresh";
 import { purchaseEventId } from "@/lib/meta-capi";
 
 export const metadata: Metadata = { robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -90,6 +91,7 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/[l
         {(st === "pending_payment" || st === "failed") && o.payment_mode === "provider" && (
           <div className="mt-6">
             <p className="text-ink-soft">{st === "failed" ? t.order.failedText : t.order.providerWaiting}</p>
+            {st === "pending_payment" && <OrderAutoRefresh text={t.order.autoChecking} />}
             {payError && <p className="err mt-2" role="alert">{t.order.payError}</p>}
             <div className="mt-3 flex flex-wrap gap-3">
               {/* новий рахунок у платіжній системі (якщо попередній не створився, сплив або оплата не пройшла) */}

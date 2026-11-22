@@ -218,6 +218,7 @@ const en: Dict = {
     thanksAddMore: "Add another file",
     providerWaiting: "Waiting for confirmation from the payment provider. The status updates automatically — you can refresh this page.",
     refresh: "Refresh status",
+    autoChecking: "Checking the payment automatically — this page will update by itself once the bank confirms it.",
     failedText: "The payment did not go through. You can try again or contact us.",
     payError: "We couldn’t open the payment page. Please try again in a minute or contact us.",
     keepLink: "Keep the link to this page — you can use it to check your order status.",

@@ -78,7 +78,10 @@ await page.getByRole("button", { name: "Імітувати успішну опл
 await page.waitForURL(/\/uk\/order\//);
 const orderText = await page.locator("main").innerText();
 check("статус після підписаного вебхука: Оплачено", orderText.includes("Оплачено"));
-check("PDF: книжку надіслано на email", orderText.includes("Книжку надіслано на ваш email"));
+// лист іде у фоні вже після відповіді сервера — даємо йому до 10 с
+let pdfSent = orderText.includes("Книжку надіслано на ваш email");
+for (let i = 0; i < 10 && !pdfSent; i++) { await page.waitForTimeout(1000); await page.reload(); pdfSent = (await page.locator("main").innerText()).includes("Книжку надіслано на ваш email"); }
+check("PDF: книжку надіслано на email", pdfSent);
 check("доставка: готуємо до відправлення", orderText.includes("Готуємо до відправлення"));
 await page.screenshot({ path: path.join(OUT, "order-paid-desktop.png"), fullPage: true });
 const orderUrl = page.url();
