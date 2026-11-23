@@ -14,36 +14,53 @@ const sha = (v: string) => createHash("sha256").update(v.trim().toLowerCase()).d
 
 export const purchaseEventId = (orderId: string) => `purchase-${orderId}`;
 
+/** Сума покупки для Meta: фактична підсумкова сума замовлення в гривнях (з копійок), лише додатне число. */
+export const purchaseValue = (totalMinor: number) => (Number.isFinite(totalMinor) && totalMinor > 0 ? Math.round(totalMinor) / 100 : null);
+export const PURCHASE_CURRENCY = "UAH" as const;
+
+type CapiOrder = { id: string; number: string; total_minor: number; email: string; phone: string | null; first_name: string | null; last_name: string | null;
+  meta_fbp: string | null; meta_fbc: string | null; paid_at: string | null; site_locale: string };
+type CapiItem = { product_id: string; quantity: number; unit_price_minor: number };
+
+/** Серверна подія Purchase (Conversions API) — ті самі value, currency та event_id, що й у браузерного пікселя. */
+export function purchaseCapiEvent(o: CapiOrder, items: CapiItem[], siteUrl: string) {
+  const value = purchaseValue(o.total_minor);
+  if (value == null) return null;
+  const phone = (o.phone ?? "").replace(/\D/g, "");
+  return {
+    event_name: "Purchase",
+    event_time: Math.floor(Date.parse(o.paid_at ?? new Date().toISOString()) / 1000),
+    event_id: purchaseEventId(o.id),
+    action_source: "website",
+    event_source_url: `${siteUrl}/${o.site_locale}/checkout`,
+    user_data: {
+      em: [sha(o.email)],
+      ...(phone ? { ph: [sha(phone)] } : {}),
+      ...(o.first_name ? { fn: [sha(o.first_name)] } : {}),
+      ...(o.last_name ? { ln: [sha(o.last_name)] } : {}),
+      country: [sha("ua")],
+      ...(o.meta_fbp ? { fbp: o.meta_fbp } : {}),
+      ...(o.meta_fbc ? { fbc: o.meta_fbc } : {}),
+    },
+    custom_data: {
+      value, currency: PURCHASE_CURRENCY, order_id: o.number, content_type: "product",
+      content_ids: [...new Set(items.map((i) => i.product_id))],
+      contents: items.map((i) => ({ id: i.product_id, quantity: i.quantity, item_price: i.unit_price_minor / 100 })),
+      num_items: items.reduce((a, i) => a + i.quantity, 0),
+    },
+  };
+}
+
 export async function sendPurchaseToMeta(orderId: string) {
   if (!metaCapiConfigured()) return "not_configured" as const;
   const o = await db.selectFrom("orders").selectAll().where("id", "=", orderId).executeTakeFirst();
   if (!o || o.payment_status !== "paid") return "skipped" as const;
   if (o.ad_consent !== 1) return "no_consent" as const;
   const items = await db.selectFrom("order_items").select(["product_id", "quantity", "unit_price_minor"]).where("order_id", "=", orderId).execute();
-  const phone = (o.phone ?? "").replace(/\D/g, "");
+  const event = purchaseCapiEvent(o, items, appUrl());
+  if (!event) return "skipped" as const; // сума 0 або некоректна — подію без value не надсилаємо
   const body = {
-    data: [{
-      event_name: "Purchase",
-      event_time: Math.floor(Date.parse(o.paid_at ?? new Date().toISOString()) / 1000),
-      event_id: purchaseEventId(orderId),
-      action_source: "website",
-      event_source_url: `${appUrl()}/${o.site_locale}/checkout`,
-      user_data: {
-        em: [sha(o.email)],
-        ...(phone ? { ph: [sha(phone)] } : {}),
-        ...(o.first_name ? { fn: [sha(o.first_name)] } : {}),
-        ...(o.last_name ? { ln: [sha(o.last_name)] } : {}),
-        country: [sha("ua")],
-        ...(o.meta_fbp ? { fbp: o.meta_fbp } : {}),
-        ...(o.meta_fbc ? { fbc: o.meta_fbc } : {}),
-      },
-      custom_data: {
-        currency: o.currency, value: o.total_minor / 100, order_id: o.number, content_type: "product",
-        content_ids: [...new Set(items.map((i) => i.product_id))],
-        contents: items.map((i) => ({ id: i.product_id, quantity: i.quantity, item_price: i.unit_price_minor / 100 })),
-        num_items: items.reduce((a, i) => a + i.quantity, 0),
-      },
-    }],
+    data: [event],
     ...(process.env.META_CAPI_TEST_EVENT_CODE ? { test_event_code: process.env.META_CAPI_TEST_EVENT_CODE } : {}),
   };
   const version = process.env.META_GRAPH_API_VERSION || "v22.0";

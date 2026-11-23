@@ -46,9 +46,12 @@ export function trackInitiateCheckout(p: { lines: PixelLine[]; value: number }) 
 export function trackPurchase(p: { orderId: string; eventId: string; lines: PixelLine[]; value: number }) {
   const key = `pl_px_${p.eventId}`;
   try { if (localStorage.getItem(key)) return true; } catch {}
+  // value — обов'язково додатне число (фактична сума замовлення); без нього подію не надсилаємо
+  const value = Number(p.value);
+  if (!Number.isFinite(value) || value <= 0) return true;
   if (!ready()) return false;
   trackPixel("Purchase", {
-    content_ids: ids(p.lines), content_type: "product", currency: "UAH", value: p.value,
+    content_ids: ids(p.lines), content_type: "product", currency: "UAH", value: Math.round(value * 100) / 100,
     num_items: p.lines.reduce((a, l) => a + l.quantity, 0), contents: contents(p.lines),
   }, p.eventId);
   try { localStorage.setItem(key, "1"); } catch {}

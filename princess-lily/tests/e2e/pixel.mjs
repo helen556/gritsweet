@@ -57,6 +57,7 @@ const STUB = `window.__px=window.__px||[];(function(){var f=window.fbq;var rec=f
   const pur = await pg.evaluate(() => window.__px.filter((a) => a[1] === 'Purchase'));
   ok('Purchase exactly once after confirmed payment', pur.length === 1, JSON.stringify(pur[0]?.slice(2)));
   ok('Purchase has eventID for CAPI dedup', /^purchase-ord_/.test(pur[0]?.[3]?.eventID ?? ''));
+  ok('Purchase: value = order total (number > 0), currency UAH', pur[0]?.[2]?.value === 380.5 && pur[0]?.[2]?.currency === 'UAH', JSON.stringify(pur[0]?.[2]));
   await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForTimeout(400);
   ok('reload: Purchase not repeated', (await pg.evaluate(() => window.__px.filter((a) => a[1] === 'Purchase').length)) === 0);
   const pvCount = () => pg.evaluate(() => window.__px.filter((a) => a[1] === 'PageView').length);

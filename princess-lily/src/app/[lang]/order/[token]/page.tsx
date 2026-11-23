@@ -10,7 +10,7 @@ import ReceiptUpload from "@/components/ReceiptUpload";
 import { db } from "@/db";
 import Track from "@/components/tracking/Track";
 import OrderAutoRefresh from "@/components/OrderAutoRefresh";
-import { purchaseEventId } from "@/lib/meta-capi";
+import { purchaseEventId, purchaseValue } from "@/lib/meta-capi";
 
 export const metadata: Metadata = { robots: { index: false, follow: false }, referrer: "no-referrer" };
 
@@ -47,7 +47,7 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/[l
       )}
       {/* Purchase — лише після підтвердженої оплати; той самий eventID, що й у Conversions API (без дублів) */}
       {st === "paid" && <Track event="Purchase" data={{
-        orderId: o.id, eventId: purchaseEventId(o.id), value: o.total_minor / 100,
+        orderId: o.id, eventId: purchaseEventId(o.id), value: purchaseValue(o.total_minor) ?? 0,
         lines: d.items.map((i) => ({ id: i.product_id, quantity: i.quantity, price: i.unit_price_minor / 100 })),
       }} />}
       {thanks ? <h2 className="text-3xl text-plum-900">{t.order.title} {o.number}</h2> : <h1 className="text-5xl text-plum-900">{t.order.title} {o.number}</h1>}
