@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { purchaseCapiEvent, purchaseEventId, purchaseValue } from "@/lib/meta-capi";
+import { createHash } from "node:crypto";
+import { normCity, purchaseCapiEvent, purchaseEventId, purchaseValue } from "@/lib/meta-capi";
 
 const order = { id: "ord_abc", number: "PL-1", total_minor: 39900, email: "Buyer@Example.com", phone: "+380 50 123 45 67", first_name: "Олена", last_name: "Тестова",
   meta_fbp: "fb.1.1.2", meta_fbc: null, paid_at: "2026-11-23T19:30:33.400Z", site_locale: "uk" };
@@ -31,5 +32,16 @@ describe("Meta Purchase: сума, валюта, event_id", () => {
     const e = purchaseCapiEvent(order, items, "https://x")!;
     expect(e.user_data.em[0]).toMatch(/^[a-f0-9]{64}$/);
     expect(JSON.stringify(e)).not.toContain("Example.com");
+  });
+  test("агент користувача (не хешується) і місто доставки (хешоване, нормалізоване)", () => {
+    const e = purchaseCapiEvent({ ...order, meta_ua: "Mozilla/5.0 (iPhone)", np_city: "м. Біла Церква, Київська обл." }, items, "https://x")!;
+    expect(e.user_data.client_user_agent).toBe("Mozilla/5.0 (iPhone)");
+    expect(normCity("м. Біла Церква, Київська обл.")).toBe("білацерква");
+    expect(e.user_data.ct![0]).toBe(createHash("sha256").update("білацерква").digest("hex"));
+  });
+  test("PDF без доставки: міста немає, зайвих полів не надсилаємо", () => {
+    const e = purchaseCapiEvent(order, items, "https://x")!;
+    expect(e.user_data).not.toHaveProperty("ct");
+    expect(e.user_data).not.toHaveProperty("client_user_agent");
   });
 });

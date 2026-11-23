@@ -6,7 +6,7 @@ import ContactDetails from "@/components/ContactDetails";
 import { legalStatus } from "@/lib/legal";
 import { effectivePaymentMode } from "@/lib/orders";
 import { emailConfig } from "@/lib/config";
-import { metaPixelId } from "@/lib/tracking";
+import { metaCapiConfigured, metaPixelId } from "@/lib/tracking";
 import { pageMeta } from "@/lib/seo";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]/privacy">): Promise<Metadata> {
@@ -31,13 +31,17 @@ export default async function Privacy({ params }: PageProps<"/[lang]/privacy">) 
   const pay = (await effectivePaymentMode()) !== "disabled";
   const mail = emailConfig().provider === "resend";
   const pixel = !!metaPixelId();
+  const capi = metaCapiConfigured();
   const plausible = process.env.NEXT_PUBLIC_ANALYTICS_PROVIDER === "plausible" && !!process.env.NEXT_PUBLIC_ANALYTICS_DOMAIN;
   const seller = uk ? s.seller_details_uk : s.seller_details_en;
   const recipients = [
     pay && (uk ? "платіжний сервіс monobank — для оплати замовлення" : "monobank payment service — to process your payment"),
     mail && (uk ? "сервіс розсилки Resend — для листів із замовленням" : "Resend email service — to send order emails"),
     uk ? "ТОВ «Нова Пошта» — лише для друкованих замовлень" : "Nova Poshta — for printed orders only",
-    pixel && (uk ? "Meta Platforms (Meta Pixel) — лише за вашою згодою на рекламні cookie" : "Meta Platforms (Meta Pixel) — only with your consent to advertising cookies"),
+    pixel && !capi && (uk ? "Meta Platforms (Meta Pixel) — лише за вашою згодою на рекламні cookie" : "Meta Platforms (Meta Pixel) — only with your consent to advertising cookies"),
+    pixel && capi && (uk
+      ? "Meta Platforms (Meta Pixel і Conversions API) — лише за вашою згодою на рекламні cookie: дії на сайті, а після оплати — сума й склад замовлення, у зашифрованому (хешованому) вигляді email, телефон, ім’я, прізвище, місто доставки, а також технічні дані браузера"
+      : "Meta Platforms (Meta Pixel and Conversions API) — only with your consent to advertising cookies: actions on the site and, after payment, the order total and items, your email, phone, first and last name and delivery city in encrypted (hashed) form, plus technical browser data"),
   ].filter(Boolean) as string[];
   return (
     <InfoPage title={t.pages.privacy.title}>

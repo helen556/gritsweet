@@ -269,7 +269,7 @@ export async function migrate(db: Kysely<Database>) {
   await addColumns(db, "orders", [["pdf_channel", "text"], ["telegram", "text"]]);
 
   // ---- v7: згода покупця на рекламні cookie та cookie Meta (Conversions API лише за згодою) ----
-  await addColumns(db, "orders", [["ad_consent", "integer"], ["meta_fbp", "text"], ["meta_fbc", "text"]]);
+  await addColumns(db, "orders", [["ad_consent", "integer"], ["meta_fbp", "text"], ["meta_fbc", "text"], ["meta_ua", "text"]]);
 
   // ---- v9: шматки великих PDF (завантаження частинами повз ліміт тіла запиту на Vercel) ----
   await t("upload_chunks")

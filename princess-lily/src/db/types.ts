@@ -96,6 +96,8 @@ export interface OrdersTable {
   ad_consent: number | null;
   meta_fbp: string | null;
   meta_fbc: string | null;
+  /** User-Agent браузера покупця (лише за згоди на рекламні cookie) — обов'язковий для Conversions API */
+  meta_ua: string | null;
   site_locale: Locale;
   payment_status: PaymentStatus;
   payment_mode: string;

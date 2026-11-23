@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { quoteCart, type CartLineInput } from "@/lib/quote";
 import { createOrder, startProviderPayment } from "@/lib/orders";
 import { after } from "next/server";
+import { headers } from "next/headers";
 import { notifyNewOrder } from "@/lib/telegram";
 import { rateLimit } from "@/lib/rate-limit";
 import { newId } from "@/lib/ids";
@@ -72,7 +73,7 @@ export async function placeOrder(payload: CheckoutPayload): Promise<CheckoutResu
     npCity: d.npCity || null, npCityRef: d.npCityRef || null, npPoint: d.npPoint || null, npPointRef: d.npPointRef || null,
     note: d.note || null, siteLocale: d.lang, idempotencyKey: d.idempotencyKey,
     pdfChannel: d.pdfChannel, telegram: d.pdfChannel === "telegram" ? d.telegram : null,
-    meta: d.adConsent ? { fbp: d.fbp || null, fbc: d.fbc || null } : null,
+    meta: d.adConsent ? { fbp: d.fbp || null, fbc: d.fbc || null, ua: (await headers()).get("user-agent") } : null,
   }, d.expectedTotalMinor);
   if (!r.ok) return { ok: false, error: r.error };
   if (r.duplicate || !r.accessToken) return { ok: false, error: "duplicate" };

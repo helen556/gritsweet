@@ -19,7 +19,10 @@ export const purchaseValue = (totalMinor: number) => (Number.isFinite(totalMinor
 export const PURCHASE_CURRENCY = "UAH" as const;
 
 type CapiOrder = { id: string; number: string; total_minor: number; email: string; phone: string | null; first_name: string | null; last_name: string | null;
-  meta_fbp: string | null; meta_fbc: string | null; paid_at: string | null; site_locale: string };
+  meta_fbp: string | null; meta_fbc: string | null; meta_ua?: string | null; np_city?: string | null; paid_at: string | null; site_locale: string };
+
+/** Місто для Meta: нижній регістр, без «м.», пробілів і розділових знаків (як вимагає Meta перед хешуванням). */
+export const normCity = (c: string) => c.toLowerCase().replace(/^(м\.|смт\.?|с\.)\s*/u, "").split(",")[0].replace(/[\s\p{P}\p{S}]+/gu, "");
 type CapiItem = { product_id: string; quantity: number; unit_price_minor: number };
 
 /** Серверна подія Purchase (Conversions API) — ті самі value, currency та event_id, що й у браузерного пікселя. */
@@ -39,6 +42,8 @@ export function purchaseCapiEvent(o: CapiOrder, items: CapiItem[], siteUrl: stri
       ...(o.first_name ? { fn: [sha(o.first_name)] } : {}),
       ...(o.last_name ? { ln: [sha(o.last_name)] } : {}),
       country: [sha("ua")],
+      ...(o.np_city && normCity(o.np_city) ? { ct: [sha(normCity(o.np_city))] } : {}),
+      ...(o.meta_ua ? { client_user_agent: o.meta_ua } : {}),
       ...(o.meta_fbp ? { fbp: o.meta_fbp } : {}),
       ...(o.meta_fbc ? { fbc: o.meta_fbc } : {}),
     },
