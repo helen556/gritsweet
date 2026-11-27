@@ -1,0 +1,6 @@
+
+# Код сайту TOTOSH — не в публічний репозиторій (реквізити, логіка оплат)
+totosh/*
+!totosh/.restore-list.tsv
+!totosh/.vercel-assets.tsv
+!totosh/apps-script/
